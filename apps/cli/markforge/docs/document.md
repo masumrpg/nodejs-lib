@@ -46,7 +46,7 @@ backCover:
   address: "Sudirman Central Business District (SCBD) Lot 28, Tower 2 Level 38, Jakarta Selatan 12190, Indonesia"
   phone: "+62 (21) 555-0199"
   email: "engineering@masumdev.com"
-  website: "https://react-native-library-docs.vercel.app"
+  website: "https://lib.masumdev.id"
   copyright: "© 2026 PT Masum Teknologi Indonesia. Seluruh hak cipta dilindungi undang-undang."
 ---
 

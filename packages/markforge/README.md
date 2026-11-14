@@ -170,7 +170,7 @@ export default defineConfig({
     address: "Jakarta, Indonesia",
     email: "contact@masumdev.com",
     phone: "+62 812 3456 7890",
-    website: "https://react-native-library-docs.vercel.app",
+    website: "https://lib.masumdev.id",
     social: {
       github: "https://github.com/masumrpg",
     },

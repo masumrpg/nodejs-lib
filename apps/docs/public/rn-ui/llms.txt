@@ -524,4 +524,4 @@ All components are imported directly from `@masumdev/rn-ui`:
 
 ---
 
-*For additional documentation, component previews, and live web examples, visit: https://react-native-library-docs.vercel.app/rn-ui/*
+*For additional documentation, component previews, and live web examples, visit: https://lib.masumdev.id/rn-ui/*

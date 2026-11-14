@@ -1,7 +1,7 @@
 # Masum Dev — LLM Knowledge Base & Monorepo Index
 
 > High-performance, open-source React Native & Expo component libraries and tools.
-> Website: https://react-native-library-docs.vercel.app
+> Website: https://lib.masumdev.id
 
 This repository provides open-source libraries under the `@masumdev/*` namespace, built using a Turborepo + Bun monorepo architecture for mobile (iOS / Android / Web) and developer tooling.
 
@@ -40,30 +40,30 @@ bun add @masumdev/rn-ui react-native-reanimated react-native-worklets react-nati
 High-performance SVG QR code generator for React Native and Expo with custom eye shapes and presets.
 - **Install**: `bun add @masumdev/rn-qr-code react-native-svg`
 - **Key Features**: Supports custom corner eye shapes (`square`, `circle`, `rounded`, `leaf`), embedded central logos, gradient colors, and instant export/sharing.
-- **Documentation**: https://react-native-library-docs.vercel.app/rn-qr-code/
+- **Documentation**: https://lib.masumdev.id/rn-qr-code/
 
 ### 2. @masumdev/rn-tajweed-verse
 Tajweed Quranic verse parser and renderer with interactive color-coded pronunciation rules and tooltips.
 - **Install**: `bun add @masumdev/rn-tajweed-verse react-native-svg`
 - **Key Features**: Color-coded Tajweed rules (Ghunnah, Ikhfa, Idgham, Qalqalah, Madd), interactive tapping for rule explanation tooltips, customizable fonts and color schemes.
-- **Documentation**: https://react-native-library-docs.vercel.app/rn-tajweed-verse/
+- **Documentation**: https://lib.masumdev.id/rn-tajweed-verse/
 
 ### 3. @masumdev/tscheck
 High-speed TypeScript and AST checking CLI tool for monorepos and libraries.
 - **Key Features**: Deprecation scanner, unused variable/import detector, explicit `any` finder, and circular dependency cycle analyzer.
-- **Documentation**: https://react-native-library-docs.vercel.app/tscheck/
+- **Documentation**: https://lib.masumdev.id/tscheck/
 
 ### 4. @masumdev/markforge
 Markdown and documentation generator with terminal ink UI and AST parsing.
-- **Documentation**: https://react-native-library-docs.vercel.app/markforge/
+- **Documentation**: https://lib.masumdev.id/markforge/
 
 ---
 
 ## 🔗 Documentation Links
 
-- **RN UI Overview**: https://react-native-library-docs.vercel.app/rn-ui/
-- **RN UI 61+ Component Catalog**: https://react-native-library-docs.vercel.app/rn-ui/components/
-- **RN UI Theming Guide**: https://react-native-library-docs.vercel.app/rn-ui/theming/
-- **RN UI Installation**: https://react-native-library-docs.vercel.app/rn-ui/installation/
-- **RN UI Changelog**: https://react-native-library-docs.vercel.app/rn-ui/changelog/
+- **RN UI Overview**: https://lib.masumdev.id/rn-ui/
+- **RN UI 61+ Component Catalog**: https://lib.masumdev.id/rn-ui/components/
+- **RN UI Theming Guide**: https://lib.masumdev.id/rn-ui/theming/
+- **RN UI Installation**: https://lib.masumdev.id/rn-ui/installation/
+- **RN UI Changelog**: https://lib.masumdev.id/rn-ui/changelog/
 - **GitHub Repository**: https://github.com/masumrpg/nodejs-lib

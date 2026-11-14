@@ -24,7 +24,7 @@ Welcome to the **Masum Dev** monorepo. This workspace houses high-performance op
 │   ├── native/                # Interactive Expo mobile playground app (iOS / Android / Web)
 │   ├── cli/
 │   │   └── markforge/         # MarkForge publishing engine testing & playground environment
-│   └── docs/                  # Astro 5 + Starlight documentation portal (https://react-native-library-docs.vercel.app)
+│   └── docs/                  # Astro 5 + Starlight documentation portal (https://lib.masumdev.id)
 ├── scripts/                   # Workspace maintenance, publishing & audit scripts
 ├── .agents/                   # Centralized AI agent directives, skills, and configuration
 ├── README.md                  # Monorepo setup & getting started guide
@@ -153,5 +153,5 @@ export default defineConfig({
 
 ## 📄 Documentation
 
-Visit our official documentation portal at **[https://react-native-library-docs.vercel.app](https://react-native-library-docs.vercel.app)** for guides, component API references, and interactive code samples.
+Visit our official documentation portal at **[https://lib.masumdev.id](https://lib.masumdev.id)** for guides, component API references, and interactive code samples.
 

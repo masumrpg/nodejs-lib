@@ -17,7 +17,7 @@ Welcome to the **Masum Dev** Open Source Monorepo Workspace. This project is str
 ├── apps/
 │   ├── native/                # Interactive Expo playground app (iOS / Android / Web)
 │   ├── cli/                   # CLI playgrounds and compilation testing
-│   └── docs/                  # Astro 5 + Starlight documentation portal (https://react-native-library-docs.vercel.app)
+│   └── docs/                  # Astro 5 + Starlight documentation portal (https://lib.masumdev.id)
 ├── scripts/                   # Workspace maintenance & audit scripts (e.g. audit-codebase.ts)
 ├── .agents/                   # Centralized AI rules, skills, and configuration
 ├── turbo.json                 # Turborepo task orchestration
