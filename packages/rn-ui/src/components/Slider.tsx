@@ -6,7 +6,7 @@ import {
   type ViewProps,
   type ViewStyle,
 } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -14,6 +14,12 @@ import Animated, {
 import { scheduleOnRN } from "react-native-worklets";
 
 import { useTheme, type ThemeColors } from "../theme";
+import { triggerHaptic } from "../utils/haptics";
+import {
+  type BaseGlassProps,
+  type BaseHapticProps,
+  type ToneProps,
+} from "./types";
 
 export type SliderTone =
   | "primary"
@@ -24,14 +30,17 @@ export type SliderTone =
   | "danger"
   | "info";
 
-export interface SliderProps extends Omit<ViewProps, "style"> {
+export interface SliderProps
+  extends Omit<ViewProps, "style">,
+    ToneProps<SliderTone>,
+    BaseGlassProps,
+    BaseHapticProps {
   value?: number;
   defaultValue?: number;
   min?: number;
   max?: number;
   step?: number;
   disabled?: boolean;
-  tone?: SliderTone;
   onValueChange?: (value: number) => void;
   onSlidingStart?: (value: number) => void;
   onSlidingComplete?: (value: number) => void;
@@ -64,6 +73,8 @@ export function Slider({
   step = 1,
   disabled = false,
   tone = "primary",
+  glass = false,
+  haptic = true,
   onValueChange,
   onSlidingStart,
   onSlidingComplete,
@@ -102,6 +113,9 @@ export function Slider({
   const commitValue = React.useCallback(
     (nextValue: number, complete: boolean, start = false) => {
       const next = clamp(nextValue, min, max);
+      if (haptic && step > 0 && next !== internalValue) {
+        triggerHaptic("selection");
+      }
       if (!isControlled) {
         setInternalValue(next);
       }
@@ -113,7 +127,17 @@ export function Slider({
         onSlidingComplete?.(next);
       }
     },
-    [isControlled, max, min, onSlidingComplete, onSlidingStart, onValueChange],
+    [
+      haptic,
+      step,
+      internalValue,
+      isControlled,
+      max,
+      min,
+      onSlidingComplete,
+      onSlidingStart,
+      onValueChange,
+    ],
   );
 
   const handleLayout = React.useCallback(
@@ -124,69 +148,57 @@ export function Slider({
     [onLayout, trackWidth],
   );
 
-  const gesture = React.useMemo(
-    () =>
-      Gesture.Pan()
-        .enabled(!disabled)
-        .minDistance(0)
-        .hitSlop(components.slider.hitSlop)
-        .onBegin((event) => {
-          const width = trackWidth.value;
-          if (width <= 0) return;
+  const panGesture = usePanGesture({
+    enabled: !disabled,
+    minDistance: 0,
+    hitSlop: components.slider.hitSlop,
+    onBegin: (event) => {
+      "worklet";
+      const width = trackWidth.value;
+      if (width <= 0) return;
 
-          const nextProgress = Math.min(1, Math.max(0, event.x / width));
-          const rawValue = min + nextProgress * range;
-          const nextValue = clamp(snap(rawValue, step, min), min, max);
+      const nextProgress = Math.min(1, Math.max(0, event.x / width));
+      const rawValue = min + nextProgress * range;
+      const nextValue = clamp(snap(rawValue, step, min), min, max);
 
-          lastEmittedValue.value = nextValue;
-          progress.value = nextProgress;
-          scheduleOnRN(setInteractionActive, true);
-          scheduleOnRN(commitValue, nextValue, false, true);
-        })
-        .onUpdate((event) => {
-          const width = trackWidth.value;
-          if (width <= 0) return;
+      lastEmittedValue.value = nextValue;
+      progress.value = nextProgress;
+      scheduleOnRN(setInteractionActive, true);
+      scheduleOnRN(commitValue, nextValue, false, true);
+    },
+    onUpdate: (event) => {
+      "worklet";
+      const width = trackWidth.value;
+      if (width <= 0) return;
 
-          const nextProgress = Math.min(1, Math.max(0, event.x / width));
-          const rawValue = min + nextProgress * range;
-          const nextValue = clamp(snap(rawValue, step, min), min, max);
+      const nextProgress = Math.min(1, Math.max(0, event.x / width));
+      const rawValue = min + nextProgress * range;
+      const nextValue = clamp(snap(rawValue, step, min), min, max);
 
-          progress.value = nextProgress;
-          if (nextValue !== lastEmittedValue.value) {
-            lastEmittedValue.value = nextValue;
-            scheduleOnRN(commitValue, nextValue, false, false);
-          }
-        })
-        .onFinalize((event) => {
-          const width = trackWidth.value;
-          if (width > 0) {
-            const nextProgress = Math.min(1, Math.max(0, event.x / width));
-            const rawValue = min + nextProgress * range;
-            const nextValue = clamp(snap(rawValue, step, min), min, max);
-            const snappedProgress = range === 0 ? 0 : (nextValue - min) / range;
+      progress.value = nextProgress;
+      if (nextValue !== lastEmittedValue.value) {
+        lastEmittedValue.value = nextValue;
+        scheduleOnRN(commitValue, nextValue, false, false);
+      }
+    },
+    onFinalize: (event) => {
+      "worklet";
+      const width = trackWidth.value;
+      if (width > 0) {
+        const nextProgress = Math.min(1, Math.max(0, event.x / width));
+        const rawValue = min + nextProgress * range;
+        const nextValue = clamp(snap(rawValue, step, min), min, max);
+        const snappedProgress = range === 0 ? 0 : (nextValue - min) / range;
 
-            progress.value = snappedProgress;
-            lastEmittedValue.value = nextValue;
-            scheduleOnRN(setInteractionActive, false);
-            scheduleOnRN(commitValue, nextValue, true, false);
-          } else {
-            scheduleOnRN(setInteractionActive, false);
-          }
-        }),
-    [
-      commitValue,
-      components.slider.hitSlop,
-      disabled,
-      lastEmittedValue,
-      max,
-      min,
-      progress,
-      range,
-      setInteractionActive,
-      step,
-      trackWidth,
-    ],
-  );
+        progress.value = snappedProgress;
+        lastEmittedValue.value = nextValue;
+        scheduleOnRN(setInteractionActive, false);
+        scheduleOnRN(commitValue, nextValue, true, false);
+      } else {
+        scheduleOnRN(setInteractionActive, false);
+      }
+    },
+  });
 
   const activeTrackAnimatedStyle = useAnimatedStyle(() => ({
     width: Math.max(0, progress.value * (trackWidth.value - thumbSize) + thumbSize / 2),
@@ -207,7 +219,7 @@ export function Slider({
   });
 
   return (
-    <GestureDetector gesture={gesture}>
+    <GestureDetector gesture={panGesture}>
       <Animated.View
         accessibilityRole="adjustable"
         accessibilityValue={{ min, max, now: currentValue }}
@@ -264,7 +276,7 @@ export function Slider({
               width: thumbSize,
               height: thumbSize,
               borderRadius: radii.full,
-              backgroundColor: "#FFFFFF",
+              backgroundColor: colors.surface,
               borderWidth: 2,
               borderColor: activeColor,
               shadowColor: "#000000",

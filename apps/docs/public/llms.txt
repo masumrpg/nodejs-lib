@@ -9,7 +9,7 @@ This repository provides open-source libraries under the `@masumdev/*` namespace
 
 ## 🎯 Primary Focus: @masumdev/rn-ui (React Native UI Kit)
 
-`@masumdev/rn-ui` is a production-grade, typed, flat-aesthetic React Native UI library with 61 components, a dynamic theme engine, zero-elevation defaults, and zero-bounce micro-animations.
+`@masumdev/rn-ui` is a production-grade, typed, flat-aesthetic React Native UI library with 63 components, a dynamic theme engine, zero-elevation defaults, and zero-bounce micro-animations.
 
 👉 **[Read the Full React Native Context & Native Recipes Guide](/rn-ui/llms.txt)**
 - File path: `/rn-ui/llms.txt`

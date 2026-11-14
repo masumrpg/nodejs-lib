@@ -1,9 +1,61 @@
 ---
 title: Rating
-description: Interactive star rating bar component with custom shapes and fractional precision.
+description: Interactive star rating bar component with custom shapes, gesture drag precision, and haptic feedback.
 sidebar:
   badge:
     text: Updated
     variant: note
 ---
 
+import { Code } from '@astrojs/starlight/components';
+import TypeTable from '@/components/TypeTable.astro';
+
+export const exampleCode = `import { useState } from 'react';
+import { Rating, Box, Text } from '@masumdev/rn-ui';
+
+export function RatingExample() {
+  const [rating, setRating] = useState(4.5);
+
+  return (
+    <Box gap="md">
+      <Rating
+        value={rating}
+        onValueChange={setRating}
+        max={5}
+        precision="half"
+        shape="star"
+        tone="warning"
+        showValue
+        haptic
+      />
+      <Text color="textMuted">Current score: {rating} / 5</Text>
+    </Box>
+  );
+}`;
+
+`Rating` displays star, heart, thumb, fire, smile, or shield ratings with fluid tap and drag input powered by Gesture Handler 3 (`useTapGesture`, `usePanGesture`, `useCompetingGestures`), fractional precision (`full`, `half`, `exact`), and haptic snaps.
+
+## Usage
+
+<Code code={exampleCode} lang="tsx" title="RatingExample.tsx" mark={['Rating', 'value={rating}', 'onValueChange', 'precision="half"', 'haptic']} />
+
+## Props API
+
+<TypeTable
+  type={{
+    value: { type: 'number', description: 'Controlled rating numerical value.' },
+    defaultValue: { type: 'number', default: '0', description: 'Initial uncontrolled rating value.' },
+    max: { type: 'number', default: '5', description: 'Total number of rating items.' },
+    precision: { type: "'full' | 'half' | 'exact' | number", default: "'full'", description: 'Step precision increment for ratings.' },
+    shape: { type: "'star' | 'heart' | 'thumb' | 'fire' | 'smile' | 'shield'", default: "'star'", description: 'Visual shape icon type.' },
+    tone: { type: 'ComponentTone', default: "'warning'", description: 'Color palette tone.' },
+    size: { type: "'sm' | 'md' | 'lg' | 'xl' | number", default: "'md'", description: 'Item icon diameter.' },
+    gap: { type: 'number', default: '6', description: 'Horizontal spacing between items in pixels.' },
+    showValue: { type: 'boolean', default: 'false', description: 'Displays numeric rating label next to the stars.' },
+    readOnly: { type: 'boolean', default: 'false', description: 'Renders in display-only mode without gestures.' },
+    disabled: { type: 'boolean', default: 'false', description: 'Disables interaction and dims opacity.' },
+    allowClear: { type: 'boolean', default: 'false', description: 'Allows tapping current value to reset to 0.' },
+    haptic: { type: 'boolean', default: 'true', description: 'Trigger haptic feedback when changing ratings.' },
+    onValueChange: { type: '(value: number) => void', description: 'Callback emitted when rating value changes.' },
+  }}
+/>

@@ -25,6 +25,7 @@ import { getLocaleData, LocaleConfig, type LocaleInput } from "../utils/locale";
 import { Button } from "./Button";
 import { Calendar } from "./Calendar";
 import { Text } from "./Text";
+import { type BaseHapticProps } from "./types";
 
 export type DatePickerVariant = "wheel" | "calendar";
 
@@ -44,13 +45,12 @@ export interface WheelPickerItem<T = string | number> {
   value: T;
 }
 
-export interface WheelPickerColumnProps<T = string | number> {
+export interface WheelPickerColumnProps<T = string | number> extends BaseHapticProps {
   items: WheelPickerItem<T>[];
   selectedValue: T;
   onValueChange: (value: T) => void;
   itemHeight?: number;
   visibleItems?: number;
-  hapticFeedback?: boolean;
   hapticType?:
     | "light"
     | "medium"
@@ -191,7 +191,7 @@ export function WheelPickerColumn<T = string | number>({
   onValueChange,
   itemHeight = 44,
   visibleItems = 5,
-  hapticFeedback = true,
+  haptic = true,
   hapticType = "selection",
   itemStyle,
   selectedItemStyle,
@@ -232,13 +232,13 @@ export function WheelPickerColumn<T = string | number>({
       const clampedIndex = Math.max(0, Math.min(index, items.length - 1));
 
       if (items[clampedIndex] && items[clampedIndex].value !== selectedValue) {
-        if (hapticFeedback) {
+        if (haptic) {
           triggerHaptic(hapticType);
         }
         onValueChange(items[clampedIndex].value);
       }
     },
-    [hapticFeedback, hapticType, itemHeight, items, onValueChange, selectedValue],
+    [haptic, hapticType, itemHeight, items, onValueChange, selectedValue],
   );
 
   const handleItemPress = useCallback(
@@ -247,14 +247,14 @@ export function WheelPickerColumn<T = string | number>({
         y: index * itemHeight,
         animated: true,
       });
-      if (hapticFeedback) {
+      if (haptic) {
         triggerHaptic(hapticType);
       }
       if (items[index] && items[index].value !== selectedValue) {
         onValueChange(items[index].value);
       }
     },
-    [hapticFeedback, hapticType, itemHeight, items, onValueChange, selectedValue],
+    [haptic, hapticType, itemHeight, items, onValueChange, selectedValue],
   );
 
   return (
@@ -550,7 +550,7 @@ export function DatePicker({
             [isoString]: {
               selected: true,
               color: colors.primary,
-              textColor: "#FFFFFF",
+              textColor: colors.onPrimary ?? "#FFFFFF",
             },
           }}
           onDayPress={(dayData) => {
@@ -963,7 +963,7 @@ export function DatePickerCard({
                     fontWeight: "700",
                     color:
                       currentVariant === "wheel"
-                        ? "#FFFFFF"
+                        ? colors.onPrimary ?? "#FFFFFF"
                         : colors.textMuted,
                   }}
                 >
@@ -992,7 +992,7 @@ export function DatePickerCard({
                     fontWeight: "700",
                     color:
                       currentVariant === "calendar"
-                        ? "#FFFFFF"
+                        ? colors.onPrimary ?? "#FFFFFF"
                         : colors.textMuted,
                   }}
                 >

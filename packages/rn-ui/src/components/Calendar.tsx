@@ -349,14 +349,14 @@ export function Calendar({
   React.useEffect(() => {
     monthProgress.value = withTiming(showMonthSelector ? 1 : 0, {
       duration: 200,
-      easing: Easing.out(Easing.quad),
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
     });
   }, [monthProgress, showMonthSelector]);
 
   React.useEffect(() => {
     yearProgress.value = withTiming(showYearSelector ? 1 : 0, {
       duration: 200,
-      easing: Easing.out(Easing.quad),
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
     });
   }, [showYearSelector, yearProgress]);
 

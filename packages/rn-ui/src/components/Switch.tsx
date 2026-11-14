@@ -7,6 +7,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated, {
+  Easing,
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
@@ -106,9 +107,9 @@ export function Switch({
 
   React.useEffect(() => {
     progress.value = withSpring(checked ? 1 : 0, {
-      damping: 16,
-      stiffness: 240,
-      mass: 0.8,
+      duration: 200,
+      dampingRatio: 1,
+      overshootClamping: true,
     });
   }, [checked, progress]);
 
@@ -154,14 +155,16 @@ export function Switch({
 
   const activeBorderColor = invalid ? colors.danger : activeColor;
 
-  // Crisp white/light-slate knob for OFF state in both dark & light mode
+  // Crisp knob for OFF/ON state adhering to theme surface tokens
   const inactiveThumbColor = disabled
     ? colors.disabledText
     : isDark
-      ? "#e2e8f0"
-      : "#ffffff";
+      ? colors.surfaceRaised ?? colors.surface
+      : colors.surface;
 
-  const activeThumbColor = disabled ? colors.disabledText : "#ffffff";
+  const activeThumbColor = disabled
+    ? colors.disabledText
+    : colors.onPrimary ?? colors.surface;
 
   const handlePress = (event: GestureResponderEvent) => {
     onPress?.(event);
@@ -177,12 +180,18 @@ export function Switch({
 
   const handlePressIn = (event: GestureResponderEvent) => {
     onPressIn?.(event);
-    pressed.value = withTiming(1, { duration: 120 });
+    pressed.value = withTiming(1, {
+      duration: 100,
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
+    });
   };
 
   const handlePressOut = (event: GestureResponderEvent) => {
     onPressOut?.(event);
-    pressed.value = withTiming(0, { duration: 140 });
+    pressed.value = withTiming(0, {
+      duration: 140,
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
+    });
   };
 
   const trackAnimatedStyle = useAnimatedStyle(() => ({

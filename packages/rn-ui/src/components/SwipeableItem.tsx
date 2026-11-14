@@ -1,23 +1,25 @@
-import React, { useCallback, useImperativeHandle, useRef, useState } from "react";
+import React, { useCallback, useImperativeHandle, useState } from "react";
 import {
   Dimensions,
   LayoutChangeEvent,
-  PanResponder,
   Pressable,
   StyleProp,
   ViewStyle,
 } from "react-native";
+import { usePanGesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  Easing,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 
 import { useTheme } from "../theme";
 import { triggerHaptic } from "../utils/haptics";
-import { renderIcon, type ComponentTone, type RenderIcon } from "./types";
+import { renderIcon, type BaseHapticProps, type ComponentTone, type RenderIcon } from "./types";
 import { Text } from "./Text";
 
 export interface SwipeableAction {
@@ -39,7 +41,7 @@ export interface SwipeableItemRef {
   dismiss: (callback?: () => void) => void;
 }
 
-export interface SwipeableItemProps {
+export interface SwipeableItemProps extends BaseHapticProps {
   children: React.ReactNode;
   leftActions?: SwipeableAction[];
   rightActions?: SwipeableAction[];
@@ -47,7 +49,6 @@ export interface SwipeableItemProps {
   fullSwipeThreshold?: number;
   onFullSwipeLeft?: () => void;
   onFullSwipeRight?: () => void;
-  hapticFeedback?: boolean;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   containerStyle?: StyleProp<ViewStyle>;
@@ -68,7 +69,7 @@ export const SwipeableItem = React.forwardRef<SwipeableItemRef, SwipeableItemPro
       fullSwipeThreshold = SCREEN_WIDTH * 0.42,
       onFullSwipeLeft,
       onFullSwipeRight,
-      hapticFeedback = true,
+      haptic = true,
       disabled = false,
       style,
       containerStyle,
@@ -77,28 +78,29 @@ export const SwipeableItem = React.forwardRef<SwipeableItemRef, SwipeableItemPro
   ) => {
     const { colors } = useTheme();
     const translateX = useSharedValue(0);
+    const startX = useSharedValue(0);
     const itemHeight = useSharedValue<number | null>(null);
     const itemOpacity = useSharedValue(1);
+    const hasTriggeredThresholdHaptic = useSharedValue(false);
     const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
-    const hasTriggeredThresholdHaptic = useRef(false);
 
     const maxLeftDrag = leftActions.length * actionWidth;
     const maxRightDrag = -(rightActions.length * actionWidth);
 
     const close = useCallback(() => {
       translateX.value = withSpring(0, {
-        damping: 20,
-        stiffness: 240,
-        mass: 0.7,
+        duration: 300,
+        dampingRatio: 1,
+        overshootClamping: true,
       });
     }, [translateX]);
 
     const openLeft = useCallback(() => {
       if (maxLeftDrag > 0) {
         translateX.value = withSpring(maxLeftDrag, {
-          damping: 20,
-          stiffness: 240,
-          mass: 0.7,
+          duration: 300,
+          dampingRatio: 1,
+          overshootClamping: true,
         });
       }
     }, [maxLeftDrag, translateX]);
@@ -106,12 +108,51 @@ export const SwipeableItem = React.forwardRef<SwipeableItemRef, SwipeableItemPro
     const openRight = useCallback(() => {
       if (maxRightDrag < 0) {
         translateX.value = withSpring(maxRightDrag, {
-          damping: 20,
-          stiffness: 240,
-          mass: 0.7,
+          duration: 300,
+          dampingRatio: 1,
+          overshootClamping: true,
         });
       }
     }, [maxRightDrag, translateX]);
+
+    const fireHaptic = useCallback(() => {
+      if (haptic) {
+        triggerHaptic("selection");
+      }
+    }, [haptic]);
+
+    const fireMediumHaptic = useCallback(() => {
+      if (haptic) {
+        triggerHaptic("medium");
+      }
+    }, [haptic]);
+
+    const performDeleteCollapse = useCallback(
+      (callback?: () => void) => {
+        if (haptic) triggerHaptic("medium");
+        translateX.value = withTiming(-SCREEN_WIDTH, {
+          duration: 200,
+          easing: Easing.bezier(0.23, 1, 0.32, 1),
+        });
+        itemOpacity.value = withTiming(0, {
+          duration: 180,
+          easing: Easing.bezier(0.23, 1, 0.32, 1),
+        });
+        itemHeight.value = withTiming(
+          0,
+          {
+            duration: 240,
+            easing: Easing.bezier(0.23, 1, 0.32, 1),
+          },
+          (finished) => {
+            if (finished && callback) {
+              scheduleOnRN(callback);
+            }
+          },
+        );
+      },
+      [haptic, itemHeight, itemOpacity, translateX],
+    );
 
     useImperativeHandle(ref, () => ({
       close,
@@ -122,106 +163,110 @@ export const SwipeableItem = React.forwardRef<SwipeableItemRef, SwipeableItemPro
       },
     }));
 
-    const fireHaptic = useCallback(() => {
-      if (hapticFeedback) {
-        triggerHaptic("selection");
-      }
-    }, [hapticFeedback]);
-
-    const performDeleteCollapse = useCallback(
-      (callback?: () => void) => {
-        if (hapticFeedback) triggerHaptic("medium");
-        translateX.value = withTiming(-SCREEN_WIDTH, { duration: 200 });
-        itemOpacity.value = withTiming(0, { duration: 180 });
-        itemHeight.value = withTiming(0, { duration: 240 });
-        setTimeout(() => {
-          callback?.();
-        }, 250);
+    const panGesture = usePanGesture({
+      enabled: !disabled,
+      activeOffsetX: [-10, 10],
+      failOffsetY: [-12, 12],
+      onActivate: () => {
+        "worklet";
+        startX.value = translateX.value;
+        hasTriggeredThresholdHaptic.value = false;
       },
-      [hapticFeedback, itemHeight, itemOpacity, translateX],
-    );
+      onUpdate: (event) => {
+        "worklet";
+        let nextX = startX.value + event.translationX;
 
-    const panResponder = useRef(
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: (_, gestureState) => {
-          if (disabled) return false;
-          return Math.abs(gestureState.dx) > 12 && Math.abs(gestureState.dy) < 12;
-        },
-        onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-          if (disabled) return false;
-          return Math.abs(gestureState.dx) > 12 && Math.abs(gestureState.dy) < 12;
-        },
-        onPanResponderGrant: () => {
-          hasTriggeredThresholdHaptic.current = false;
-        },
-        onPanResponderMove: (_, gestureState) => {
-          let nextX = gestureState.dx;
+        if (nextX > maxLeftDrag && !onFullSwipeRight) {
+          nextX = maxLeftDrag + (nextX - maxLeftDrag) * 0.22;
+        } else if (nextX < maxRightDrag && !onFullSwipeLeft) {
+          nextX = maxRightDrag + (nextX - maxRightDrag) * 0.22;
+        }
 
-          if (nextX > maxLeftDrag && !onFullSwipeRight) {
-            nextX = maxLeftDrag + (nextX - maxLeftDrag) * 0.22;
-          } else if (nextX < maxRightDrag && !onFullSwipeLeft) {
-            nextX = maxRightDrag + (nextX - maxRightDrag) * 0.22;
-          }
-
-          if (
-            (nextX > fullSwipeThreshold && onFullSwipeRight) ||
-            (nextX < -fullSwipeThreshold && onFullSwipeLeft)
-          ) {
-            if (!hasTriggeredThresholdHaptic.current) {
-              hasTriggeredThresholdHaptic.current = true;
-              fireHaptic();
+        if (
+          (nextX > fullSwipeThreshold && onFullSwipeRight) ||
+          (nextX < -fullSwipeThreshold && onFullSwipeLeft)
+        ) {
+          if (!hasTriggeredThresholdHaptic.value) {
+            hasTriggeredThresholdHaptic.value = true;
+            if (haptic) {
+              scheduleOnRN(fireHaptic);
             }
           }
+        }
 
-          translateX.value = nextX;
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          const currentX = gestureState.dx;
+        translateX.value = nextX;
+      },
+      onDeactivate: (event) => {
+        "worklet";
+        if (event.canceled) {
+          translateX.value = withSpring(0, {
+            duration: 300,
+            dampingRatio: 1,
+            overshootClamping: true,
+          });
+          return;
+        }
 
-          // Full swipe right trigger
-          if (currentX > fullSwipeThreshold && onFullSwipeRight) {
-            if (hapticFeedback) triggerHaptic("medium");
-            translateX.value = withSpring(SCREEN_WIDTH, { damping: 20 });
-            setTimeout(() => {
-              onFullSwipeRight?.();
-            }, 250);
-            return;
-          }
+        const currentX = translateX.value;
+        const velocityX = event.velocityX;
 
-          // Full swipe left auto delete collapse
-          if (currentX < -fullSwipeThreshold && onFullSwipeLeft) {
-            performDeleteCollapse(onFullSwipeLeft);
-            return;
-          }
+        // Full swipe right trigger
+        if (
+          (currentX > fullSwipeThreshold || (currentX > maxLeftDrag && velocityX > 800)) &&
+          onFullSwipeRight
+        ) {
+          if (haptic) scheduleOnRN(fireMediumHaptic);
+          translateX.value = withTiming(
+            SCREEN_WIDTH,
+            { duration: 220, easing: Easing.bezier(0.23, 1, 0.32, 1) },
+            (finished) => {
+              if (finished && onFullSwipeRight) {
+                scheduleOnRN(onFullSwipeRight);
+              }
+            },
+          );
+          return;
+        }
 
-          // Snap to open Left actions
-          if (currentX > maxLeftDrag * 0.45 && maxLeftDrag > 0) {
-            if (hapticFeedback) triggerHaptic("selection");
-            translateX.value = withSpring(maxLeftDrag, {
-              damping: 20,
-              stiffness: 240,
-              mass: 0.7,
-            });
-            return;
-          }
+        // Full swipe left auto delete collapse
+        if (
+          (currentX < -fullSwipeThreshold || (currentX < maxRightDrag && velocityX < -800)) &&
+          onFullSwipeLeft
+        ) {
+          scheduleOnRN(performDeleteCollapse, onFullSwipeLeft);
+          return;
+        }
 
-          // Snap to open Right actions
-          if (currentX < maxRightDrag * 0.45 && maxRightDrag < 0) {
-            if (hapticFeedback) triggerHaptic("selection");
-            translateX.value = withSpring(maxRightDrag, {
-              damping: 20,
-              stiffness: 240,
-              mass: 0.7,
-            });
-            return;
-          }
+        // Snap to open Left actions
+        if (currentX > maxLeftDrag * 0.45 && maxLeftDrag > 0) {
+          if (haptic) scheduleOnRN(fireHaptic);
+          translateX.value = withSpring(maxLeftDrag, {
+            duration: 300,
+            dampingRatio: 1,
+            overshootClamping: true,
+          });
+          return;
+        }
 
-          // Otherwise snap closed
-          close();
-        },
-      }),
-    ).current;
+        // Snap to open Right actions
+        if (currentX < maxRightDrag * 0.45 && maxRightDrag < 0) {
+          if (haptic) scheduleOnRN(fireHaptic);
+          translateX.value = withSpring(maxRightDrag, {
+            duration: 300,
+            dampingRatio: 1,
+            overshootClamping: true,
+          });
+          return;
+        }
+
+        // Otherwise snap closed
+        translateX.value = withSpring(0, {
+          duration: 300,
+          dampingRatio: 1,
+          overshootClamping: true,
+        });
+      },
+    });
 
     const rowAnimatedStyle = useAnimatedStyle(() => ({
       transform: [{ translateX: translateX.value }],
@@ -302,20 +347,25 @@ export const SwipeableItem = React.forwardRef<SwipeableItemRef, SwipeableItemPro
           >
             {leftActions.map((action, idx) => {
               const bg = action.backgroundColor ?? getActionToneColor(action.tone);
-              const fg = action.color ?? "#FFFFFF";
+              const fg = action.color ?? colors.onPrimary ?? colors.textInverse;
               const isDestructive = action.isDestructive ?? action.tone === "danger";
 
               return (
                 <Pressable
                   key={action.key ?? `left-action-${idx}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.label}
                   onPress={() => {
-                    if (hapticFeedback) triggerHaptic("selection");
+                    if (haptic) triggerHaptic("selection");
                     if (isDestructive) {
                       performDeleteCollapse(action.onPress);
                     } else {
                       action.onPress?.();
                       if (action.closeOnPress !== false) {
-                        translateX.value = withSpring(0);
+                        translateX.value = withTiming(0, {
+                          duration: 180,
+                          easing: Easing.bezier(0.23, 1, 0.32, 1),
+                        });
                       }
                     }
                   }}
@@ -364,20 +414,25 @@ export const SwipeableItem = React.forwardRef<SwipeableItemRef, SwipeableItemPro
           >
             {rightActions.map((action, idx) => {
               const bg = action.backgroundColor ?? getActionToneColor(action.tone ?? "danger");
-              const fg = action.color ?? "#FFFFFF";
+              const fg = action.color ?? colors.onPrimary ?? colors.textInverse;
               const isDestructive = action.isDestructive ?? (action.tone === "danger" || action.label?.toLowerCase().includes("delete"));
 
               return (
                 <Pressable
                   key={action.key ?? `right-action-${idx}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.label}
                   onPress={() => {
-                    if (hapticFeedback) triggerHaptic("selection");
+                    if (haptic) triggerHaptic("selection");
                     if (isDestructive) {
                       performDeleteCollapse(action.onPress);
                     } else {
                       action.onPress?.();
                       if (action.closeOnPress !== false) {
-                        translateX.value = withSpring(0);
+                        translateX.value = withTiming(0, {
+                          duration: 180,
+                          easing: Easing.bezier(0.23, 1, 0.32, 1),
+                        });
                       }
                     }
                   }}
@@ -410,19 +465,20 @@ export const SwipeableItem = React.forwardRef<SwipeableItemRef, SwipeableItemPro
         )}
 
         {/* Swiping Foreground Content */}
-        <Animated.View
-          {...panResponder.panHandlers}
-          style={[
-            {
-              backgroundColor: colors.surface,
-              zIndex: 2,
-            },
-            rowAnimatedStyle,
-            style,
-          ]}
-        >
-          {children}
-        </Animated.View>
+        <GestureDetector gesture={panGesture}>
+          <Animated.View
+            style={[
+              {
+                backgroundColor: colors.surface,
+                zIndex: 2,
+              },
+              rowAnimatedStyle,
+              style,
+            ]}
+          >
+            {children}
+          </Animated.View>
+        </GestureDetector>
       </Animated.View>
     );
   },

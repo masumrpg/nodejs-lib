@@ -81,7 +81,7 @@ export function CollapsibleTrigger({
   style,
   ...props
 }: CollapsibleTriggerProps) {
-  const { toggle } = useCollapsible();
+  const { toggle, open } = useCollapsible();
 
   const handlePress = () => {
     triggerHaptic("selection");
@@ -89,7 +89,13 @@ export function CollapsibleTrigger({
   };
 
   return (
-    <Pressable onPress={handlePress} style={style} {...props}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      onPress={handlePress}
+      style={style}
+      {...props}
+    >
       {typeof children === "function"
         ? (children as () => React.ReactNode)()
         : children}
@@ -114,7 +120,7 @@ export function CollapsibleContent({
   React.useEffect(() => {
     progress.value = withTiming(open ? 1 : 0, {
       duration: 220,
-      easing: Easing.out(Easing.quad),
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
     });
   }, [open, progress]);
 

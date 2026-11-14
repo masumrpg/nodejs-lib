@@ -1,6 +1,7 @@
 {
   "extends": "../typescript-config/base.json",
   "compilerOptions": {
+    "rootDir": "./src",
     "declaration": true,
     "declarationMap": true,
     "jsx": "react-native"

@@ -45,7 +45,7 @@ export interface CarouselContextProps {
   scrollNext: () => void;
   canScrollPrev: boolean;
   canScrollNext: boolean;
-  scrollViewRef: React.RefObject<ScrollView | null>;
+  scrollViewRef: React.RefObject<React.ComponentRef<typeof ScrollView> | null>;
   setActiveIndex: React.Dispatch<React.SetStateAction<number>>;
 }
 
@@ -134,7 +134,7 @@ export function Carousel({
   const [totalItems, setTotalItems] = React.useState(0);
 
   const scrollX = useSharedValue(0);
-  const scrollViewRef = React.useRef<ScrollView | null>(null);
+  const scrollViewRef = React.useRef<React.ComponentRef<typeof ScrollView> | null>(null);
 
   const resolvedItemWidth = itemWidth || containerWidth * 0.78;
 
@@ -262,11 +262,14 @@ export function CarouselContent({ style, children }: CarouselContentProps) {
     [setActiveIndex],
   );
 
+  const lastActiveIndex = useSharedValue(-1);
+
   const handleScroll = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollX.value = event.contentOffset.x;
       const index = Math.round(event.contentOffset.x / itemWidth);
-      if (index >= 0 && index < total) {
+      if (index >= 0 && index < total && index !== lastActiveIndex.value) {
+        lastActiveIndex.value = index;
         scheduleOnRN(updateActiveIndex, index);
       }
     },
@@ -294,7 +297,7 @@ export function CarouselContent({ style, children }: CarouselContentProps) {
   return (
     <View onLayout={handleLayout} style={{ width: "100%", overflow: "hidden" }}>
       <Animated.ScrollView
-        ref={scrollViewRef}
+        ref={scrollViewRef as never}
         horizontal
         pagingEnabled={false}
         snapToInterval={itemWidth}

@@ -9,10 +9,46 @@ import ChangelogTimeline from '@/components/ChangelogTimeline.astro';
 
 export const releases = [
   {
+    version: 'v0.5.0',
+    date: '2026-11-15',
+    tag: 'Feature Release',
+    isLatest: true,
+    changes: [
+      {
+        type: 'feat',
+        text: '<strong>Design System Base Interfaces</strong>: Standardized component prop contracts (<code>ToneProps</code>, <code>VariantProps</code>, <code>SizeProps</code>, <code>BaseGlassProps</code>, <code>BaseHapticProps</code>, <code>BaseAnimatedProps</code>, <code>IconSlotsProps</code>) across all components.',
+      },
+      {
+        type: 'feat',
+        text: '<strong>Enhanced Badge Slots</strong>: Added <code>leftIcon</code> and <code>rightIcon</code> pluggable slots to <code>Badge</code>.',
+      },
+      {
+        type: 'refactor',
+        text: '<strong>Gesture Handler 3 Hook Migration</strong>: Migrated all gesture components (<code>Slider</code>, <code>RangeSlider</code>, <code>Rating</code>, <code>SwipeableItem</code>, <code>Toast</code>) to modern Gesture Handler 3 hooks (<code>usePanGesture</code>, <code>useTapGesture</code>, <code>useCompetingGestures</code>).',
+      },
+      {
+        type: 'refactor',
+        text: '<strong>Zero Deprecation & Haptic Standardization</strong>: Fully purged deprecated <code>hapticFeedback</code> props and directives across the entire codebase in favor of standardized <code>haptic</code> (from <code>BaseHapticProps</code>).',
+      },
+      {
+        type: 'refactor',
+        text: '<strong>Single Source of Truth Theme Tokens</strong>: Eliminated all hardcoded hex colors across 16+ components in favor of dynamic <code>useTheme()</code> semantic tokens.',
+      },
+      {
+        type: 'perf',
+        text: '<strong>Zero-Bounce UI Thread Worklets</strong>: Re-engineered gesture physics and overlay transitions (<code>AlertDialog</code>, <code>Popover</code>, <code>Toast</code>, <code>DropdownMenu</code>, <code>HoverCard</code>, <code>ContextMenu</code>) with critically damped spring physics and cubic ease-out curves.',
+      },
+      {
+        type: 'a11y',
+        text: '<strong>Comprehensive A11y & Touch Targets</strong>: Enforced WCAG 2.1 touch targets (≥ 44pt hitSlop) and added native roles/states (<code>tablist</code>, <code>adjustable</code>, <code>checkbox</code>, <code>expanded</code>).',
+      },
+    ],
+  },
+  {
     version: 'v0.4.2',
     date: '2026-09-21',
     tag: 'Patch Release',
-    isLatest: true,
+    isLatest: false,
     changes: [
       {
         type: 'fix',

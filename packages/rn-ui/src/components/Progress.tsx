@@ -88,7 +88,10 @@ export function Progress({
       width.value = progress;
       return;
     }
-    width.value = withTiming(progress, { duration: 220, easing: Easing.out(Easing.quad) });
+    width.value = withTiming(progress, {
+      duration: 220,
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
+    });
 
     return () => {
       cancelAnimation(width);

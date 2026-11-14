@@ -61,6 +61,8 @@ export function BadgeExample() {
     tone: { type: "'primary' | 'secondary' | 'accent' | 'success' | 'warning' | 'danger' | 'info'", default: "'primary'", description: 'Color tone styling.' },
     size: { type: "'sm' | 'md' | 'lg'", default: "'md'", description: 'Size scale (sm, md, lg).' },
     glass: { type: 'boolean', default: 'false', description: 'Enables translucent frosted glass background styling.' },
-    icon: { type: 'RenderIcon', description: 'Optional icon prefix render function.' },
+    icon: { type: 'RenderIcon', description: 'Optional icon prefix render function (alias for leftIcon).' },
+    leftIcon: { type: 'RenderIcon', description: 'Optional leading icon render function.' },
+    rightIcon: { type: 'RenderIcon', description: 'Optional trailing icon render function.' },
   }}
 />

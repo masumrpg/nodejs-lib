@@ -1,9 +1,10 @@
 import React from "react";
 import { Pressable, View, type StyleProp, type ViewStyle } from "react-native";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
+  withTiming,
 } from "react-native-reanimated";
 
 import { useTheme } from "../theme";
@@ -50,9 +51,9 @@ export function Checkbox({
   const progress = useSharedValue(checked ? 1 : 0);
 
   React.useEffect(() => {
-    progress.value = withSpring(checked ? 1 : 0, {
-      damping: 14,
-      stiffness: 220,
+    progress.value = withTiming(checked ? 1 : 0, {
+      duration: 140,
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
     });
   }, [checked, progress]);
 

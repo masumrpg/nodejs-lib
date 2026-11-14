@@ -3,6 +3,7 @@ import {
   TextInput,
   type KeyboardTypeOptions,
   type StyleProp,
+  type TextInputInstance,
   type TextInputProps,
   type TextStyle,
 } from "react-native";
@@ -51,7 +52,10 @@ function getKeyboardType(type: InputType): KeyboardTypeOptions {
 
 import { useFormField } from "./FormField";
 
-export const Input = React.forwardRef<TextInput, InputProps>(function Input(
+export const Input: (
+  props: InputProps & { ref?: React.Ref<TextInputInstance> },
+) => React.ReactNode = React.forwardRef<TextInputInstance, InputProps>(
+  function Input(
   {
     type = "text",
     size = "md",
@@ -95,7 +99,7 @@ export const Input = React.forwardRef<TextInput, InputProps>(function Input(
 
   return (
     <TextInput
-      ref={ref}
+      ref={ref as never}
       editable={isEditable}
       keyboardType={keyboardType ?? getKeyboardType(type)}
       secureTextEntry={secureTextEntry ?? type === "password"}

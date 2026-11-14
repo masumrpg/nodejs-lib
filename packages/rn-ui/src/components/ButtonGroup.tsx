@@ -61,29 +61,37 @@ export function ButtonGroup({
         layoutIndex++;
 
         // Visual border & radius overrides based on position in group
-        const childStyle: ViewStyle = {};
-
-        if (isHorizontal) {
-          if (index > 0) {
-            childStyle.borderTopLeftRadius = 0;
-            childStyle.borderBottomLeftRadius = 0;
-            childStyle.borderLeftWidth = 0;
-          }
-          if (index < count - 1) {
-            childStyle.borderTopRightRadius = 0;
-            childStyle.borderBottomRightRadius = 0;
-          }
-        } else {
-          if (index > 0) {
-            childStyle.borderTopLeftRadius = 0;
-            childStyle.borderTopRightRadius = 0;
-            childStyle.borderTopWidth = 0;
-          }
-          if (index < count - 1) {
-            childStyle.borderBottomLeftRadius = 0;
-            childStyle.borderBottomRightRadius = 0;
-          }
-        }
+        const childStyle: ViewStyle = isHorizontal
+          ? {
+              ...(index > 0
+                ? {
+                    borderTopLeftRadius: 0,
+                    borderBottomLeftRadius: 0,
+                    borderLeftWidth: 0,
+                  }
+                : {}),
+              ...(index < count - 1
+                ? {
+                    borderTopRightRadius: 0,
+                    borderBottomRightRadius: 0,
+                  }
+                : {}),
+            }
+          : {
+              ...(index > 0
+                ? {
+                    borderTopLeftRadius: 0,
+                    borderTopRightRadius: 0,
+                    borderTopWidth: 0,
+                  }
+                : {}),
+              ...(index < count - 1
+                ? {
+                    borderBottomLeftRadius: 0,
+                    borderBottomRightRadius: 0,
+                  }
+                : {}),
+            };
 
         // Clone child and inject styles.
         // We append childStyle AFTER child's own style to ensure adjacent flat corners & border removals override defaults.
