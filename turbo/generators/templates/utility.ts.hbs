@@ -1,0 +1,10 @@
+export interface {{pascalCase name}}Options {
+  debug?: boolean;
+}
+
+export function {{camelCase name}}(input: string, options: {{pascalCase name}}Options = {}): string {
+  if (options.debug) {
+    console.log(`[{{kebabCase name}}] processing:`, input);
+  }
+  return input.trim();
+}

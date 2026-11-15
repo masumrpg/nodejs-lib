@@ -1,0 +1,23 @@
+#!/usr/bin/env bun
+import { {{camelCase name}} } from './index';
+
+function main() {
+  const args = process.argv.slice(2);
+  const command = args[0] || 'help';
+
+  console.log(`\n🚀 @masumdev/{{kebabCase name}} CLI\n`);
+
+  if (command === 'help' || command === '--help' || command === '-h') {
+    console.log(`Usage:`);
+    console.log(`  {{kebabCase name}} <command> [options]\n`);
+    console.log(`Commands:`);
+    console.log(`  run     Run {{kebabCase name}} action`);
+    console.log(`  help    Show this message\n`);
+    process.exit(0);
+  }
+
+  const result = {{camelCase name}}(command);
+  console.log(`Executed: ${result}`);
+}
+
+main();

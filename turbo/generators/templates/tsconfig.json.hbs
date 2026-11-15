@@ -3,9 +3,9 @@
   "compilerOptions": {
     "outDir": "./dist",
     "declaration": true,
-    "declarationMap": true,
-    "jsx": "react-native"
+    "declarationMap": true{{#if jsxMode}},
+    "jsx": "{{jsxMode}}"{{/if}}
   },
   "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules"]
+  "exclude": ["dist", "lib", "node_modules"]
 }
