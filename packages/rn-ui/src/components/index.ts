@@ -521,4 +521,31 @@ export { RangeSlider } from "./RangeSlider";
 export type { RangeSliderProps } from "./RangeSlider";
 export { SignaturePad } from "./SignaturePad";
 export type { SignaturePadProps, SignaturePadRef } from "./SignaturePad";
+export { Tabs, TabsList, TabsTrigger, TabsContent } from "./Tabs";
+export type {
+  TabsProps,
+  TabsListProps,
+  TabsTriggerProps,
+  TabsContentProps,
+  TabsVariant,
+  TabsTransition,
+} from "./Tabs";
+export { SearchBar } from "./SearchBar";
+export type {
+  SearchBarProps,
+  SearchBarRef,
+  SearchBarVariant,
+} from "./SearchBar";
+export { Tooltip } from "./Tooltip";
+export type {
+  TooltipProps,
+  TooltipPlacement,
+  TooltipTone,
+} from "./Tooltip";
+export { SpeedDial } from "./SpeedDial";
+export type {
+  SpeedDialProps,
+  SpeedDialActionItem,
+  SpeedDialPlacement,
+} from "./SpeedDial";
 

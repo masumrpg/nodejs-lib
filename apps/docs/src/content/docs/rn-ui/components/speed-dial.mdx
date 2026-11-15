@@ -1,0 +1,91 @@
+---
+title: SpeedDial
+description: Expanding floating action group with staggered spring sub-actions and backdrop overlay.
+sidebar:
+  badge:
+    text: New
+    variant: tip
+---
+
+import { Code } from '@astrojs/starlight/components';
+import TypeTable from '@/components/TypeTable.astro';
+
+export const exampleCode = `import { useState } from 'react';
+import { SpeedDial } from '@masumdev/rn-ui';
+import { FileText, QrCode, Upload } from 'lucide-react-native';
+
+export function SpeedDialExample() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <SpeedDial
+      open={open}
+      onOpenChange={setOpen}
+      tone="primary"
+      placement="bottom-end"
+      offset={20}
+      actions={[
+        {
+          id: 'doc',
+          label: 'Create Document',
+          icon: ({ color, size }) => <FileText color={color} size={size} />,
+          onPress: () => console.log('Create Doc'),
+        },
+        {
+          id: 'qr',
+          label: 'Scan QR Code',
+          icon: ({ color, size }) => <QrCode color={color} size={size} />,
+          tone: 'accent',
+          onPress: () => console.log('Scan QR'),
+        },
+        {
+          id: 'upload',
+          label: 'Upload File',
+          icon: ({ color, size }) => <Upload color={color} size={size} />,
+          tone: 'success',
+          onPress: () => console.log('Upload File'),
+        },
+      ]}
+    />
+  );
+}`;
+
+`SpeedDial` provides an expanding floating action group that fans out into secondary action pills with staggered spring animations, optional backdrop dimming, and full tactile haptic support.
+
+## Usage
+
+<Code code={exampleCode} lang="tsx" title="SpeedDialExample.tsx" mark={['SpeedDial', 'actions', 'onPress']} />
+
+## Props API
+
+<TypeTable
+  type={{
+    actions: { type: 'SpeedDialActionItem[]', required: true, description: 'List of secondary action items revealed on expansion.' },
+    open: { type: 'boolean', description: 'Controlled expanded open state.' },
+    defaultOpen: { type: 'boolean', default: 'false', description: 'Uncontrolled initial open state.' },
+    onOpenChange: { type: '(open: boolean) => void', description: 'Callback fired when expanded state changes.' },
+    icon: { type: 'RenderIcon', description: 'Custom main icon (defaults to plus icon rotated by 45deg on open).' },
+    activeIcon: { type: 'RenderIcon', description: 'Icon displayed when expanded (bypasses default 45deg rotation).' },
+    placement: { type: '"bottom-end" | "bottom-start" | "top-end" | "top-start"', default: '"bottom-end"', description: 'Screen anchor placement.' },
+    offset: { type: 'number', default: '20', description: 'Offset distance in points from screen edges.' },
+    tone: { type: 'ComponentTone', default: '"primary"', description: 'Color tone for the main floating action button.' },
+    size: { type: '"sm" | "md" | "lg"', default: '"md"', description: 'Dimension scale for main and secondary action buttons.' },
+    overlay: { type: 'boolean', default: 'true', description: 'Render semi-transparent backdrop behind expanded actions.' },
+    overlayColor: { type: 'string', description: 'Custom backdrop overlay background color.' },
+    haptic: { type: 'boolean', default: 'true', description: 'Enable tactile feedback on expand and action selection.' },
+    glass: { type: 'boolean', default: 'false', description: 'Enable translucent glassmorphism label styling.' },
+  }}
+/>
+
+### SpeedDialActionItem
+
+<TypeTable
+  type={{
+    id: { type: 'string', required: true, description: 'Unique identifier for the action item.' },
+    icon: { type: 'RenderIcon', required: true, description: 'Action icon element or render function.' },
+    label: { type: 'string', description: 'Text label badge displayed next to the action button.' },
+    tone: { type: 'ComponentTone', description: 'Color tone override for this specific action button.' },
+    disabled: { type: 'boolean', default: 'false', description: 'Whether this action button is disabled.' },
+    onPress: { type: '() => void', required: true, description: 'Callback fired when action button is pressed.' },
+  }}
+/>

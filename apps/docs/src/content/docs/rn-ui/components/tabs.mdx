@@ -1,0 +1,128 @@
+---
+title: Tabs
+description: Accessible compound tab system with animated sliding underline or pill indicators.
+sidebar:
+  badge:
+    text: New
+    variant: tip
+---
+
+import { Code } from '@astrojs/starlight/components';
+import TypeTable from '@/components/TypeTable.astro';
+
+export const exampleCode = `import { useState } from 'react';
+import { Tabs, TabsList, TabsTrigger, TabsContent, Text, Box } from '@masumdev/rn-ui';
+
+export function TabsExample() {
+  const [activeTab, setActiveTab] = useState('overview');
+
+  return (
+    <Tabs value={activeTab} onValueChange={setActiveTab} variant="line">
+      <TabsList>
+        <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="analytics" badge="3">Analytics</TabsTrigger>
+        <TabsTrigger value="settings">Settings</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="overview">
+        <Box p="md" bg="surfaceMuted" style={{ borderRadius: 8 }}>
+          <Text weight="600">Overview Panel</Text>
+          <Text color="textMuted">Welcome to the workspace overview.</Text>
+        </Box>
+      </TabsContent>
+
+      <TabsContent value="analytics">
+        <Box p="md" bg="surfaceMuted" style={{ borderRadius: 8 }}>
+          <Text weight="600">Analytics Panel</Text>
+          <Text color="textMuted">Daily metrics and user telemetry data.</Text>
+        </Box>
+      </TabsContent>
+
+      <TabsContent value="settings">
+        <Box p="md" bg="surfaceMuted" style={{ borderRadius: 8 }}>
+          <Text weight="600">Settings Panel</Text>
+          <Text color="textMuted">Configure account and security preferences.</Text>
+        </Box>
+      </TabsContent>
+    </Tabs>
+  );
+}`;
+
+export const pillExample = `import { Tabs, TabsList, TabsTrigger, TabsContent, Text } from '@masumdev/rn-ui';
+
+<Tabs defaultValue="week" variant="pill" tone="accent">
+  <TabsList>
+    <TabsTrigger value="day">Day</TabsTrigger>
+    <TabsTrigger value="week">Week</TabsTrigger>
+    <TabsTrigger value="month">Month</TabsTrigger>
+  </TabsList>
+
+  <TabsContent value="day"><Text>Daily summary</Text></TabsContent>
+  <TabsContent value="week"><Text>Weekly summary</Text></TabsContent>
+  <TabsContent value="month"><Text>Monthly summary</Text></TabsContent>
+</Tabs>`;
+
+`Tabs` provides an accessible, compound tab navigation primitive with zero-bounce spring indicator transitions, supporting line, pill capsule, and soft tint styling.
+
+## Usage
+
+<Code code={exampleCode} lang="tsx" title="TabsExample.tsx" mark={['Tabs', 'TabsList', 'TabsTrigger', 'TabsContent']} />
+
+### Pill Variant
+
+<Code code={pillExample} lang="tsx" title="PillTabs.tsx" mark={['variant="pill"', 'tone="accent"']} />
+
+## Props API
+
+### Tabs
+
+<TypeTable
+  type={{
+    value: { type: 'string', description: 'Controlled active tab identifier.' },
+    defaultValue: { type: 'string', default: '""', description: 'Initial active tab identifier.' },
+    onValueChange: { type: '(value: string) => void', description: 'Callback invoked when active tab changes.' },
+    variant: { type: '"line" | "pill" | "soft"', default: '"line"', description: 'Visual structure of the tabs and active indicator.' },
+    tone: { type: 'ComponentTone', default: '"primary"', description: 'Semantic color intent for active indicator and text.' },
+    size: { type: 'ComponentSize', default: '"md"', description: 'Dimension scale preset (sm, md, lg).' },
+    haptic: { type: 'boolean', default: 'true', description: 'Enable tactile haptic feedback on tab selection.' },
+    glass: { type: 'boolean', default: 'false', description: 'Enable translucent glassmorphism background styling.' },
+    animated: { type: 'boolean', default: 'true', description: 'Enable smooth indicator sliding worklet transitions.' },
+    transition: { type: '"slide" | "fade" | "scale" | "none"', default: '"slide"', description: 'Content panel entrance transition adhering to expo-animation.' },
+  }}
+/>
+
+### TabsList
+
+<TypeTable
+  type={{
+    style: { type: 'StyleProp<ViewStyle>', description: 'Style overrides for the tab list container.' },
+    indicatorStyle: { type: 'StyleProp<ViewStyle>', description: 'Style overrides for the sliding indicator.' },
+    children: { type: 'ReactNode', required: true, description: 'TabsTrigger elements.' },
+  }}
+/>
+
+### TabsTrigger
+
+<TypeTable
+  type={{
+    value: { type: 'string', required: true, description: 'Unique identifier corresponding to a TabsContent panel.' },
+    disabled: { type: 'boolean', default: 'false', description: 'Whether the tab trigger is disabled.' },
+    icon: { type: 'RenderIcon', description: 'Leading icon element or render function.' },
+    badge: { type: 'string | number', description: 'Notification badge count or label.' },
+    style: { type: 'StyleProp<ViewStyle>', description: 'Style overrides for the tab button.' },
+    textStyle: { type: 'StyleProp<TextStyle>', description: 'Text style overrides for the tab label.' },
+    activeTextStyle: { type: 'StyleProp<TextStyle>', description: 'Text style overrides applied when selected.' },
+  }}
+/>
+
+### TabsContent
+
+<TypeTable
+  type={{
+    value: { type: 'string', required: true, description: 'Matches the value of the trigger that reveals this panel.' },
+    lazy: { type: 'boolean', default: 'true', description: 'Whether inactive tab content is unmounted.' },
+    transition: { type: '"slide" | "fade" | "scale" | "none"', description: 'Override the container transition specifically for this panel.' },
+    style: { type: 'StyleProp<ViewStyle>', description: 'Style overrides for the content panel wrapper.' },
+    children: { type: 'ReactNode', required: true, description: 'Panel content elements.' },
+  }}
+/>

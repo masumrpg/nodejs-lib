@@ -1,0 +1,73 @@
+---
+title: SearchBar
+description: Mobile search bar with debouncing, animated clear, loading indicator, and cancel transition.
+sidebar:
+  badge:
+    text: New
+    variant: tip
+---
+
+import { Code } from '@astrojs/starlight/components';
+import TypeTable from '@/components/TypeTable.astro';
+
+export const exampleCode = `import { useState } from 'react';
+import { SearchBar } from '@masumdev/rn-ui';
+
+export function SearchBarExample() {
+  const [query, setQuery] = useState('');
+
+  return (
+    <SearchBar
+      placeholder="Search documents or members..."
+      value={query}
+      onChangeText={setQuery}
+      onSearchDebounced={(cleanQuery) => console.log('Searching for:', cleanQuery)}
+      debounceMs={300}
+      showCancelButton
+    />
+  );
+}`;
+
+export const pillExample = `import { SearchBar } from '@masumdev/rn-ui';
+
+<SearchBar
+  placeholder="Filter contacts..."
+  variant="outline"
+  shape="pill"
+  tone="accent"
+  cancelLabel="Done"
+/>`;
+
+`SearchBar` provides an integrated search input featuring built-in debounced callbacks, an animated clear button, loading spinner states, and a smooth iOS/Material style cancel button transition.
+
+## Usage
+
+<Code code={exampleCode} lang="tsx" title="SearchBarExample.tsx" mark={['SearchBar', 'onSearchDebounced', 'debounceMs']} />
+
+### Pill Outline Variant
+
+<Code code={pillExample} lang="tsx" title="PillSearch.tsx" mark={['variant="outline"', 'shape="pill"']} />
+
+## Props API
+
+<TypeTable
+  type={{
+    value: { type: 'string', description: 'Controlled input string value.' },
+    defaultValue: { type: 'string', default: '""', description: 'Uncontrolled initial search text.' },
+    onChangeText: { type: '(text: string) => void', description: 'Callback invoked immediately on text change.' },
+    onSearchDebounced: { type: '(query: string) => void', description: 'Debounced callback invoked after typing pauses.' },
+    debounceMs: { type: 'number', default: '300', description: 'Delay in milliseconds for debounced callback.' },
+    onClear: { type: '() => void', description: 'Callback fired when the clear button is pressed.' },
+    onCancel: { type: '() => void', description: 'Callback fired when the cancel button is pressed.' },
+    loading: { type: 'boolean', default: 'false', description: 'Displays an activity spinner in place of the clear button.' },
+    showCancelButton: { type: 'boolean', default: 'true', description: 'Animates in a cancel button when focused or populated.' },
+    cancelLabel: { type: 'string', default: '"Cancel"', description: 'Text label for the cancel button.' },
+    tone: { type: 'ComponentTone', default: '"primary"', description: 'Semantic color intent for focused border and cancel button.' },
+    variant: { type: '"filled" | "outline" | "soft"', default: '"filled"', description: 'Visual structure and background styling.' },
+    size: { type: 'ComponentSize', default: '"md"', description: 'Size preset (sm, md, lg).' },
+    shape: { type: 'ComponentShape', default: '"rounded"', description: 'Border radius shape (rounded, pill, square).' },
+    disabled: { type: 'boolean', default: 'false', description: 'Whether the search bar interaction is disabled.' },
+    haptic: { type: 'boolean', default: 'true', description: 'Enable tactile feedback on clear and cancel actions.' },
+    glass: { type: 'boolean', default: 'false', description: 'Enable translucent glassmorphism background styling.' },
+  }}
+/>
