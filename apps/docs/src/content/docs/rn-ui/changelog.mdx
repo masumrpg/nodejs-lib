@@ -9,10 +9,38 @@ import ChangelogTimeline from '@/components/ChangelogTimeline.astro';
 
 export const releases = [
   {
-    version: 'v0.5.0',
+    version: 'v0.6.0',
     date: '2026-11-15',
     tag: 'Feature Release',
     isLatest: true,
+    changes: [
+      {
+        type: 'feat',
+        text: '<strong>New High-Impact Components</strong>: Introduced 4 mobile UI primitives: <code>Tabs</code> (compound TabView with animated indicator & fluid slide/scale transitions), <code>SearchBar</code> (debounced search with clear and animated cancel), <code>Tooltip</code> (anchored micro-interaction hint balloons with smart collision auto-flip and tap-and-hold), and <code>SpeedDial</code> (expanding FAB group with staggered spring actions).',
+      },
+      {
+        type: 'feat',
+        text: '<strong>Tabs Motion & Transitions</strong>: Powered by <code>expo-animation</code> principles, <code>TabsContent</code> now supports directional slide, scale, fade, and none transitions with compiler-safe value getters/setters and <code>useReducedMotion()</code> accessibility support.',
+      },
+      {
+        type: 'feat',
+        text: '<strong>Smart Tooltip Collision & Tap-and-Hold</strong>: Upgraded <code>Tooltip</code> with automatic viewport edge collision detection and flipping (<code>autoFlip</code>), 250ms tap-and-hold activation, child button event forwarding, and Android translucent status bar coordinate correction.',
+      },
+      {
+        type: 'feat',
+        text: '<strong>Expo Ecosystem Support</strong>: Added full verified support for Expo SDK and bare React Native workflows with dedicated badge and optimized bundle tree-shaking.',
+      },
+      {
+        type: 'perf',
+        text: '<strong>Strict Zero-Bounce Worklets</strong>: Enforced critically damped spring physics (<code>dampingRatio: 1, overshootClamping: true</code>) across all new gesture and transition controllers.',
+      },
+    ],
+  },
+  {
+    version: 'v0.5.0',
+    date: '2026-11-15',
+    tag: 'Feature Release',
+    isLatest: false,
     changes: [
       {
         type: 'feat',

@@ -62,6 +62,10 @@ import {
   ChipSection,
   SignaturePadSection,
   SpinnerSection,
+  TabsSection,
+  SearchBarSection,
+  TooltipSection,
+  SpeedDialSection,
 } from "../../components/rn-ui";
 
 export default function RnUiComponentDetailScreen() {
@@ -205,6 +209,14 @@ export default function RnUiComponentDetailScreen() {
       case "spinner":
       case "loader":
         return <SpinnerSection ctx={ctx} />;
+      case "tabs":
+        return <TabsSection ctx={ctx} />;
+      case "search-bar":
+        return <SearchBarSection ctx={ctx} />;
+      case "tooltip":
+        return <TooltipSection ctx={ctx} />;
+      case "speed-dial":
+        return <SpeedDialSection ctx={ctx} />;
 
       default:
         return <ButtonsSection ctx={ctx} />;

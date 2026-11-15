@@ -54,3 +54,7 @@ export { SegmentedControlSection } from './sections/SegmentedControlSection';
 export { ChipSection } from './sections/ChipSection';
 export { SignaturePadSection } from './sections/SignaturePadSection';
 export { SpinnerSection } from './sections/SpinnerSection';
+export { TabsSection } from './sections/TabsSection';
+export { SearchBarSection } from './sections/SearchBarSection';
+export { TooltipSection } from './sections/TooltipSection';
+export { SpeedDialSection } from './sections/SpeedDialSection';

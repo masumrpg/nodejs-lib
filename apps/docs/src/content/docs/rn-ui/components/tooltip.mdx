@@ -1,0 +1,73 @@
+---
+title: Tooltip
+description: Anchored micro-interaction hint balloons with directional pointer arrows.
+sidebar:
+  badge:
+    text: New
+    variant: tip
+---
+
+import { Code } from '@astrojs/starlight/components';
+import TypeTable from '@/components/TypeTable.astro';
+
+export const exampleCode = `import { Tooltip, IconButton } from '@masumdev/rn-ui';
+import { Download } from 'lucide-react-native';
+
+export function TooltipExample() {
+  return (
+    <Tooltip content="Download monthly balance statement" position="top">
+      <IconButton
+        icon={({ color, size }) => <Download color={color} size={size} />}
+        variant="outline"
+        tone="primary"
+      />
+    </Tooltip>
+  );
+}`;
+
+export const pressExample = `import { Tooltip, Button } from '@masumdev/rn-ui';
+import { Info } from 'lucide-react-native';
+
+<Tooltip
+  content="API key configured for production"
+  triggerMode="press"
+  position="top"
+  tone="dark"
+  duration={3000}
+>
+  <Button tone="secondary" variant="outline">
+    View Key Status
+  </Button>
+</Tooltip>`;
+
+`Tooltip` provides an anchored contextual balloon anchored to any trigger element, rendering a directional pointer arrow and handling touch-outside dismissal.
+
+## Usage
+
+<Code code={exampleCode} lang="tsx" title="TooltipExample.tsx" mark={['Tooltip', 'content', 'position']} />
+
+### Tap Trigger Mode
+
+<Code code={pressExample} lang="tsx" title="TapTooltip.tsx" mark={['triggerMode="press"', 'duration={3000}']} />
+
+## Props API
+
+<TypeTable
+  type={{
+    content: { type: 'ReactNode', required: true, description: 'Text label or custom element displayed inside the balloon.' },
+    position: { type: '"top" | "bottom" | "left" | "right" | "auto"', default: '"top"', description: 'Anchored placement relative to target.' },
+    triggerMode: { type: '"longPress" | "press"', default: '"longPress"', description: 'Interaction gesture used to reveal the tooltip.' },
+    autoFlip: { type: 'boolean', default: 'true', description: 'Automatically flip placement when near viewport edges (e.g. right to left, bottom to top).' },
+    tone: { type: '"default" | "primary" | "dark" | "light"', default: '"default"', description: 'Color tone of the tooltip balloon.' },
+    arrow: { type: 'boolean', default: 'true', description: 'Whether to render the directional pointer arrow.' },
+    delay: { type: 'number', default: '0', description: 'Delay in milliseconds before showing tooltip after trigger.' },
+    delayLongPress: { type: 'number', default: '250', description: 'Hold duration in milliseconds required to trigger longPress mode.' },
+    dismissOnPressOut: { type: 'boolean', default: 'false', description: 'Whether releasing the hold dismisses the tooltip immediately.' },
+    duration: { type: 'number', description: 'Auto-dismiss timeout duration in milliseconds.' },
+    visible: { type: 'boolean', description: 'Controlled visibility state.' },
+    onOpenChange: { type: '(open: boolean) => void', description: 'Callback fired when open state changes.' },
+    haptic: { type: 'boolean', default: 'true', description: 'Enable tactile feedback on tooltip trigger.' },
+    glass: { type: 'boolean', default: 'false', description: 'Enable translucent glassmorphism balloon styling.' },
+    children: { type: 'ReactElement', required: true, description: 'Target trigger element.' },
+  }}
+/>

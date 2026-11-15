@@ -23,6 +23,7 @@ export interface ComponentCatalogItem {
   description: string;
   badge?: string;
   tone?: ComponentTone;
+  isNew?: boolean;
 }
 
 export interface ComponentCategory {
@@ -170,6 +171,13 @@ export const CATALOG_CATEGORIES: ComponentCategory[] = [
         tone: "accent",
       },
       {
+        id: "speed-dial",
+        name: "SpeedDial",
+        description: "Expanding floating action group with staggered spring sub-actions.",
+        tone: "accent",
+        isNew: true,
+      },
+      {
         id: "badge",
         name: "Badge",
         description: "Small status label pill with tone colors.",
@@ -188,6 +196,13 @@ export const CATALOG_CATEGORIES: ComponentCategory[] = [
         name: "Input",
         description: "Single-line text input with prefix/suffix icons.",
         tone: "success",
+      },
+      {
+        id: "search-bar",
+        name: "SearchBar",
+        description: "Mobile search bar with debouncing, clear, and cancel transition.",
+        tone: "success",
+        isNew: true,
       },
       {
         id: "input-group",
@@ -283,6 +298,13 @@ export const CATALOG_CATEGORIES: ComponentCategory[] = [
     iconName: "Layers",
     items: [
       {
+        id: "tabs",
+        name: "Tabs",
+        description: "Compound tab navigation with animated sliding indicator.",
+        tone: "warning",
+        isNew: true,
+      },
+      {
         id: "segmented-control",
         name: "SegmentedControl",
         description: "Cupertino sliding pill tab switcher with haptics.",
@@ -337,6 +359,13 @@ export const CATALOG_CATEGORIES: ComponentCategory[] = [
         name: "HoverCard",
         description: "Preview card trigger on interaction.",
         tone: "danger",
+      },
+      {
+        id: "tooltip",
+        name: "Tooltip",
+        description: "Contextual hint balloon anchored with directional arrow.",
+        tone: "danger",
+        isNew: true,
       },
       {
         id: "dropdown-menu",
@@ -552,6 +581,11 @@ export default function RnUiCatalogScreen() {
                               <Badge tone={item.tone || "secondary"} size="sm" style={{ alignSelf: "center" }}>
                                 {item.id}
                               </Badge>
+                              {item.isNew && (
+                                <Badge tone="success" variant="solid" size="sm" style={{ alignSelf: "center" }}>
+                                  NEW
+                                </Badge>
+                              )}
                             </Box>
                             <Text
                               variant="caption"

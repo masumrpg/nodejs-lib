@@ -1,9 +1,10 @@
 # @masumdev/rn-ui
 
-> A modern, flat-designed React Native & Expo UI kit with 63+ typed components, dynamic light/dark theme engine, versatile borderless/outlined styling, zero-bounce worklet animations, and pluggable architecture.
+> A modern, flat-designed React Native & Expo UI kit with 67+ typed components, dynamic light/dark theme engine, versatile borderless/outlined styling, zero-bounce worklet animations, and pluggable architecture.
 
 [![npm version](https://img.shields.io/npm/v/@masumdev/rn-ui.svg?style=flat-square&color=33CDCF)](https://www.npmjs.com/package/@masumdev/rn-ui)
 [![npm downloads](https://img.shields.io/npm/dt/@masumdev/rn-ui.svg?style=flat-square&color=33CDCF)](https://www.npmjs.com/package/@masumdev/rn-ui)
+[![Expo Supported](https://img.shields.io/badge/Expo-Supported-000020.svg?style=flat-square&logo=expo&logoColor=white)](https://expo.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-33CDCF.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict_Zero_Any-3178c6.svg?style=flat-square)](https://www.typescriptlang.org/)
 [![Built with Bun](https://img.shields.io/badge/Built_with-Bun-fbf0df.svg?style=flat-square)](https://bun.sh)
@@ -19,7 +20,7 @@ Comprehensive guides, component previews, prop tables, and interactive examples 
 
 - 📖 **[Installation Guide](https://lib.masumdev.id/rn-ui/installation)**
 - 🎨 **[Theming & Dark Mode](https://lib.masumdev.id/rn-ui/theming)**
-- 🧩 **[60+ Component Catalog](https://lib.masumdev.id/rn-ui/components)**
+- 🧩 **[67+ Component Catalog](https://lib.masumdev.id/rn-ui/components)**
 - 🛠️ **[Building Custom Components](https://lib.masumdev.id/rn-ui/custom-components)**
 - 📜 **[Architectural Rules](./RULES.md)**
 - 🚀 **[Changelog](https://lib.masumdev.id/rn-ui/changelog)**
@@ -30,11 +31,21 @@ Comprehensive guides, component previews, prop tables, and interactive examples 
 
 - **Versatile Flat & Borderless Design**: Border-based, clean UI primitives with zero elevation/shadow by default, full support for Spotify-style borderless layouts, elevated shadow cards, and glassmorphism.
 - **Dynamic Theme Engine**: Light, dark, and system preference support via `ThemeProvider` with single-source-of-truth semantic tokens.
-- **63+ Typed Components**: Forms, feedback, overlays, navigation, data display, and chat UI primitives.
+- **67+ Typed Components**: Forms, feedback, overlays, navigation, data display, and chat UI primitives.
 - **Pluggable Architecture**: Zero lock-in for fonts, icons, navigation, storage, or haptics.
 - **Zero-Bounce Worklets**: Critically damped spring physics (`dampingRatio: 1, overshootClamping: true`) and cubic bezier curves running 100% on the UI thread.
 - **A11y First**: Enforced accessibility roles, interactive states, and touch targets (≥ 44pt).
 - **Strict Type Safety**: 100% TypeScript with zero `any` types and shared base UI prop interfaces.
+
+### 🧩 Component Highlights (67+ Primitives)
+
+- **Navigation & Structure**: `Tabs` (Compound TabView with animated indicator & fluid slide/scale transitions), `Breadcrumb`, `Pagination`, `Stepper`
+- **Overlays & Modals**: `Tooltip` (Collision-aware balloons with pointer arrows & tap-and-hold), `SpeedDial` (Expanding FAB with staggered actions), `Alert`, `AlertDialog`, `Toast`, `Popover`, `HoverCard`, `DropdownMenu`, `ContextMenu`, `Command`
+- **Form Controls & Inputs**: `SearchBar` (Debounced input with clear & cancel transition), `Input`, `InputGroup`, `InputOTP`, `DatePicker`, `TimePicker`, `Textarea`, `Checkbox`, `RadioGroup`, `Switch`, `Slider`, `RangeSlider`, `SignaturePad`, `Rating`, `Select`, `Combobox`, `Label`, `FormField`
+- **Buttons & Actions**: `Button`, `IconButton`, `ButtonGroup`, `Chip`, `SegmentedControl`, `FloatingActionButton`
+- **Typography & Data**: `Text`, `Avatar`, `Badge`, `Item`, `SwipeableItem`, `Bubble`, `Attachment`, `DataList`, `MetricCard`, `Table`, `Timeline`, `Empty`
+- **Layout & Foundations**: `Box`, `Card`, `Divider`, `AspectRatio`, `KeyboardAvoiding`
+- **Disclosure & Loading**: `Accordion`, `Collapsible`, `Carousel`, `Calendar`, `ExpandableCalendar`, `TimelineCalendar`, `Progress`, `Skeleton`, `Spinner`
 
 ---
 
