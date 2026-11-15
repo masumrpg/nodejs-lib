@@ -81,7 +81,7 @@ export function Select({
   const field = useFormField();
   const [open, setOpen] = React.useState(false);
   const [internalValue, setInternalValue] = React.useState(defaultValue);
-  const triggerRef = React.useRef<View>(null);
+  const triggerRef = React.useRef<React.ComponentRef<typeof View>>(null);
   const [coords, setCoords] = React.useState({ x: 0, y: 0, width: 0 });
 
   const isInvalid = Boolean(field?.invalid);
@@ -101,15 +101,17 @@ export function Select({
     if (isDisabled) return;
     if (haptic) triggerHaptic("light");
 
-    triggerRef.current?.measureInWindow((x, y, width, height) => {
-      setCoords({
-        x,
-        y: y + height + 4,
-        width,
-      });
-      setOpen(false);
-      setOpen(true);
-    });
+    triggerRef.current?.measureInWindow(
+      (x: number, y: number, width: number, height: number) => {
+        setCoords({
+          x,
+          y: y + height + 4,
+          width,
+        });
+        setOpen(false);
+        setOpen(true);
+      },
+    );
   };
 
   const glassBg = isDark
@@ -136,7 +138,7 @@ export function Select({
   const paddingX = selectPaddingX[size];
 
   return (
-    <View ref={triggerRef} style={{ width: "100%" }}>
+    <View ref={triggerRef as never} style={{ width: "100%" }}>
       <Pressable
         accessibilityRole="button"
         disabled={disabled}

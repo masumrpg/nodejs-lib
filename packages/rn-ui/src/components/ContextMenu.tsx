@@ -12,6 +12,7 @@ import {
   type TextStyle,
 } from "react-native";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -92,7 +93,7 @@ export function ContextMenuTrigger({
   disabled = false,
 }: ContextMenuTriggerProps) {
   const { setOpen, setTriggerLayout } = useContextMenu();
-  const triggerRef = React.useRef<View | null>(null);
+  const triggerRef = React.useRef<React.ComponentRef<typeof View> | null>(null);
 
   const handleLongPress = () => {
     if (!disabled) {
@@ -109,7 +110,7 @@ export function ContextMenuTrigger({
 
   return (
     <Pressable
-      ref={triggerRef}
+      ref={triggerRef as never}
       onLongPress={handleLongPress}
       delayLongPress={500} // Standard Android/iOS long press timing
       style={style}
@@ -142,7 +143,10 @@ export function ContextMenuContent({
   const progress = useSharedValue(open ? 1 : 0);
 
   React.useEffect(() => {
-    progress.value = withTiming(open ? 1 : 0, { duration: 150 });
+    progress.value = withTiming(open ? 1 : 0, {
+      duration: 150,
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
+    });
   }, [open, progress]);
 
   const { height: SCREEN_HEIGHT } = Dimensions.get("window");

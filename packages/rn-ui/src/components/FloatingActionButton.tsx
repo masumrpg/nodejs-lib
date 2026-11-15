@@ -8,22 +8,26 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
 import { useTheme } from "../theme";
 import { withAlpha } from "../utils";
+import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
   renderIcon,
+  type BaseAnimatedProps,
+  type BaseGlassProps,
+  type BaseHapticProps,
   type RenderIcon,
+  type SizeProps,
   type ToneProps,
   type VariantProps,
-  type SizeProps,
 } from "./types";
 import type { ButtonTone, ButtonVariant } from "./Button";
 
@@ -39,14 +43,16 @@ export interface FloatingActionButtonProps
   extends Omit<PressableProps, "children" | "style">,
     VariantProps<Exclude<ButtonVariant, "danger">>,
     ToneProps<ButtonTone>,
-    SizeProps<FloatingActionButtonSize> {
+    SizeProps<FloatingActionButtonSize>,
+    BaseGlassProps,
+    BaseHapticProps,
+    BaseAnimatedProps {
   icon?: RenderIcon;
   label?: React.ReactNode;
   extended?: boolean;
   placement?: FloatingActionButtonPlacement;
   offset?: number;
   visible?: boolean;
-  animated?: boolean;
   loading?: boolean;
   fullWidth?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -107,11 +113,14 @@ export function FloatingActionButton({
   offset,
   visible = true,
   animated = true,
+  glass = false,
+  haptic = true,
   loading,
   disabled,
   fullWidth,
   style,
   textStyle,
+  onPress,
   onPressIn,
   onPressOut,
   ...props
@@ -142,7 +151,7 @@ export function FloatingActionButton({
 
     visibility.value = withTiming(
       visible ? 1 : 0,
-      { duration: 180 },
+      { duration: 180, easing: Easing.bezier(0.23, 1, 0.32, 1) },
       (finished) => {
         if (finished && !visible) {
           scheduleOnRN(setMounted, false);
@@ -203,16 +212,32 @@ export function FloatingActionButton({
     >
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={
+          typeof label === "string"
+            ? label
+            : props.accessibilityLabel ?? "Floating action button"
+        }
         disabled={isDisabled}
+        onPress={(event) => {
+          if (isDisabled) return;
+          if (haptic) triggerHaptic("light");
+          onPress?.(event);
+        }}
         onPressIn={(event) => {
           if (animated) {
-            press.value = withSpring(0.94, { damping: 16, stiffness: 260 });
+            press.value = withTiming(0.95, {
+              duration: 100,
+              easing: Easing.bezier(0.23, 1, 0.32, 1),
+            });
           }
           onPressIn?.(event);
         }}
         onPressOut={(event) => {
           if (animated) {
-            press.value = withSpring(1, { damping: 16, stiffness: 260 });
+            press.value = withTiming(1, {
+              duration: 140,
+              easing: Easing.bezier(0.23, 1, 0.32, 1),
+            });
           }
           onPressOut?.(event);
         }}

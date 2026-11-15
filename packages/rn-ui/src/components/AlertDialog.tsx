@@ -105,7 +105,7 @@ export function AlertDialog({
   cancelDisabled = false,
   dismissOnBackdropPress = true,
   animated = true,
-  animationDuration = 220,
+  animationDuration = 180,
   modalProps,
   overlayStyle,
   style,
@@ -115,17 +115,21 @@ export function AlertDialog({
 }: AlertDialogProps) {
   const { colors, components, radii, spacing, isDark } = useTheme();
   const [mounted, setMounted] = useState(visible);
+  if (visible && !mounted) {
+    setMounted(true);
+  }
+
   const progress = useSharedValue(visible ? 1 : 0);
   const toneColor = getToneColor(tone, colors);
 
   useEffect(() => {
     if (visible) {
       if (haptic) triggerHaptic("medium");
-      setMounted(true);
       if (animated) {
+        progress.value = 0;
         progress.value = withTiming(1, {
           duration: animationDuration,
-          easing: Easing.out(Easing.cubic),
+          easing: Easing.bezier(0.23, 1, 0.32, 1),
         });
       } else {
         progress.value = 1;
@@ -136,7 +140,7 @@ export function AlertDialog({
           0,
           {
             duration: Math.max(120, animationDuration - 40),
-            easing: Easing.in(Easing.quad),
+            easing: Easing.bezier(0.23, 1, 0.32, 1),
           },
           (finished) => {
             if (finished) {
@@ -163,7 +167,7 @@ export function AlertDialog({
     ],
   }));
 
-  if (!mounted) return null;
+  if (!mounted && !visible) return null;
 
   const requestClose = () => {
     if (haptic) triggerHaptic("selection");
@@ -370,31 +374,39 @@ export function AlertDialog({
       onRequestClose={requestClose}
       {...modalProps}
     >
-      <Animated.View
-        style={[
-          {
-            flex: 1,
-            backgroundColor: isDark ? "rgba(0, 0, 0, 0.78)" : "rgba(15, 23, 42, 0.65)",
-            padding: spacing.xl,
-            alignItems: "center",
-            justifyContent: "center",
-          },
-          backdropAnimatedStyle,
-          overlayStyle,
-        ]}
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          padding: spacing.xl,
+        }}
       >
-        <Pressable
-          accessibilityRole="button"
-          style={{
-            position: "absolute",
-            top: 0,
-            right: 0,
-            bottom: 0,
-            left: 0,
-          }}
-          onPress={handleBackdropPress}
-        />
+        {/* Independent Backdrop Overlay Layer */}
+        <Animated.View
+          style={[
+            {
+              position: "absolute",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              left: 0,
+              backgroundColor: isDark
+                ? "rgba(0, 0, 0, 0.78)"
+                : "rgba(15, 23, 42, 0.65)",
+            },
+            backdropAnimatedStyle,
+            overlayStyle,
+          ]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            style={{ flex: 1 }}
+            onPress={handleBackdropPress}
+          />
+        </Animated.View>
 
+        {/* Dialog Card Layer (independent opacity, no parent opacity multiplication) */}
         {animated ? (
           <Animated.View
             style={[
@@ -411,7 +423,7 @@ export function AlertDialog({
         ) : (
           dialog
         )}
-      </Animated.View>
+      </View>
     </Modal>
   );
 }

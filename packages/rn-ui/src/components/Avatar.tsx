@@ -165,11 +165,11 @@ export function Avatar({
     ringPadding = 2;
   } else if (variant === "premium") {
     borderWidth = 2.5;
-    borderColor = "#8B5CF6";
+    borderColor = colors.accent ?? "#8B5CF6";
     ringPadding = 2;
   } else if (variant === "vip") {
     borderWidth = 2.5;
-    borderColor = "#F59E0B";
+    borderColor = colors.warning ?? "#F59E0B";
     ringPadding = 2;
   }
 
@@ -469,20 +469,14 @@ export function AvatarBadge({
       ? -2
       : -1;
 
-  const positionStyle: ViewStyle = {};
-  if (finalPosition === "top-right") {
-    positionStyle.top = offset;
-    positionStyle.right = offset;
-  } else if (finalPosition === "top-left") {
-    positionStyle.top = offset;
-    positionStyle.left = offset;
-  } else if (finalPosition === "bottom-left") {
-    positionStyle.bottom = offset;
-    positionStyle.left = offset;
-  } else {
-    positionStyle.bottom = offset;
-    positionStyle.right = offset;
-  }
+  const positionStyle: ViewStyle =
+    finalPosition === "top-right"
+      ? { top: offset, right: offset }
+      : finalPosition === "top-left"
+        ? { top: offset, left: offset }
+        : finalPosition === "bottom-left"
+          ? { bottom: offset, left: offset }
+          : { bottom: offset, right: offset };
 
   // If pure status indicator dot
   if (isStatusDot) {
@@ -562,13 +556,22 @@ export function AvatarBadge({
     zIndex: 10,
   };
 
+  const badgeTextColor =
+    tone === "danger"
+      ? colors.onDanger
+      : tone === "warning"
+        ? colors.onWarning
+        : tone === "success"
+          ? colors.onSuccess
+          : colors.onPrimary ?? colors.textInverse;
+
   return (
     <View style={[customBadgeStyle, style]} {...props}>
       {isNumericOrShortText ? (
         <Text
           style={[
             {
-              color: "#FFFFFF",
+              color: badgeTextColor,
               fontSize,
               fontWeight: "700",
               lineHeight: fontSize + 2,

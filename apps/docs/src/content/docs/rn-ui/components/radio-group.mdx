@@ -1,9 +1,59 @@
 ---
 title: Radio Group
-description: Radio button group selection component with context value state.
+description: Radio button group selection component with context value state, card/plain variants, and haptic feedback.
 sidebar:
   badge:
     text: Updated
     variant: note
 ---
 
+import { Code } from '@astrojs/starlight/components';
+import TypeTable from '@/components/TypeTable.astro';
+
+export const exampleCode = `import { useState } from 'react';
+import { RadioGroup, RadioGroupItem, Box } from '@masumdev/rn-ui';
+
+export function RadioExample() {
+  const [value, setValue] = useState('expo');
+
+  return (
+    <RadioGroup value={value} onValueChange={setValue} variant="card">
+      <RadioGroupItem value="expo" label="Expo Framework" description="Universal React Native ecosystem" />
+      <RadioGroupItem value="cli" label="React Native CLI" description="Standard bare native development" />
+    </RadioGroup>
+  );
+}`;
+
+`RadioGroup` allows users to select a single option from a set with accessible radiogroup roles, card and plain layouts, and fluid selection indicator animations.
+
+## Usage
+
+<Code code={exampleCode} lang="tsx" title="RadioExample.tsx" mark={['RadioGroup', 'RadioGroupItem', 'value={value}', 'onValueChange', 'variant="card"']} />
+
+## Props API
+
+### RadioGroup
+
+<TypeTable
+  type={{
+    value: { type: 'string', description: 'Selected radio item value.' },
+    defaultValue: { type: 'string', description: 'Default uncontrolled radio value.' },
+    onValueChange: { type: '(value: string) => void', description: 'Callback when selection changes.' },
+    orientation: { type: "'horizontal' | 'vertical'", default: "'vertical'", description: 'Layout orientation direction.' },
+    variant: { type: "'card' | 'plain'", default: "'card'", description: 'Visual appearance variant.' },
+    disabled: { type: 'boolean', default: 'false', description: 'Disables all radio items in the group.' },
+  }}
+/>
+
+### RadioGroupItem
+
+<TypeTable
+  type={{
+    value: { type: 'string', required: true, description: 'Unique option identifier.' },
+    label: { type: 'string', description: 'Option label text.' },
+    description: { type: 'string', description: 'Optional helper description beneath the label.' },
+    disabled: { type: 'boolean', default: 'false', description: 'Disable this specific item.' },
+    tone: { type: 'ComponentTone', default: "'primary'", description: 'Selection color tone.' },
+    haptic: { type: 'boolean', default: 'true', description: 'Trigger haptic feedback on selection.' },
+  }}
+/>

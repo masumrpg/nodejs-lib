@@ -8,6 +8,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -122,11 +123,15 @@ function DefaultAccordionContent({
       setShouldRender(true);
     }
 
-    progress.value = withTiming(expanded ? 1 : 0, { duration }, (finished) => {
-      if (finished && !expanded) {
-        scheduleOnRN(setShouldRender, false);
-      }
-    });
+    progress.value = withTiming(
+      expanded ? 1 : 0,
+      { duration, easing: Easing.bezier(0.23, 1, 0.32, 1) },
+      (finished) => {
+        if (finished && !expanded) {
+          scheduleOnRN(setShouldRender, false);
+        }
+      },
+    );
   }, [duration, expanded, progress]);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -161,7 +166,10 @@ function DefaultAccordionIndicator({
   const progress = useSharedValue(expanded ? 1 : 0);
 
   useEffect(() => {
-    progress.value = withTiming(expanded ? 1 : 0, { duration });
+    progress.value = withTiming(expanded ? 1 : 0, {
+      duration,
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
+    });
   }, [duration, expanded, progress]);
 
   const animatedStyle = useAnimatedStyle(() => ({

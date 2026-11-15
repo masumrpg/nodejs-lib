@@ -13,6 +13,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -49,7 +50,7 @@ export interface ComboboxContextProps {
   setOpen: (open: boolean) => void;
   inputValue: string;
   setInputValue: (val: string) => void;
-  triggerRef: React.RefObject<View | null>;
+  triggerRef: React.RefObject<React.ComponentRef<typeof View> | null>;
   triggerLayout: {
     pageX: number;
     pageY: number;
@@ -93,7 +94,7 @@ export function Combobox({
     height: 0,
   });
 
-  const triggerRef = React.useRef<View | null>(null);
+  const triggerRef = React.useRef<React.ComponentRef<typeof View> | null>(null);
 
   const value =
     controlledValue !== undefined ? controlledValue : uncontrolledValue;
@@ -269,7 +270,7 @@ export function ComboboxInput({
 
   return (
     <Pressable
-      ref={triggerRef}
+      ref={triggerRef as never}
       onPress={handlePress}
       disabled={disabled}
       style={[
@@ -353,7 +354,10 @@ export function ComboboxContent({
   const progress = useSharedValue(open ? 1 : 0);
 
   React.useEffect(() => {
-    progress.value = withTiming(open ? 1 : 0, { duration: 150 });
+    progress.value = withTiming(open ? 1 : 0, {
+      duration: 150,
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
+    });
   }, [open, progress]);
 
   const { height: SCREEN_HEIGHT } = Dimensions.get("window");

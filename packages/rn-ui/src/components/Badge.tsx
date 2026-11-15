@@ -9,6 +9,7 @@ import {
   type ToneProps,
   type VariantProps,
   type SizeProps,
+  type IconSlotsProps,
   type BaseGlassProps,
   type ComponentTone,
 } from "./types";
@@ -21,6 +22,7 @@ export interface BadgeProps
   extends ToneProps<BadgeTone>,
     VariantProps<BadgeVariant>,
     SizeProps<BadgeSize>,
+    IconSlotsProps,
     BaseGlassProps {
   children: string;
   icon?: RenderIcon;
@@ -76,6 +78,8 @@ export function Badge({
   size = "md",
   glass = false,
   icon,
+  leftIcon,
+  rightIcon,
   style,
 }: BadgeProps) {
   const { colors, components, radii, spacing, isDark } = useTheme();
@@ -85,6 +89,7 @@ export function Badge({
   const isSubtle = variant === "subtle";
   const isOutline = variant === "outline";
   const iconSize = size === "lg" ? 14 : size === "sm" ? 10 : 12;
+  const leadIcon = icon ?? leftIcon;
 
   const glassBg = isDark
     ? "rgba(15, 27, 45, 0.60)"
@@ -115,6 +120,7 @@ export function Badge({
 
   return (
     <View
+      accessibilityRole="text"
       style={[
         {
           alignSelf: "flex-start",
@@ -131,7 +137,7 @@ export function Badge({
         style,
       ]}
     >
-      {renderIcon(icon, textColor, iconSize)}
+      {leadIcon ? renderIcon(leadIcon, textColor, iconSize) : null}
       <Text
         variant="labelSmall"
         color={isSolid && !glass ? "textInverse" : "text"}
@@ -139,6 +145,7 @@ export function Badge({
       >
         {children}
       </Text>
+      {rightIcon ? renderIcon(rightIcon, textColor, iconSize) : null}
     </View>
   );
 }

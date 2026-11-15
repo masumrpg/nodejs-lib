@@ -5,6 +5,31 @@ All notable changes to **@masumdev/rn-ui** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-11-15
+
+### Added
+- **Design System Base Interfaces**: Standardized base component prop contracts (`ToneProps`, `VariantProps`, `SizeProps`, `BaseGlassProps`, `BaseHapticProps`, `BaseAnimatedProps`, `IconSlotsProps`) across all components.
+- **Enhanced Badge Slots**: Added `leftIcon` and `rightIcon` slot props from `IconSlotsProps` to `Badge`.
+- **Haptic Prop Standardization**: Standardized `haptic` prop (default `true`) from `BaseHapticProps` across all touch and gesture components (`Chip`, `SegmentedControl`, `RangeSlider`, `Slider`, `Rating`, `FloatingActionButton`, `SwipeableItem`, `DatePicker`, `SignaturePad`).
+- **A11y Enhancements**: Added comprehensive accessibility roles and states:
+  - `accessibilityRole="tablist"` and `"tab"` with `accessibilityState={{ selected }}` in `SegmentedControl`.
+  - `accessibilityRole="checkbox" | "button"` in `Chip`.
+  - `accessibilityRole="adjustable"` with dynamic `accessibilityValue` in `Slider`, `RangeSlider`, and `Rating`.
+  - `accessibilityRole="button"` with `accessibilityState={{ expanded }}` in `Collapsible`.
+  - Enforced touch targets and hitSlops (≥ 44pt / `hitSlop={10-12}`) on dismiss actions (`Alert`, `Chip`, `Toast`).
+
+### Changed
+- **Gesture Handler 3 Hook Migration**: Migrated all gesture components (`Slider`, `RangeSlider`, `Rating`, `SwipeableItem`, `Toast`) to the modern Gesture Handler 3 hook API (`usePanGesture`, `useTapGesture`, `useCompetingGestures`) with zero deprecated builder calls.
+- **Complete Deprecation & Suppression Directives Purge**: Purged all deprecated `hapticFeedback` prop aliases and eradicated all `/* tscheck-disable deprecated */` comment directives. The codebase is 100% clean with zero warnings.
+- **Zero Hardcoded Hex Tokens (Single Source of Truth)**: Replaced all hardcoded hex color codes across components (`Alert`, `Avatar`, `Chip`, `DatePicker`, `DropdownMenu`, `FloatingActionButton`, `RangeSlider`, `Rating`, `SegmentedControl`, `SignaturePad`, `Slider`, `SwipeableItem`, `Switch`, `Toast`) with dynamic design tokens from `useTheme()` (`colors.surface`, `colors.surfaceRaised`, `colors.onTone`, `colors.onPrimary`, `colors.border`, etc.).
+- **Synchronized Entrance & Exit Transitions**: Overhauled overlay transitions in `AlertDialog`, `Popover`, `Toast`, `DropdownMenu`, `HoverCard`, and `ContextMenu` for seamless, glitch-free backdrop/content synchronization.
+- **Zero-Bounce Worklet Curves**: Standardized all UI thread animations to strictly critically damped spring physics (`dampingRatio: 1, overshootClamping: true`) or cubic ease-out curves (`Easing.bezier(0.23, 1, 0.32, 1)`), eliminating wobble and unwanted bounce.
+
+### Fixed
+- **Clean Animation Cleanup**: Ensured `cancelAnimation` and `scheduleOnRN` safely tear down worklets upon unmount or interrupt.
+
+---
+
 ## [0.4.2] - 2026-09-21
 
 ### Fixed

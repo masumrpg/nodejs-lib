@@ -16,6 +16,7 @@ import Svg, { Path } from "react-native-svg";
 import { useTheme } from "../theme";
 import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
+import { type BaseHapticProps } from "./types";
 
 export interface SignaturePadRef {
   clear: () => void;
@@ -25,7 +26,7 @@ export interface SignaturePadRef {
   isEmpty: () => boolean;
 }
 
-export interface SignaturePadProps {
+export interface SignaturePadProps extends BaseHapticProps {
   strokeColor?: string;
   strokeWidth?: number;
   backgroundColor?: string;
@@ -34,7 +35,6 @@ export interface SignaturePadProps {
   onBegin?: () => void;
   onEnd?: () => void;
   onChange?: (paths: string[]) => void;
-  hapticFeedback?: boolean;
   height?: number;
   style?: StyleProp<ViewStyle>;
 }
@@ -83,14 +83,14 @@ export const SignaturePad = React.forwardRef<SignaturePadRef, SignaturePadProps>
       onBegin,
       onEnd,
       onChange,
-      hapticFeedback = true,
+      haptic = true,
       height = 200,
       style,
     },
     ref,
   ) => {
-    const { colors, radii, isDark } = useTheme();
-    const activeStrokeColor = strokeColor ?? (isDark ? "#FFFFFF" : colors.text);
+    const { colors, radii } = useTheme();
+    const activeStrokeColor = strokeColor ?? colors.text;
     const activeBgColor = backgroundColor ?? colors.surface;
 
     const [paths, setPaths] = useState<string[]>([]);
@@ -99,20 +99,20 @@ export const SignaturePad = React.forwardRef<SignaturePadRef, SignaturePadProps>
     const currentStrokeRef = useRef<Point[]>([]);
 
     const clear = useCallback(() => {
-      if (hapticFeedback) triggerHaptic("selection");
+      if (haptic) triggerHaptic("selection");
       setPaths([]);
       setCurrentPoints([]);
       currentStrokeRef.current = [];
       onChange?.([]);
-    }, [hapticFeedback, onChange]);
+    }, [haptic, onChange]);
 
     const undo = useCallback(() => {
       if (paths.length === 0) return;
-      if (hapticFeedback) triggerHaptic("selection");
+      if (haptic) triggerHaptic("selection");
       const next = paths.slice(0, -1);
       setPaths(next);
       onChange?.(next);
-    }, [hapticFeedback, onChange, paths]);
+    }, [haptic, onChange, paths]);
 
     useImperativeHandle(ref, () => ({
       clear,

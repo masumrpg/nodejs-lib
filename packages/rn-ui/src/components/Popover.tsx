@@ -133,9 +133,15 @@ export function PopoverContent({
   React.useEffect(() => {
     if (context?.open) {
       triggerHaptic("medium");
-      progress.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.quad) });
+      progress.value = withTiming(1, {
+        duration: 180,
+        easing: Easing.bezier(0.23, 1, 0.32, 1),
+      });
     } else {
-      progress.value = withTiming(0, { duration: 140, easing: Easing.in(Easing.quad) });
+      progress.value = withTiming(0, {
+        duration: 140,
+        easing: Easing.bezier(0.23, 1, 0.32, 1),
+      });
     }
   }, [context?.open, progress]);
 

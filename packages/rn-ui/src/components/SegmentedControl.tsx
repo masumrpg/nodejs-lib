@@ -15,9 +15,20 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { useTheme } from "../theme";
+import { withAlpha } from "../utils/color";
 import { triggerHaptic } from "../utils/haptics";
 import { Badge } from "./Badge";
-import { renderIcon, type ComponentSize, type ComponentTone, type RenderIcon } from "./types";
+import {
+  renderIcon,
+  type BaseAnimatedProps,
+  type BaseGlassProps,
+  type BaseHapticProps,
+  type ComponentSize,
+  type ComponentTone,
+  type RenderIcon,
+  type SizeProps,
+  type ToneProps,
+} from "./types";
 import { Text } from "./Text";
 
 export interface SegmentedOption {
@@ -28,15 +39,17 @@ export interface SegmentedOption {
   disabled?: boolean;
 }
 
-export interface SegmentedControlProps {
+export interface SegmentedControlProps
+  extends ToneProps<ComponentTone>,
+    SizeProps<ComponentSize>,
+    BaseGlassProps,
+    BaseHapticProps,
+    BaseAnimatedProps {
   values: (string | SegmentedOption)[];
   selectedIndex?: number;
   defaultIndex?: number;
   onChange?: (index: number, value: string) => void;
-  size?: ComponentSize;
-  tone?: ComponentTone;
   disabled?: boolean;
-  hapticFeedback?: boolean;
   style?: StyleProp<ViewStyle>;
   segmentStyle?: StyleProp<ViewStyle>;
   indicatorStyle?: StyleProp<ViewStyle>;
@@ -55,7 +68,9 @@ export function SegmentedControl({
   size = "md",
   tone = "primary",
   disabled = false,
-  hapticFeedback = true,
+  haptic = true,
+  animated = true,
+  glass = false,
   style,
   segmentStyle,
   indicatorStyle,
@@ -91,23 +106,28 @@ export function SegmentedControl({
       const segmentW = innerWidth / count;
       const targetX = padding + activeIndex * segmentW;
 
-      indicatorX.value = withSpring(targetX, {
-        damping: 20,
-        stiffness: 260,
-        mass: 0.7,
-      });
-      indicatorWidth.value = withSpring(segmentW, {
-        damping: 20,
-        stiffness: 260,
-        mass: 0.7,
-      });
+      if (!animated) {
+        indicatorX.value = targetX;
+        indicatorWidth.value = segmentW;
+      } else {
+        indicatorX.value = withSpring(targetX, {
+          duration: 240,
+          dampingRatio: 1,
+          overshootClamping: true,
+        });
+        indicatorWidth.value = withSpring(segmentW, {
+          duration: 240,
+          dampingRatio: 1,
+          overshootClamping: true,
+        });
+      }
     }
-  }, [activeIndex, containerWidth, count, indicatorWidth, indicatorX]);
+  }, [activeIndex, animated, containerWidth, count, indicatorWidth, indicatorX]);
 
   const handleSelect = useCallback(
     (index: number) => {
       if (disabled || options[index]?.disabled) return;
-      if (hapticFeedback) {
+      if (haptic) {
         triggerHaptic("selection");
       }
       if (!isControlled) {
@@ -115,7 +135,7 @@ export function SegmentedControl({
       }
       onChange?.(index, options[index]?.value ?? "");
     },
-    [disabled, hapticFeedback, isControlled, onChange, options],
+    [disabled, haptic, isControlled, onChange, options],
   );
 
   const indicatorAnimatedStyle = useAnimatedStyle(() => ({
@@ -127,6 +147,7 @@ export function SegmentedControl({
 
   return (
     <View
+      accessibilityRole="tablist"
       onLayout={(e: LayoutChangeEvent) =>
         setContainerWidth(e.nativeEvent.layout.width)
       }
@@ -134,15 +155,17 @@ export function SegmentedControl({
         {
           height,
           flexDirection: "row",
-          backgroundColor: isDark
-            ? "rgba(30, 41, 59, 0.85)"
-            : colors.backgroundMuted,
+          backgroundColor: glass
+            ? withAlpha(isDark ? (colors.surfaceRaised ?? colors.surface) : colors.surface, 0.72)
+            : isDark
+              ? "rgba(30, 41, 59, 0.85)"
+              : colors.backgroundMuted,
           borderRadius: radii.lg,
           padding,
           position: "relative",
           alignItems: "center",
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.border,
+          borderColor: glass ? withAlpha(colors.border, 0.5) : colors.border,
           opacity: disabled ? 0.5 : 1,
         },
         style,
@@ -157,8 +180,8 @@ export function SegmentedControl({
             bottom: padding,
             borderRadius: radii.md,
             backgroundColor: isDark
-              ? colors.surfaceRaised ?? "#1e293b"
-              : "#FFFFFF",
+              ? colors.surfaceRaised ?? colors.surface
+              : colors.surface,
             shadowColor: "#000000",
             shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.12,
@@ -180,6 +203,9 @@ export function SegmentedControl({
         return (
           <Pressable
             key={`${option.value}-${idx}`}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isSelected, disabled: isOptionDisabled }}
+            accessibilityLabel={option.label}
             disabled={isOptionDisabled}
             onPress={() => handleSelect(idx)}
             style={[

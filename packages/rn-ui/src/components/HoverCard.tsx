@@ -10,6 +10,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -129,7 +130,7 @@ export function HoverCardTrigger({
     closeDelay,
     triggerMode,
   } = useHoverCard();
-  const triggerRef = React.useRef<View>(null);
+  const triggerRef = React.useRef<React.ComponentRef<typeof View>>(null);
   const openTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -145,13 +146,15 @@ export function HoverCardTrigger({
       if (disabled || triggerMode === "manual") return;
 
       if (closeTimer.current) clearTimeout(closeTimer.current);
-      triggerRef.current?.measureInWindow((x, y, width, height) => {
-        if (width > 0 && height > 0) {
-          setTriggerLayout({ pageX: x, pageY: y, width, height });
-          if (openTimer.current) clearTimeout(openTimer.current);
-          openTimer.current = setTimeout(() => setOpen(nextOpen), openDelay);
-        }
-      });
+      triggerRef.current?.measureInWindow(
+        (x: number, y: number, width: number, height: number) => {
+          if (width > 0 && height > 0) {
+            setTriggerLayout({ pageX: x, pageY: y, width, height });
+            if (openTimer.current) clearTimeout(openTimer.current);
+            openTimer.current = setTimeout(() => setOpen(nextOpen), openDelay);
+          }
+        },
+      );
     },
     [disabled, openDelay, setOpen, setTriggerLayout, triggerMode],
   );
@@ -165,7 +168,7 @@ export function HoverCardTrigger({
 
   return (
     <Pressable
-      ref={triggerRef}
+      ref={triggerRef as never}
       accessibilityRole="button"
       accessibilityState={{ expanded: open, disabled }}
       disabled={disabled}
@@ -213,7 +216,10 @@ export function HoverCardContent({
   const progress = useSharedValue(0);
 
   React.useEffect(() => {
-    progress.value = withTiming(open ? 1 : 0, { duration: 100 });
+    progress.value = withTiming(open ? 1 : 0, {
+      duration: 120,
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
+    });
   }, [open, progress]);
 
   const { height: screenHeight, width: screenWidth } = Dimensions.get("window");

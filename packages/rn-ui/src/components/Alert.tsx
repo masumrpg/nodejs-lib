@@ -7,6 +7,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -16,7 +17,14 @@ import { scheduleOnRN } from "react-native-worklets";
 import { useTheme } from "../theme";
 import { withAlpha } from "../utils";
 import { Text } from "./Text";
-import { renderIcon, type RenderIcon, type BaseGlassProps } from "./types";
+import {
+  renderIcon,
+  type BaseAnimatedProps,
+  type BaseGlassProps,
+  type RenderIcon,
+  type ToneProps,
+  type VariantProps,
+} from "./types";
 
 export type AlertTone =
   | "primary"
@@ -34,15 +42,16 @@ export interface AlertAction {
   icon?: RenderIcon;
 }
 
-export interface AlertProps extends BaseGlassProps {
+export interface AlertProps
+  extends BaseGlassProps,
+    ToneProps<AlertTone>,
+    VariantProps<AlertVariant>,
+    BaseAnimatedProps {
   title?: React.ReactNode;
   children?: React.ReactNode;
-  tone?: AlertTone;
-  variant?: AlertVariant;
   icon?: RenderIcon;
   action?: AlertAction;
   dismissible?: boolean;
-  animated?: boolean;
   animationDuration?: number;
   onClose?: () => void;
   closeIcon?: RenderIcon;
@@ -73,7 +82,13 @@ function DefaultInfoIcon({ color }: { color: string }) {
   );
 }
 
-function DefaultSuccessIcon({ color }: { color: string }) {
+function DefaultSuccessIcon({
+  color,
+  onColor,
+}: {
+  color: string;
+  onColor?: string;
+}) {
   return (
     <View
       style={{
@@ -91,7 +106,7 @@ function DefaultSuccessIcon({ color }: { color: string }) {
           height: 4,
           borderLeftWidth: 1.8,
           borderBottomWidth: 1.8,
-          borderColor: "#FFFFFF",
+          borderColor: onColor ?? "#FFFFFF",
           transform: [{ rotate: "-45deg" }],
           marginTop: -1,
         }}
@@ -108,7 +123,13 @@ function DefaultWarningIcon({ color }: { color: string }) {
   );
 }
 
-function DefaultDangerIcon({ color }: { color: string }) {
+function DefaultDangerIcon({
+  color,
+  onColor,
+}: {
+  color: string;
+  onColor?: string;
+}) {
   return (
     <View
       style={{
@@ -120,17 +141,17 @@ function DefaultDangerIcon({ color }: { color: string }) {
         justifyContent: "center",
       }}
     >
-      <Text style={{ color: "#FFFFFF", fontSize: 11, fontWeight: "700", lineHeight: 12 }}>
+      <Text style={{ color: onColor ?? "#FFFFFF", fontSize: 11, fontWeight: "700", lineHeight: 12 }}>
         ✕
       </Text>
     </View>
   );
 }
 
-function renderDefaultIcon(tone: AlertTone, color: string) {
-  if (tone === "success") return <DefaultSuccessIcon color={color} />;
+function renderDefaultIcon(tone: AlertTone, color: string, onColor?: string) {
+  if (tone === "success") return <DefaultSuccessIcon color={color} onColor={onColor} />;
   if (tone === "warning") return <DefaultWarningIcon color={color} />;
-  if (tone === "danger") return <DefaultDangerIcon color={color} />;
+  if (tone === "danger") return <DefaultDangerIcon color={color} onColor={onColor} />;
   return <DefaultInfoIcon color={color} />;
 }
 
@@ -156,16 +177,6 @@ export function Alert({
   const [visible, setVisible] = React.useState(true);
   const progress = useSharedValue(1);
 
-  // Deep rich solid colors for dark mode & light mode
-  const solidColors: Record<AlertTone, { bg: string; text: string }> = {
-    primary: { bg: isDark ? "#3730A3" : colors.primary, text: "#FFFFFF" },
-    success: { bg: isDark ? "#065F46" : "#059669", text: "#FFFFFF" },
-    warning: { bg: isDark ? "#92400E" : "#D97706", text: "#FFFFFF" },
-    danger: { bg: isDark ? "#991B1B" : "#DC2626", text: "#FFFFFF" },
-    info: { bg: isDark ? "#075985" : "#0284C7", text: "#FFFFFF" },
-    secondary: { bg: isDark ? "#334155" : colors.secondary, text: "#FFFFFF" },
-  };
-
   const toneBaseColor: Record<AlertTone, string> = {
     primary: colors.primary,
     success: colors.success,
@@ -175,7 +186,31 @@ export function Alert({
     secondary: colors.secondary,
   };
 
+  const toneOnColor: Record<AlertTone, string> = {
+    primary: colors.onPrimary,
+    success: colors.onSuccess,
+    warning: colors.onWarning,
+    danger: colors.onDanger,
+    info: colors.onInfo,
+    secondary: colors.onSecondary,
+  };
+
   const currentToneColor = toneBaseColor[tone];
+  const currentOnColor = toneOnColor[tone] ?? colors.textInverse;
+
+  // Solid variant colors mapped directly from theme tokens (single source of truth)
+  const solidColors: Record<AlertTone, { bg: string; text: string }> = {
+    primary: {
+      bg: isDark ? (colors.primaryStrong ?? colors.primary) : colors.primary,
+      text: colors.onPrimary,
+    },
+    success: { bg: colors.success, text: colors.onSuccess },
+    warning: { bg: colors.warning, text: colors.onWarning },
+    danger: { bg: colors.danger, text: colors.onDanger },
+    info: { bg: colors.info, text: colors.onInfo },
+    secondary: { bg: colors.secondary, text: colors.onSecondary },
+  };
+
   const effectiveVariant = glass ? "glass" : variant;
 
   const glassBg = isDark
@@ -233,7 +268,10 @@ export function Alert({
     if ((dismissible || onClose) && animated) {
       progress.value = withTiming(
         0,
-        { duration: animationDuration },
+        {
+          duration: animationDuration,
+          easing: Easing.bezier(0.23, 1, 0.32, 1),
+        },
         (finished) => {
           if (finished) {
             scheduleOnRN(setVisible, false);
@@ -274,7 +312,13 @@ export function Alert({
     >
       {/* Icon */}
       <View style={{ marginTop: 2 }}>
-        {icon ? renderIcon(icon, iconColor, 20) : renderDefaultIcon(tone, iconColor)}
+        {icon
+          ? renderIcon(icon, iconColor, 20)
+          : renderDefaultIcon(
+              tone,
+              iconColor,
+              effectiveVariant === "solid" ? currentOnColor : undefined,
+            )}
       </View>
 
       {/* Main Content */}
@@ -333,7 +377,7 @@ export function Alert({
           accessibilityRole="button"
           accessibilityLabel="Close alert"
           onPress={handleClose}
-          hitSlop={8}
+          hitSlop={12}
           style={({ pressed }) => ({
             width: 24,
             height: 24,

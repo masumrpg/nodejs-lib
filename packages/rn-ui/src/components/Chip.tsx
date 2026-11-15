@@ -7,22 +7,40 @@ import {
   ViewStyle,
 } from "react-native";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import Svg, { Path } from "react-native-svg";
 
 import { useTheme } from "../theme";
 import { withAlpha } from "../utils/color";
 import { triggerHaptic } from "../utils/haptics";
-import { renderIcon, type ComponentSize, type ComponentTone, type RenderIcon } from "./types";
+import {
+  renderIcon,
+  type BaseAnimatedProps,
+  type BaseGlassProps,
+  type BaseHapticProps,
+  type ComponentSize,
+  type ComponentTone,
+  type RenderIcon,
+  type SizeProps,
+  type ToneProps,
+  type VariantProps,
+} from "./types";
 import { Text } from "./Text";
 
 export type ChipVariant = "filled" | "outline" | "soft";
 
-export interface ChipProps {
+export interface ChipProps
+  extends VariantProps<ChipVariant>,
+    ToneProps<ComponentTone>,
+    SizeProps<ComponentSize>,
+    BaseGlassProps,
+    BaseHapticProps,
+    BaseAnimatedProps {
   label: string;
   selected?: boolean;
   onSelect?: (selected: boolean) => void;
@@ -30,11 +48,7 @@ export interface ChipProps {
   onClose?: () => void;
   icon?: RenderIcon;
   rightIcon?: RenderIcon;
-  variant?: ChipVariant;
-  size?: ComponentSize;
-  tone?: ComponentTone;
   disabled?: boolean;
-  hapticFeedback?: boolean;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
 }
@@ -54,7 +68,9 @@ export function Chip({
   size = "md",
   tone = "primary",
   disabled = false,
-  hapticFeedback = true,
+  haptic = true,
+  animated = true,
+  glass = false,
   style,
   textStyle,
 }: ChipProps) {
@@ -68,15 +84,15 @@ export function Chip({
   const isDismissing = useSharedValue(1);
 
   useEffect(() => {
-    selectProgress.value = withSpring(selected ? 1 : 0, {
-      damping: 18,
-      stiffness: 240,
+    selectProgress.value = withTiming(selected ? 1 : 0, {
+      duration: 140,
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
     });
   }, [selectProgress, selected]);
 
   const handlePress = () => {
     if (disabled) return;
-    if (hapticFeedback) {
+    if (haptic) {
       triggerHaptic("selection");
     }
     if (isSelectable) {
@@ -87,16 +103,37 @@ export function Chip({
 
   const handleClose = () => {
     if (disabled) return;
-    if (hapticFeedback) {
+    if (haptic) {
       triggerHaptic("selection");
     }
-    isDismissing.value = withTiming(0, { duration: 160 });
-    setTimeout(() => {
-      onClose?.();
-    }, 160);
+    isDismissing.value = withTiming(
+      0,
+      { duration: 160, easing: Easing.bezier(0.23, 1, 0.32, 1) },
+      (finished) => {
+        if (finished && onClose) {
+          scheduleOnRN(onClose);
+        }
+      },
+    );
   };
 
   const toneColor = tone && tone !== "default" ? colors[tone] : colors.primary;
+  const onToneColor =
+    tone === "primary"
+      ? colors.onPrimary
+      : tone === "secondary"
+        ? colors.onSecondary
+        : tone === "accent"
+          ? colors.onAccent
+          : tone === "success"
+            ? colors.onSuccess
+            : tone === "warning"
+              ? colors.onWarning
+              : tone === "danger"
+                ? colors.onDanger
+                : tone === "info"
+                  ? colors.onInfo
+                  : colors.textInverse;
 
   const height = size === "sm" ? 28 : size === "lg" ? 40 : 34;
   const paddingHorizontal = size === "sm" ? 10 : size === "lg" ? 16 : 12;
@@ -111,7 +148,7 @@ export function Chip({
   if (variant === "filled") {
     if (selected) {
       backgroundColor = toneColor;
-      textColor = "#FFFFFF";
+      textColor = onToneColor;
     } else {
       backgroundColor = colors.backgroundMuted;
       textColor = colors.text;
@@ -142,8 +179,12 @@ export function Chip({
     }
   }
 
+  if (glass) {
+    backgroundColor = withAlpha(backgroundColor, 0.72);
+  }
+
   const animatedChipStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: (1 - pressed.value * 0.05) * isDismissing.value }],
+    transform: [{ scale: animated ? (1 - pressed.value * 0.05) * isDismissing.value : isDismissing.value }],
     opacity: isDismissing.value,
   }));
 
@@ -155,13 +196,24 @@ export function Chip({
   return (
     <Animated.View style={[animatedChipStyle, { alignSelf: "flex-start" }]}>
       <Pressable
+        accessibilityRole={isSelectable ? "checkbox" : isInteractive ? "button" : undefined}
+        accessibilityState={{ selected, disabled }}
+        accessibilityLabel={label}
         disabled={disabled || !isInteractive}
         onPress={handlePress}
         onPressIn={() => {
-          pressed.value = withTiming(1, { duration: 80 });
+          if (!animated) return;
+          pressed.value = withTiming(1, {
+            duration: 90,
+            easing: Easing.bezier(0.23, 1, 0.32, 1),
+          });
         }}
         onPressOut={() => {
-          pressed.value = withTiming(0, { duration: 120 });
+          if (!animated) return;
+          pressed.value = withTiming(0, {
+            duration: 120,
+            easing: Easing.bezier(0.23, 1, 0.32, 1),
+          });
         }}
         style={[
           {
@@ -221,7 +273,9 @@ export function Chip({
         {/* Dismiss / Remove Icon */}
         {onClose && (
           <Pressable
-            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove ${label}`}
+            hitSlop={10}
             disabled={disabled}
             onPress={handleClose}
             style={{

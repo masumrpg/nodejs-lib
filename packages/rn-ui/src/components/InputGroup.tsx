@@ -3,7 +3,7 @@ import {
   Text as RNText,
   View,
   type StyleProp,
-  type TextInput,
+  type TextInputInstance,
   type TextStyle,
   type ViewProps,
   type ViewStyle,
@@ -262,8 +262,10 @@ export function InputGroupText({
 
 export interface InputGroupInputProps extends InputProps {}
 
-export const InputGroupInput = React.forwardRef<
-  TextInput,
+export const InputGroupInput: (
+  props: InputGroupInputProps & { ref?: React.Ref<TextInputInstance> },
+) => React.ReactNode = React.forwardRef<
+  TextInputInstance,
   InputGroupInputProps
 >(function InputGroupInput(
   {
@@ -286,7 +288,7 @@ export const InputGroupInput = React.forwardRef<
 
   return (
     <Input
-      ref={ref}
+      ref={ref as never}
       invalid={false}
       disabled={!isEditable}
       editable={isEditable}
@@ -320,13 +322,15 @@ export interface InputGroupTextareaProps extends Omit<
   "multiline"
 > {}
 
-export const InputGroupTextarea = React.forwardRef<
-  TextInput,
+export const InputGroupTextarea: (
+  props: InputGroupTextareaProps & { ref?: React.Ref<TextInputInstance> },
+) => React.ReactNode = React.forwardRef<
+  TextInputInstance,
   InputGroupTextareaProps
 >(function InputGroupTextarea({ style, ...props }, ref) {
   return (
     <InputGroupInput
-      ref={ref}
+      ref={ref as never}
       multiline
       textAlignVertical="top"
       style={[

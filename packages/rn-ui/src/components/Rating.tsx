@@ -7,12 +7,17 @@ import {
   type ViewProps,
   type ViewStyle,
 } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import {
+  GestureDetector,
+  useCompetingGestures,
+  usePanGesture,
+  useTapGesture,
+} from "react-native-gesture-handler";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
-  withSequence,
-  withSpring,
+  withTiming,
   type SharedValue,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
@@ -23,9 +28,11 @@ import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
   renderIcon,
-  type RenderIcon,
   type BaseGlassProps,
   type BaseHapticProps,
+  type RenderIcon,
+  type SizeProps,
+  type ToneProps,
 } from "./types";
 
 export type RatingShape =
@@ -61,6 +68,8 @@ export interface RatingItemInfo {
 
 export interface RatingProps
   extends Omit<ViewProps, "style">,
+    ToneProps<RatingTone>,
+    SizeProps<Exclude<RatingSize, number>>,
     BaseGlassProps,
     BaseHapticProps {
   value?: number;
@@ -68,9 +77,7 @@ export interface RatingProps
   max?: number;
   precision?: RatingPrecision;
   shape?: RatingShape;
-  size?: RatingSize;
   gap?: number;
-  tone?: RatingTone;
   color?: string;
   emptyColor?: string;
   readOnly?: boolean;
@@ -340,6 +347,7 @@ export function Rating({
   );
 
   const ratingShared = useSharedValue(currentValue);
+  const lastEmittedRating = useSharedValue(currentValue);
   const isInteracting = useSharedValue(false);
   const containerWidth = useSharedValue(max * itemSize + (max - 1) * gap);
   const scaleAnim = useSharedValue(1);
@@ -349,9 +357,10 @@ export function Rating({
   React.useEffect(() => {
     if (!isInteracting.value) {
       ratingShared.value = currentValue;
+      lastEmittedRating.value = currentValue;
       setDisplayVal(currentValue);
     }
-  }, [currentValue, isInteracting, ratingShared]);
+  }, [currentValue, isInteracting, lastEmittedRating, ratingShared]);
 
   const updateRatingFromX = React.useCallback(
     (xPos: number, isFinal: boolean = false) => {
@@ -367,10 +376,12 @@ export function Rating({
       }
 
       ratingShared.value = nextVal;
-      scheduleOnRN(setDisplayVal, nextVal);
-
-      if (onValueChange) {
-        scheduleOnRN(onValueChange, nextVal);
+      if (nextVal !== lastEmittedRating.value || isFinal) {
+        lastEmittedRating.value = nextVal;
+        scheduleOnRN(setDisplayVal, nextVal);
+        if (onValueChange) {
+          scheduleOnRN(onValueChange, nextVal);
+        }
       }
       if (isFinal && !isControlled) {
         scheduleOnRN(setInternalValue, nextVal);
@@ -381,6 +392,7 @@ export function Rating({
       containerWidth,
       isControlled,
       itemSize,
+      lastEmittedRating,
       max,
       onValueChange,
       ratingShared,
@@ -392,51 +404,63 @@ export function Rating({
     if (haptic) triggerHaptic("selection");
   }, [haptic]);
 
-  const tapGesture = Gesture.Tap()
-    .enabled(!disabled && !readOnly)
-    .onEnd((e) => {
+  const tapGesture = useTapGesture({
+    enabled: !disabled && !readOnly,
+    onDeactivate: (e) => {
       "worklet";
-      updateRatingFromX(e.x, true);
-      scheduleOnRN(triggerHapticFeedback);
-    });
+      if (!e.canceled) {
+        updateRatingFromX(e.x, true);
+        scheduleOnRN(triggerHapticFeedback);
+      }
+    },
+  });
 
-  const panGesture = Gesture.Pan()
-    .enabled(!disabled && !readOnly)
-    .minDistance(2)
-    .onBegin((e) => {
+  const panGesture = usePanGesture({
+    enabled: !disabled && !readOnly,
+    minDistance: 2,
+    onBegin: (e) => {
       "worklet";
       isInteracting.value = true;
-      scaleAnim.value = withSpring(1.05, { damping: 15, stiffness: 200 });
+      scaleAnim.value = withTiming(1.04, {
+        duration: 120,
+        easing: Easing.bezier(0.23, 1, 0.32, 1),
+      });
       if (onSlidingStart) {
         scheduleOnRN(onSlidingStart, ratingShared.value);
       }
       updateRatingFromX(e.x, false);
-    })
-    .onUpdate((e) => {
+    },
+    onUpdate: (e) => {
       "worklet";
       updateRatingFromX(e.x, false);
-    })
-    .onEnd((e) => {
+    },
+    onDeactivate: (e) => {
       "worklet";
-      updateRatingFromX(e.x, true);
-      const finalVal = ratingShared.value;
-      scaleAnim.value = withSequence(
-        withSpring(1.08, { damping: 10 }),
-        withSpring(1, { damping: 15 }),
-      );
-      if (onSlidingComplete) {
-        scheduleOnRN(onSlidingComplete, finalVal);
+      if (!e.canceled) {
+        updateRatingFromX(e.x, true);
+        const finalVal = ratingShared.value;
+        scaleAnim.value = withTiming(1, {
+          duration: 140,
+          easing: Easing.bezier(0.23, 1, 0.32, 1),
+        });
+        if (onSlidingComplete) {
+          scheduleOnRN(onSlidingComplete, finalVal);
+        }
+        scheduleOnRN(triggerHapticFeedback);
       }
-      scheduleOnRN(triggerHapticFeedback);
       isInteracting.value = false;
-    })
-    .onFinalize(() => {
+    },
+    onFinalize: () => {
       "worklet";
       isInteracting.value = false;
-      scaleAnim.value = withSpring(1);
-    });
+      scaleAnim.value = withTiming(1, {
+        duration: 140,
+        easing: Easing.bezier(0.23, 1, 0.32, 1),
+      });
+    },
+  });
 
-  const composedGesture = Gesture.Race(tapGesture, panGesture);
+  const composedGesture = useCompetingGestures(tapGesture, panGesture);
 
   const containerAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scaleAnim.value }],
@@ -456,6 +480,9 @@ export function Rating({
     <View style={[styles.root, style]} {...props}>
       <GestureDetector gesture={composedGesture}>
         <Animated.View
+          accessibilityRole={readOnly ? undefined : "adjustable"}
+          accessibilityLabel="Rating"
+          accessibilityValue={{ min: 0, max, now: displayVal }}
           onLayout={handleLayout}
           style={[styles.container, { gap }, containerAnimatedStyle]}
         >

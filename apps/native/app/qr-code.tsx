@@ -30,7 +30,7 @@ const icon =
   (Icon: React.ComponentType<{ color?: string; size?: number }>): RenderIcon =>
   ({ color, size }) => <Icon color={color} size={size} />;
 
-const DOCS_URL = "https://react-native-library-docs.vercel.app/";
+const DOCS_URL = "https://lib.masumdev.id/";
 
 async function shareQRCodeFile(
   base64Data: string,
@@ -292,7 +292,7 @@ export default function QRCodeScreen() {
                   Scan to explore live documentation & components
                 </Text>
                 <Badge tone="primary" variant="outline" size="sm">
-                  react-native-library-docs.vercel.app
+                  lib.masumdev.id
                 </Badge>
               </Box>
             </Card>

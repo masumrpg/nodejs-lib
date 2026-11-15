@@ -1,9 +1,59 @@
 ---
 title: Slider
-description: Range track slider component with min/max values and tone styling.
+description: Continuous and stepped track slider component powered by Gesture Handler & Reanimated worklets.
 sidebar:
   badge:
     text: Updated
     variant: note
 ---
+
+import { Code } from '@astrojs/starlight/components';
+import TypeTable from '@/components/TypeTable.astro';
+
+export const sliderCode = `import React, { useState } from 'react';
+import { Slider, Box, Text } from '@masumdev/rn-ui';
+
+export function SliderExample() {
+  const [volume, setVolume] = useState(40);
+
+  return (
+    <Box gap="md">
+      <Text>Volume: {Math.round(volume)}%</Text>
+      <Slider
+        min={0}
+        max={100}
+        step={1}
+        value={volume}
+        onValueChange={setVolume}
+        tone="primary"
+        haptic
+      />
+    </Box>
+  );
+}`;
+
+`Slider` provides smooth 60–120fps continuous or stepped numeric input along a horizontal track with Reanimated worklets, gesture detection, accessibility adjustable role, and haptic detents.
+
+## Usage
+
+<Code code={sliderCode} lang="tsx" title="SliderExample.tsx" mark={['Slider', 'min', 'max', 'onValueChange']} />
+
+## Props API
+
+<TypeTable
+  type={{
+    min: { type: 'number', default: '0', description: 'Minimum numerical range value.' },
+    max: { type: 'number', default: '100', description: 'Maximum numerical range value.' },
+    step: { type: 'number', default: '1', description: 'Step increment for snapping.' },
+    value: { type: 'number', description: 'Controlled slider value.' },
+    defaultValue: { type: 'number', default: '0', description: 'Initial uncontrolled slider value.' },
+    onValueChange: { type: '(value: number) => void', description: 'Callback emitted continuously during sliding.' },
+    onSlidingStart: { type: '(value: number) => void', description: 'Callback emitted when drag begins.' },
+    onSlidingComplete: { type: '(value: number) => void', description: 'Callback emitted when drag ends.' },
+    tone: { type: "'primary' | 'secondary' | 'accent' | 'success' | 'warning' | 'danger' | 'info'", default: "'primary'", description: 'Color tone for active track and thumb.' },
+    disabled: { type: 'boolean', default: 'false', description: 'Disables gesture tracking and dims track.' },
+    haptic: { type: 'boolean', default: 'true', description: 'Trigger haptic feedback when passing stepped increments.' },
+    glass: { type: 'boolean', default: 'false', description: 'Enable translucent frosted track styling.' },
+  }}
+/>
 

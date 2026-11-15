@@ -1,30 +1,38 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   LayoutChangeEvent,
   StyleProp,
   View,
   ViewStyle,
 } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 
 import { useTheme } from "../theme";
+import { withAlpha } from "../utils/color";
 import { triggerHaptic } from "../utils/haptics";
-import { type ComponentTone } from "./types";
+import {
+  type BaseGlassProps,
+  type BaseHapticProps,
+  type ComponentTone,
+  type ToneProps,
+} from "./types";
 
-export interface RangeSliderProps {
+export interface RangeSliderProps
+  extends ToneProps<ComponentTone>,
+    BaseGlassProps,
+    BaseHapticProps {
   min?: number;
   max?: number;
   step?: number;
   value?: [number, number];
   defaultValue?: [number, number];
   onValueChange?: (values: [number, number]) => void;
-  tone?: ComponentTone;
   disabled?: boolean;
-  hapticFeedback?: boolean;
   trackHeight?: number;
   thumbSize?: number;
   style?: StyleProp<ViewStyle>;
@@ -53,7 +61,8 @@ export function RangeSlider({
   onValueChange,
   tone = "primary",
   disabled = false,
-  hapticFeedback = true,
+  glass = false,
+  haptic = true,
   trackHeight = 6,
   thumbSize = 24,
   style,
@@ -75,18 +84,22 @@ export function RangeSlider({
   const minProgress = useSharedValue(minRatio);
   const maxProgress = useSharedValue(maxRatio);
   const trackWidth = useSharedValue(0);
+  const lastEmittedMin = useSharedValue(currentValues[0]);
+  const lastEmittedMax = useSharedValue(currentValues[1]);
 
   // Sync progress values directly without bounce
   useEffect(() => {
     minProgress.value = minRatio;
     maxProgress.value = maxRatio;
-  }, [maxProgress, maxRatio, minProgress, minRatio]);
+    lastEmittedMin.value = currentValues[0];
+    lastEmittedMax.value = currentValues[1];
+  }, [currentValues, lastEmittedMax, lastEmittedMin, maxProgress, maxRatio, minProgress, minRatio]);
 
   const updateValues = useCallback(
     (newMin: number, newMax: number) => {
       const safeMin = Math.min(newMin, newMax);
       const safeMax = Math.max(newMin, newMax);
-      if (hapticFeedback) {
+      if (haptic) {
         triggerHaptic("selection");
       }
       if (!isControlled) {
@@ -94,7 +107,7 @@ export function RangeSlider({
       }
       onValueChange?.([safeMin, safeMax]);
     },
-    [hapticFeedback, isControlled, onValueChange],
+    [haptic, isControlled, onValueChange],
   );
 
   const handleActiveThumbChange = useCallback((thumb: "min" | "max" | null) => {
@@ -103,82 +116,93 @@ export function RangeSlider({
 
   const activeDragThumb = useSharedValue<"min" | "max">("min");
 
-  const gesture = useMemo(() => {
-    return Gesture.Pan()
-      .enabled(!disabled)
-      .minDistance(0)
-      .hitSlop({ top: 15, bottom: 15, left: 10, right: 10 })
-      .runOnJS(true)
-      .onBegin((e) => {
-        const width = trackWidth.value;
-        if (width <= 0) return;
+  const panGesture = usePanGesture({
+    enabled: !disabled,
+    minDistance: 0,
+    hitSlop: { top: 15, bottom: 15, left: 10, right: 10 },
+    onBegin: (e) => {
+      "worklet";
+      const width = trackWidth.value;
+      if (width <= 0) return;
 
-        const touchProgress = clamp(e.x / width, 0, 1);
-        const distToMin = Math.abs(touchProgress - minProgress.value);
-        const distToMax = Math.abs(touchProgress - maxProgress.value);
+      const touchProgress = clamp(e.x / width, 0, 1);
+      const distToMin = Math.abs(touchProgress - minProgress.value);
+      const distToMax = Math.abs(touchProgress - maxProgress.value);
 
-        const chosen = distToMin <= distToMax ? "min" : "max";
-        activeDragThumb.value = chosen;
-        handleActiveThumbChange(chosen);
+      const chosen = distToMin <= distToMax ? "min" : "max";
+      activeDragThumb.value = chosen;
+      scheduleOnRN(handleActiveThumbChange, chosen);
 
-        if (chosen === "min") {
-          const clampedProg = Math.min(touchProgress, maxProgress.value);
-          minProgress.value = clampedProg;
-          const raw = min + clampedProg * range;
-          const snapped = clamp(snap(raw, step, min), min, max);
-          const currentMax = min + maxProgress.value * range;
-          const snappedMax = clamp(snap(currentMax, step, min), min, max);
-          updateValues(snapped, Math.max(snapped, snappedMax));
-        } else {
-          const clampedProg = Math.max(touchProgress, minProgress.value);
-          maxProgress.value = clampedProg;
-          const raw = min + clampedProg * range;
-          const snapped = clamp(snap(raw, step, min), min, max);
-          const currentMin = min + minProgress.value * range;
-          const snappedMin = clamp(snap(currentMin, step, min), min, max);
-          updateValues(Math.min(snappedMin, snapped), snapped);
-        }
-      })
-      .onUpdate((e) => {
-        const width = trackWidth.value;
-        if (width <= 0) return;
+      let nextMin = minProgress.value;
+      let nextMax = maxProgress.value;
 
-        const touchProgress = clamp(e.x / width, 0, 1);
+      if (chosen === "min") {
+        const clampedProg = Math.min(touchProgress, maxProgress.value);
+        minProgress.value = clampedProg;
+        const raw = min + clampedProg * range;
+        const snapped = clamp(snap(raw, step, min), min, max);
+        const currentMax = min + maxProgress.value * range;
+        const snappedMax = clamp(snap(currentMax, step, min), min, max);
+        nextMin = snapped;
+        nextMax = Math.max(snapped, snappedMax);
+      } else {
+        const clampedProg = Math.max(touchProgress, minProgress.value);
+        maxProgress.value = clampedProg;
+        const raw = min + clampedProg * range;
+        const snapped = clamp(snap(raw, step, min), min, max);
+        const currentMin = min + minProgress.value * range;
+        const snappedMin = clamp(snap(currentMin, step, min), min, max);
+        nextMin = Math.min(snappedMin, snapped);
+        nextMax = snapped;
+      }
 
-        if (activeDragThumb.value === "min") {
-          const clampedProg = Math.min(touchProgress, maxProgress.value);
-          minProgress.value = clampedProg;
-          const raw = min + clampedProg * range;
-          const snapped = clamp(snap(raw, step, min), min, max);
-          const currentMax = min + maxProgress.value * range;
-          const snappedMax = clamp(snap(currentMax, step, min), min, max);
-          updateValues(snapped, Math.max(snapped, snappedMax));
-        } else {
-          const clampedProg = Math.max(touchProgress, minProgress.value);
-          maxProgress.value = clampedProg;
-          const raw = min + clampedProg * range;
-          const snapped = clamp(snap(raw, step, min), min, max);
-          const currentMin = min + minProgress.value * range;
-          const snappedMin = clamp(snap(currentMin, step, min), min, max);
-          updateValues(Math.min(snappedMin, snapped), snapped);
-        }
-      })
-      .onEnd(() => {
-        handleActiveThumbChange(null);
-      });
-  }, [
-    disabled,
-    handleActiveThumbChange,
-    max,
-    maxProgress,
-    min,
-    minProgress,
-    range,
-    step,
-    trackWidth,
-    updateValues,
-    activeDragThumb,
-  ]);
+      if (nextMin !== lastEmittedMin.value || nextMax !== lastEmittedMax.value) {
+        lastEmittedMin.value = nextMin;
+        lastEmittedMax.value = nextMax;
+        scheduleOnRN(updateValues, nextMin, nextMax);
+      }
+    },
+    onUpdate: (e) => {
+      "worklet";
+      const width = trackWidth.value;
+      if (width <= 0) return;
+
+      const touchProgress = clamp(e.x / width, 0, 1);
+
+      let nextMin = minProgress.value;
+      let nextMax = maxProgress.value;
+
+      if (activeDragThumb.value === "min") {
+        const clampedProg = Math.min(touchProgress, maxProgress.value);
+        minProgress.value = clampedProg;
+        const raw = min + clampedProg * range;
+        const snapped = clamp(snap(raw, step, min), min, max);
+        const currentMax = min + maxProgress.value * range;
+        const snappedMax = clamp(snap(currentMax, step, min), min, max);
+        nextMin = snapped;
+        nextMax = Math.max(snapped, snappedMax);
+      } else {
+        const clampedProg = Math.max(touchProgress, minProgress.value);
+        maxProgress.value = clampedProg;
+        const raw = min + clampedProg * range;
+        const snapped = clamp(snap(raw, step, min), min, max);
+        const currentMin = min + minProgress.value * range;
+        const snappedMin = clamp(snap(currentMin, step, min), min, max);
+        nextMin = Math.min(snappedMin, snapped);
+        nextMax = snapped;
+      }
+
+      if (nextMin !== lastEmittedMin.value || nextMax !== lastEmittedMax.value) {
+        lastEmittedMin.value = nextMin;
+        lastEmittedMax.value = nextMax;
+        scheduleOnRN(updateValues, nextMin, nextMax);
+      }
+    },
+    onDeactivate: () => {
+      "worklet";
+      scheduleOnRN(handleActiveThumbChange, null);
+    },
+  });
 
   const minThumbStyle = useAnimatedStyle(() => {
     const travel = trackWidth.value > 0 ? trackWidth.value - thumbSize : 0;
@@ -212,7 +236,7 @@ export function RangeSlider({
 
   return (
     <View style={[{ width: "100%", paddingVertical: 14 }, style]}>
-      <GestureDetector gesture={gesture}>
+      <GestureDetector gesture={panGesture}>
         <View
           onLayout={handleLayout}
           style={{
@@ -227,9 +251,11 @@ export function RangeSlider({
             style={{
               height: trackHeight,
               borderRadius: radii.full,
-              backgroundColor: isDark
-                ? "rgba(51, 65, 85, 0.8)"
-                : colors.backgroundMuted,
+              backgroundColor: glass
+                ? withAlpha(colors.surface, 0.75)
+                : isDark
+                  ? "rgba(51, 65, 85, 0.8)"
+                  : colors.backgroundMuted,
               width: "100%",
             }}
           />
@@ -249,13 +275,20 @@ export function RangeSlider({
 
           {/* Min Thumb */}
           <Animated.View
+            accessibilityRole="adjustable"
+            accessibilityLabel="Minimum value"
+            accessibilityValue={{
+              min,
+              max: currentValues[1],
+              now: currentValues[0],
+            }}
             style={[
               {
                 position: "absolute",
                 width: thumbSize,
                 height: thumbSize,
                 borderRadius: radii.full,
-                backgroundColor: "#FFFFFF",
+                backgroundColor: colors.surface,
                 borderWidth: 2,
                 borderColor: toneColor,
                 shadowColor: "#000000",
@@ -273,13 +306,20 @@ export function RangeSlider({
 
           {/* Max Thumb */}
           <Animated.View
+            accessibilityRole="adjustable"
+            accessibilityLabel="Maximum value"
+            accessibilityValue={{
+              min: currentValues[0],
+              max,
+              now: currentValues[1],
+            }}
             style={[
               {
                 position: "absolute",
                 width: thumbSize,
                 height: thumbSize,
                 borderRadius: radii.full,
-                backgroundColor: "#FFFFFF",
+                backgroundColor: colors.surface,
                 borderWidth: 2,
                 borderColor: toneColor,
                 shadowColor: "#000000",

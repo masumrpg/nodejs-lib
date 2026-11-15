@@ -47,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Documentation & Homepage URLs**:
-  - Updated all monorepo documentation portal URLs and repository links to the new production domain: `https://react-native-library-docs.vercel.app/`.
+  - Updated all monorepo documentation portal URLs and repository links to the new production domain: `https://lib.masumdev.id/`.
 - **Monorepo Configuration & Import Resolving**:
   - Standardized `defineConfig` import resolution for TypeScript project configurations.
 

@@ -1,6 +1,6 @@
 # @masumdev/rn-ui
 
-> A modern, flat-designed React Native & Expo UI kit with 55+ typed components, dynamic light/dark theme engine, zero-shadow defaults, and pluggable architecture.
+> A modern, flat-designed React Native & Expo UI kit with 63+ typed components, dynamic light/dark theme engine, versatile borderless/outlined styling, zero-bounce worklet animations, and pluggable architecture.
 
 [![npm version](https://img.shields.io/npm/v/@masumdev/rn-ui.svg?style=flat-square&color=33CDCF)](https://www.npmjs.com/package/@masumdev/rn-ui)
 [![npm downloads](https://img.shields.io/npm/dt/@masumdev/rn-ui.svg?style=flat-square&color=33CDCF)](https://www.npmjs.com/package/@masumdev/rn-ui)
@@ -15,24 +15,25 @@
 
 Comprehensive guides, component previews, prop tables, and interactive examples are available in our official documentation:
 
-👉 **[Explore Full Documentation & Component Catalog](https://react-native-library-docs.vercel.app/rn-ui)**
+👉 **[Explore Full Documentation & Component Catalog](https://lib.masumdev.id/rn-ui)**
 
-- 📖 **[Installation Guide](https://react-native-library-docs.vercel.app/rn-ui/installation)**
-- 🎨 **[Theming & Dark Mode](https://react-native-library-docs.vercel.app/rn-ui/theming)**
-- 🧩 **[60+ Component Catalog](https://react-native-library-docs.vercel.app/rn-ui/components)**
-- 🛠️ **[Building Custom Components](https://react-native-library-docs.vercel.app/rn-ui/custom-components)**
+- 📖 **[Installation Guide](https://lib.masumdev.id/rn-ui/installation)**
+- 🎨 **[Theming & Dark Mode](https://lib.masumdev.id/rn-ui/theming)**
+- 🧩 **[60+ Component Catalog](https://lib.masumdev.id/rn-ui/components)**
+- 🛠️ **[Building Custom Components](https://lib.masumdev.id/rn-ui/custom-components)**
 - 📜 **[Architectural Rules](./RULES.md)**
-- 🚀 **[Changelog](https://react-native-library-docs.vercel.app/rn-ui/changelog)**
+- 🚀 **[Changelog](https://lib.masumdev.id/rn-ui/changelog)**
 
 ---
 
 ## ✨ Features
 
-- **Flat Aesthetic**: Border-based, clean UI primitives with zero elevation/shadow by default.
-- **Dynamic Theme Engine**: Light, dark, and system preference support via `ThemeProvider`.
-- **60+ Typed Components**: Forms, feedback, overlays, navigation, data display, and chat UI primitives.
+- **Versatile Flat & Borderless Design**: Border-based, clean UI primitives with zero elevation/shadow by default, full support for Spotify-style borderless layouts, elevated shadow cards, and glassmorphism.
+- **Dynamic Theme Engine**: Light, dark, and system preference support via `ThemeProvider` with single-source-of-truth semantic tokens.
+- **63+ Typed Components**: Forms, feedback, overlays, navigation, data display, and chat UI primitives.
 - **Pluggable Architecture**: Zero lock-in for fonts, icons, navigation, storage, or haptics.
-- **Reanimated Powered**: Smooth 60fps micro-animations powered by `react-native-reanimated`.
+- **Zero-Bounce Worklets**: Critically damped spring physics (`dampingRatio: 1, overshootClamping: true`) and cubic bezier curves running 100% on the UI thread.
+- **A11y First**: Enforced accessibility roles, interactive states, and touch targets (≥ 44pt).
 - **Strict Type Safety**: 100% TypeScript with zero `any` types and shared base UI prop interfaces.
 
 ---

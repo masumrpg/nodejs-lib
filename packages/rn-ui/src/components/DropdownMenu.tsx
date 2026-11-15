@@ -116,25 +116,27 @@ export function DropdownMenuTrigger({
   disabled = false,
 }: DropdownMenuTriggerProps) {
   const { open, setOpen, setTriggerLayout } = useDropdownMenu();
-  const triggerRef = React.useRef<View>(null);
+  const triggerRef = React.useRef<React.ComponentRef<typeof View>>(null);
 
   const handlePress = () => {
     if (disabled) return;
     triggerHaptic("selection");
 
-    triggerRef.current?.measureInWindow((x, y, width, height) => {
-      if (width > 0 && height > 0) {
-        setTriggerLayout({ pageX: x, pageY: y, width, height });
-        setOpen(!open);
-      }
-    });
+    triggerRef.current?.measureInWindow(
+      (x: number, y: number, width: number, height: number) => {
+        if (width > 0 && height > 0) {
+          setTriggerLayout({ pageX: x, pageY: y, width, height });
+          setOpen(!open);
+        }
+      },
+    );
   };
 
   if (React.isValidElement(children)) {
     return React.cloneElement(
       children as React.ReactElement<Record<string, unknown>>,
       {
-        ref: triggerRef,
+        ref: triggerRef as never,
         disabled,
         onPress: (e: GestureResponderEvent) => {
           handlePress();
@@ -150,7 +152,7 @@ export function DropdownMenuTrigger({
 
   return (
     <Pressable
-      ref={triggerRef}
+      ref={triggerRef as never}
       accessibilityRole="button"
       accessibilityState={{ expanded: open, disabled }}
       disabled={disabled}
@@ -193,9 +195,15 @@ export function DropdownMenuContent({
   React.useEffect(() => {
     if (open) {
       triggerHaptic("medium");
-      progress.value = withTiming(1, { duration: 160, easing: Easing.out(Easing.quad) });
+      progress.value = withTiming(1, {
+        duration: 160,
+        easing: Easing.bezier(0.23, 1, 0.32, 1),
+      });
     } else {
-      progress.value = withTiming(0, { duration: 120, easing: Easing.in(Easing.quad) });
+      progress.value = withTiming(0, {
+        duration: 120,
+        easing: Easing.bezier(0.23, 1, 0.32, 1),
+      });
     }
   }, [open, progress]);
 
@@ -262,7 +270,9 @@ export function DropdownMenuContent({
             position: "absolute",
             left,
             width,
-            backgroundColor: isDark ? "#0E2430" : colors.surface,
+            backgroundColor: isDark
+              ? colors.surfaceRaised ?? colors.surface
+              : colors.surface,
             borderWidth: components.borderWidth.strong,
             borderColor: colors.border,
             borderRadius: radii.xl,

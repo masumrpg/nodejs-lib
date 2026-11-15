@@ -46,7 +46,8 @@ export function RangeSliderExample() {
     onValueChange: { type: '(values: [number, number]) => void', description: 'Callback during drag.' },
     tone: { type: 'ComponentTone', default: '"primary"', description: 'Color tone for track and thumbs.' },
     disabled: { type: 'boolean', default: 'false', description: 'Disable interaction.' },
-    hapticFeedback: { type: 'boolean', default: 'true', description: 'Enable haptic feedback on step snap.' },
+    haptic: { type: 'boolean', default: 'true', description: 'Enable haptic feedback on step snap.' },
+    glass: { type: 'boolean', default: 'false', description: 'Enable translucent glass track styling.' },
     trackHeight: { type: 'number', default: '6', description: 'Track height in pixels.' },
     thumbSize: { type: 'number', default: '24', description: 'Thumb diameter in pixels.' },
   }}

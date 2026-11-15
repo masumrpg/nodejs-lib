@@ -14,10 +14,10 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
   <Card title="Multi-Format Output" icon="document">
     Generate `.docx`, `.pdf`, and `.html` simultaneously from a single Markdown source.
   </Card>
-  <Card title="Theme.CORPORATE & ThemeProps" icon="palette">
-    Flagship cyan corporate design system + full custom colors and fonts via `ThemeProps`.
+  <Card title="Theme.CORPORATE and ThemeProps" icon="palette">
+    Flagship cyan corporate design system plus full custom colors and fonts via `ThemeProps`.
   </Card>
-  <Card title="Per-Zone Header & Footer" icon="setting">
+  <Card title="Per-Zone Header and Footer" icon="setting">
     Granular color, font size, font family, bold, and italic controls per `left`, `center`, and `right` slot.
   </Card>
   <Card title="Mermaid Diagrams" icon="seti:graphql">
@@ -106,7 +106,7 @@ All themes inherit a shared **`THEME_COMPONENTS`** foundation layer providing co
 markforge spec.md --to docx,pdf,html -o ./dist
 ```
 
-```markdown
+````markdown
 ---
 title: "Enterprise System Specification"
 author: "Masum Dev"
@@ -137,4 +137,4 @@ flowchart LR
     P --> PDF[Vector PDF]
     P --> HTML[Bundled HTML]
 ```
-```
+````

@@ -1,9 +1,56 @@
 ---
 title: Switch
-description: Animated toggle switch with active/inactive track colors.
+description: Animated toggle switch with active/inactive track colors, zero-bounce sliding physics, and haptic feedback.
 sidebar:
   badge:
     text: Updated
     variant: note
 ---
 
+import { Code } from '@astrojs/starlight/components';
+import TypeTable from '@/components/TypeTable.astro';
+
+export const exampleCode = `import { useState } from 'react';
+import { Switch, Box, Text } from '@masumdev/rn-ui';
+
+export function SwitchExample() {
+  const [enabled, setEnabled] = useState(true);
+
+  return (
+    <Box row align="center" justify="space-between">
+      <Text>Enable Notifications</Text>
+      <Switch
+        value={enabled}
+        onValueChange={setEnabled}
+        tone="primary"
+        size="md"
+        haptic
+      />
+    </Box>
+  );
+}`;
+
+`Switch` toggles the state of a single setting on or off with smooth UI thread worklet translation, custom tone color tracks, round and oval variants, and haptic taps.
+
+## Usage
+
+<Code code={exampleCode} lang="tsx" title="SwitchExample.tsx" mark={['Switch', 'value={enabled}', 'onValueChange', 'tone="primary"', 'haptic']} />
+
+## Props API
+
+<TypeTable
+  type={{
+    value: { type: 'boolean', description: 'Controlled active toggle state.' },
+    defaultValue: { type: 'boolean', default: 'false', description: 'Initial uncontrolled toggle state.' },
+    onValueChange: { type: '(value: boolean) => void', description: 'Callback on toggle state change.' },
+    size: { type: "'sm' | 'md' | 'lg'", default: "'md'", description: 'Preset track and thumb scale.' },
+    variant: { type: "'round' | 'oval'", default: "'round'", description: 'Track corner radius variant.' },
+    tone: { type: 'ComponentTone', default: "'primary'", description: 'Active track color tone.' },
+    disabled: { type: 'boolean', default: 'false', description: 'Disables user interaction and dims opacity.' },
+    invalid: { type: 'boolean', default: 'false', description: 'Highlights error state with danger outline.' },
+    glass: { type: 'boolean', default: 'false', description: 'Enable translucent glass track styling.' },
+    haptic: { type: 'boolean', default: 'true', description: 'Trigger haptic feedback on toggle.' },
+    activeIcon: { type: 'RenderIcon', description: 'Optional icon rendered inside the thumb when checked.' },
+    inactiveIcon: { type: 'RenderIcon', description: 'Optional icon rendered inside the thumb when unchecked.' },
+  }}
+/>

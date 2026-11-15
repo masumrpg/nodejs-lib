@@ -527,7 +527,7 @@ export async function buildDocxDocument(
   pageMap?: Map<string, number>
 ): Promise<Buffer> {
   const resolved = resolveDocumentConfig(doc.metadata as Record<string, unknown>, config);
-  const docElements: (Paragraph | Table)[] = [];
+  const docElements: (Paragraph | Table | TableOfContents)[] = [];
 
   // Theme Resolution
   let themeProps: ThemeProps = {};

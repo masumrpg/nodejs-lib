@@ -6,6 +6,7 @@ import {
   View,
   type PressableProps,
   type StyleProp,
+  type TextInputInstance,
   type TextInputProps,
   type ViewProps,
   type ViewStyle,
@@ -83,7 +84,7 @@ export function InputOTP({
   ...props
 }: InputOTPProps) {
   const { colors } = useTheme();
-  const inputRef = React.useRef<TextInput>(null);
+  const inputRef = React.useRef<TextInputInstance>(null);
   const [focused, setFocused] = React.useState(false);
   const [internalValue, setInternalValue] = React.useState(() =>
     normalizeValue(defaultValue, maxLength),
@@ -155,7 +156,7 @@ export function InputOTP({
       >
         {children}
         <TextInput
-          ref={inputRef}
+          ref={inputRef as never}
           value={currentValue}
           maxLength={maxLength}
           editable={!disabled}
