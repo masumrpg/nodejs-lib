@@ -73,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Brand-new dedicated `Spinner` component (also exported as `Loader`) powered by `react-native-reanimated` with 60–120fps UI thread execution.
   - Supports 4 visual animation variants: `circular` (high-performance SVG arc), `ring` (dual concentric reverse-spinning rings), `dots` (three phase-shifted pulsing wave dots), and `bars` (vertical soundwave equalizer bars).
   - Configurable speeds (`slow`, `normal`, `fast`, or custom ms duration), size scales (`xs`, `sm`, `default`, `lg`, `xl`, or numeric pixel size), semantic color tones (`primary`, `secondary`, `accent`, `success`, `warning`, `danger`, `info`), and optional descriptive labels with flexible placement (`bottom`, `top`, `left`, `right`).
-  - Added interactive showcase demo in `apps/native` playground with live playground, variant gallery, and card overlay simulation.
+  - Added interactive showcase demo in `apps/expo-go` playground with live playground, variant gallery, and card overlay simulation.
   - Added complete documentation and prop table in `apps/docs`.
 
 ### Optimized

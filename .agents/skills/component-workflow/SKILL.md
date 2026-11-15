@@ -1,6 +1,6 @@
 ---
 name: component-workflow
-description: Step-by-step workflow for creating, registering, or updating components across @masumdev/rn-ui, apps/native playground, and apps/docs portal.
+description: Step-by-step workflow for creating, registering, or updating components across @masumdev/rn-ui, apps/expo-go playground, and apps/docs portal.
 ---
 
 # Component Creation & Update Workflow
@@ -16,12 +16,12 @@ Whenever a component is added or modified in `@masumdev/rn-ui`, you must follow 
 3. Use `react-native-reanimated` (`withTiming` 100-160ms) and `react-native-gesture-handler` for gestures (Zero-Bounce Policy).
 4. Export the component and its types from `packages/rn-ui/src/components/index.ts`.
 
-## Step 2: Native Showcase Demo (`apps/native`)
-1. Create a section component in `apps/native/components/rn-ui/sections/<ComponentName>Section.tsx`.
+## Step 2: Expo Go Showcase Demo (`apps/expo-go`)
+1. Create a section component in `apps/expo-go/components/rn-ui/sections/<ComponentName>Section.tsx`.
 2. Register the section in:
-   - `apps/native/components/rn-ui/sections/index.ts`
-   - `apps/native/components/rn-ui/index.ts`
-   - `apps/native/app/rn-ui/[id].tsx`
+   - `apps/expo-go/components/rn-ui/sections/index.ts`
+   - `apps/expo-go/components/rn-ui/index.ts`
+   - `apps/expo-go/app/rn-ui/[id].tsx`
 3. Provide interactive controls, light/dark mode preview, and sample persona ("Ma'sum").
 
 ## Step 3: Documentation & Changelog (`apps/docs`)

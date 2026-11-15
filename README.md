@@ -21,7 +21,7 @@ Welcome to the **Masum Dev** monorepo. This workspace houses high-performance op
 │   ├── rn-tajweed-verse/      # Quranic verse Tajweed parser & interactive renderer
 │   └── rn-qr-code/            # High-performance SVG QR code generator with presets & async mode
 ├── apps/
-│   ├── native/                # Interactive Expo mobile playground app (iOS / Android / Web)
+│   ├── expo-go/               # Interactive Expo Go mobile playground app (iOS / Android / Web)
 │   ├── cli/
 │   │   └── markforge/         # MarkForge publishing engine testing & playground environment
 │   └── docs/                  # Astro 5 + Starlight documentation portal (https://lib.masumdev.id)
@@ -46,9 +46,9 @@ bun dev:docs
 ```
 Open [http://localhost:4321](http://localhost:4321) in your browser.
 
-### 3. Run Native Playground App (`apps/native`)
+### 3. Run Expo Go Playground App (`apps/expo-go`)
 ```bash
-bun dev:native
+bun dev:expo-go
 ```
 
 ### 4. Build All Packages & Web Applications

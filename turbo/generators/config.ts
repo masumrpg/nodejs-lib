@@ -57,16 +57,16 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
         path: "packages/{{kebabCase name}}/LICENSE",
         templateFile: "templates/LICENSE.hbs",
       },
-      // Install package ke native app
+      // Install package ke expo-go playground app
       {
         type: "modify",
-        path: "apps/native/package.json",
+        path: "apps/expo-go/package.json",
         pattern: /("dependencies":\s*\{[\s\S]*?)(\n\s*\})/,
         template: '$1,\n    "@masumdev/{{kebabCase name}}": "workspace:*"$2',
       },
       {
         type: "modify",
-        path: "apps/native/tsconfig.json",
+        path: "apps/expo-go/tsconfig.json",
         pattern: /("paths":\s*\{[\s\S]*?)(\n\s*\})/,
         template: '$1,\n      "@masumdev/{{kebabCase name}}": ["../../packages/{{kebabCase name}}/src"]$2',
       },

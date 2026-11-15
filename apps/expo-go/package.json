@@ -1,6 +1,7 @@
 {
-  "name": "native",
+  "name": "expo-go",
   "version": "1.0.0",
+  "description": "Expo Go interactive playground for Masum Dev UI libraries",
   "private": true,
   "main": "index.js",
   "scripts": {

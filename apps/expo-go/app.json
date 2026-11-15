@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "native",
-    "slug": "native",
+    "name": "Expo Go Playground",
+    "slug": "expo-go",
     "version": "1.0.0",
-    "scheme": "com.turbo.example",
+    "scheme": "masumdev-expogo",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -11,7 +11,8 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "id.masumdev.expogo"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +20,7 @@
         "backgroundColor": "#FFFFFF"
       },
       "softwareKeyboardLayoutMode": "resize",
-      "package": "com.turbo.example"
+      "package": "id.masumdev.expogo"
     },
     "web": {
       "favicon": "./assets/favicon.png",

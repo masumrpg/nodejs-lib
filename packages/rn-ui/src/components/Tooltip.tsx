@@ -35,7 +35,17 @@ import type { BaseAnimatedProps, BaseGlassProps, BaseHapticProps } from "./types
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
 export type TooltipPlacement = "top" | "bottom" | "left" | "right" | "auto";
-export type TooltipTone = "default" | "primary" | "dark" | "light";
+export type TooltipTone =
+  | "default"
+  | "primary"
+  | "secondary"
+  | "accent"
+  | "success"
+  | "warning"
+  | "danger"
+  | "info"
+  | "dark"
+  | "light";
 
 export interface TooltipProps
   extends BaseGlassProps,
@@ -226,6 +236,18 @@ export function Tooltip({
   const backgroundColor =
     tone === "primary"
       ? colors.primary
+      : tone === "secondary"
+      ? colors.secondary
+      : tone === "accent"
+      ? colors.accent
+      : tone === "success"
+      ? colors.success
+      : tone === "warning"
+      ? colors.warning
+      : tone === "danger"
+      ? colors.danger
+      : tone === "info"
+      ? colors.info
       : tone === "dark"
       ? isDark
         ? colors.surfaceRaised
@@ -243,6 +265,8 @@ export function Tooltip({
       ? colors.onPrimary
       : tone === "light"
       ? "#0F172A"
+      : tone === "warning"
+      ? colors.background
       : "#FFFFFF";
 
   const windowDim = Dimensions.get("window");

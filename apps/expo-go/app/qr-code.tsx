@@ -123,7 +123,7 @@ export default function QRCodeScreen() {
   const [demoLoading, setDemoLoading] = useState(true);
 
   const bareExportRef = useRef<Svg>(null);
-  const brandedCardRef = useRef<View>(null);
+  const brandedCardRef = useRef<React.ComponentRef<typeof View>>(null);
 
   const { onScroll, headerStyle, scrollEventThrottle } = useHeaderScroll({
     headerHeight: 220,

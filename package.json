@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "turbo run dev",
-    "dev:native": "turbo dev --filter='@masumdev/*' --filter=native",
+    "dev:expo-go": "turbo dev --filter='@masumdev/*' --filter=expo-go",
+    "dev:native": "turbo dev --filter='@masumdev/*' --filter=expo-go",
     "dev:docs": "turbo dev --filter=docs",
     "gen:expo-package": "bunx turbo gen expo-package",
     "gen:cli-package": "bunx turbo gen cli-package",

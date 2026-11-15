@@ -26,11 +26,7 @@ export function SystemUIOverlay({
 
   return (
     <>
-      <StatusBar
-        translucent
-        backgroundColor="transparent"
-        barStyle={barStyle}
-      />
+      <StatusBar barStyle={barStyle} />
 
       {top ? (
         <View
