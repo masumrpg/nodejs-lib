@@ -1,0 +1,72 @@
+{
+  "expo": {
+    "name": "Camera AI Demo",
+    "slug": "expo-native",
+    "version": "1.0.0",
+    "scheme": "masumdev-exponative",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "id.masumdev.exponative",
+      "infoPlist": {
+        "NSCameraUsageDescription": "$(PRODUCT_NAME) needs camera access to perform real-time AI object detection."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#05161E"
+      },
+      "softwareKeyboardLayoutMode": "resize",
+      "package": "id.masumdev.exponative",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.CAMERA"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-dev-client",
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#05161E"
+        }
+      ],
+      [
+        "react-native-fast-tflite",
+        {
+          "enableAndroidGpuLibraries": true
+        }
+      ]
+    ],
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "36c20481-3a3a-49eb-905f-70af8efc9b4a"
+      }
+    },
+    "owner": "mclasix",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/36c20481-3a3a-49eb-905f-70af8efc9b4a"
+    }
+  }
+}

@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@turbo/gen": "^2.10.12",
+    "expo-dev-client": "~58.0.21",
     "prettier": "^3.9.6",
     "turbo": "^2.10.12"
   },

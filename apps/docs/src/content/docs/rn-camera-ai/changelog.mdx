@@ -1,0 +1,73 @@
+---
+title: Changelog
+sidebar:
+  order: 99
+description: Release notes and version history for @masumdev/rn-camera-ai and @masumdev/rn-camera-ai-tflite.
+---
+
+import ChangelogTimeline from '@/components/ChangelogTimeline.astro';
+
+export const releases = [
+  {
+    version: 'v0.2.0',
+    date: '2026-11-22',
+    tag: 'Latest Release',
+    isLatest: true,
+    changes: [
+      {
+        type: 'feat',
+        text: 'Added 468-point 3D Face Mesh decoding and wireframe rendering (anatomical contours, eyebrows, eyes, lips, jawline, and triangle tesselation web) using MediaPipe <code>face_landmark.tflite</code>.',
+      },
+      {
+        type: 'feat',
+        text: 'Added MobileFaceNet 112×112 biometric face recognition with 192-dimensional embeddings, L2-normalization, and real-time Cosine Similarity identity matching.',
+      },
+      {
+        type: 'feat',
+        text: 'Implemented 1-tap on-device face enrollment (<code>enrollLastDetectedFace</code>, <code>enrollFace</code>, <code>removeEnrolledFace</code>, <code>getEnrolledFaces</code>).',
+      },
+      {
+        type: 'perf',
+        text: 'Architected <code>projectDetectionsWorklet</code>: 100% of screen coordinate projections, aspect ratio letterboxing, and 178-mesh-line trigonometry (<code>Math.atan2</code>, <code>Math.sqrt</code>) now execute on the Camera Worklet Thread with 0% JS-thread overhead and zero Reanimated mapper queue lag.',
+      },
+      {
+        type: 'feat',
+        text: 'Full UI Customization: added declarative <code>overlayTheme</code> with <code>boxVariant</code> (<code>solid</code>, <code>corners</code> scanner brackets, <code>dashed</code>), <code>labelPosition</code>, and custom slot renderers (<code>renderBox</code>, <code>renderLabel</code>, <code>renderLandmarkDot</code>).',
+      },
+      {
+        type: 'feat',
+        text: 'Introduced <code>apps/expo-native</code> Expo development build playground with Feature Menu Hub, Object Detection, and Face Recognition testing screens.',
+      },
+    ],
+  },
+  {
+    version: 'v0.1.0',
+    date: '2026-11-21',
+    tag: 'Initial Beta',
+    isLatest: false,
+    changes: [
+      {
+        type: 'feat',
+        text: 'Migrated <code>CameraAI</code> to React Native Vision Camera v5 Nitro (<code>useFrameOutput</code>, <code>outputs</code>, <code>constraints</code>, and automatic <code>frame.dispose()</code>).',
+      },
+      {
+        type: 'feat',
+        text: 'Adopted <code>react-native-worklets</code> and <code>react-native-vision-camera-worklets</code> with 3-tier processor dispatch (<code>processFrameWorklet</code>, worklet <code>processFrame</code>, and <code>scheduleOnRN</code> fallback).',
+      },
+      {
+        type: 'feat',
+        text: 'Added Vision Camera v5 <code>HybridFrameConverter</code> + <code>react-native-nitro-image</code> preprocessing with RGB uint8 conversion and deterministic intermediate image disposal.',
+      },
+      {
+        type: 'feat',
+        text: 'Updated <code>parseDetectionOutputs</code> for <code>react-native-fast-tflite</code> v3 <code>ArrayBuffer</code> tensor outputs and strict <code>confidenceThreshold &gt; 1</code> / <code>Infinity</code> rejection.',
+      },
+      {
+        type: 'feat',
+        text: 'Published initial core preview, <code>DetectionOverlay</code>, normalized math engine, and 4-tensor TFLite adapter.',
+      },
+    ],
+  },
+];
+
+<ChangelogTimeline releases={releases} />

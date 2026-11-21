@@ -1,0 +1,227 @@
+---
+title: Coordinate Math & Overlays
+sidebar:
+  label: Coordinate Math & Overlays
+  order: 6
+description: Mathematical foundations of camera stream projections, normalized [0..1] coordinates, aspect ratio scaling (cover vs contain), orientation, and mirroring.
+---
+
+import { Tabs, TabItem, Card, CardGrid, Badge } from '@astrojs/starlight/components';
+
+Mapping bounding boxes predicted by an AI model onto a live camera preview screen requires solving four distinct mathematical transformations simultaneously:
+
+1. **Resolution Independence**: Converting arbitrary sensor resolutions (1920x1080, 1280x720) into uniform units.
+2. **Aspect Ratio Projection**: Scaling and centering video feeds across different device displays using `cover` or `contain` modes.
+3. **Physical Sensor Orientation**: Compensating for camera sensor mounting angles (0°, 90°, 180°, 270°).
+4. **Selfie Mirror Inversion**: Mirroring horizontal coordinates for front-facing selfie cameras.
+
+`@masumdev/rn-camera-ai` provides a complete, worklet-safe suite of pure math functions to handle these transformations off the main JavaScript thread.
+
+```typescript
+import {
+  clampBox,
+  normalizeCoordinates,
+  denormalizeCoordinates,
+  calculateScaleAndOffsets,
+  mirrorHorizontalBox,
+  rotateBox,
+  transformNormalizedToPixelBox,
+} from '@masumdev/rn-camera-ai';
+```
+
+---
+
+## The Normalized Coordinate System `[0..1]`
+
+All bounding boxes in `@masumdev/rn-camera-ai` are represented in the **Normalized Coordinate System**, where every dimension is expressed as a relative fraction in the range `[0.0, 1.0]`:
+
+```typescript
+export interface BoundingBox {
+  x: number;      // Fraction from left edge [0.0, 1.0]
+  y: number;      // Fraction from top edge [0.0, 1.0]
+  width: number;  // Fraction of total width [0.0, 1.0]
+  height: number; // Fraction of total height [0.0, 1.0]
+}
+```
+
+```
+(0,0) ────────────────────────── (1,0)
+  │                                │
+  │        (x, y)                  │
+  │          ┌─────────┐           │
+  │          │         │ height    │
+  │          │         │           │
+  │          └─────────┘           │
+  │             width              │
+  │                                │
+(0,1) ────────────────────────── (1,1)
+```
+
+### Safety Clamping: `clampBox(box)`
+
+Floating point calculations from neural network decoders can occasionally produce values slightly outside `[0, 1]` (e.g. `-0.002` or `1.004`). `clampBox` guarantees that boxes stay within valid bounds:
+
+```text
+x = max(0, min(1, rawX))
+y = max(0, min(1, rawY))
+width = max(0, min(1 - x, rawWidth))
+height = max(0, min(1 - y, rawHeight))
+```
+
+```typescript
+const safeBox = clampBox(rawCandidateBox);
+```
+
+---
+
+## Aspect Ratio Scaling: `calculateScaleAndOffsets`
+
+When rendering a camera stream of resolution `(stream.width, stream.height)` inside a UI container of dimensions `(view.width, view.height)`, the two aspect ratios almost never match.
+
+We compute individual horizontal and vertical scaling factors:
+
+```text
+scaleX = view.width / stream.width
+scaleY = view.height / stream.height
+```
+
+### 1. `cover` Mode (Crop to Fill)
+
+In `cover` mode, the stream must completely fill the container with zero empty margins:
+
+```text
+scale = max(scaleX, scaleY)
+renderedWidth = stream.width * scale
+renderedHeight = stream.height * scale
+offsetX = (view.width - renderedWidth) / 2  // <= 0 (cropped margins)
+offsetY = (view.height - renderedHeight) / 2 // <= 0 (cropped margins)
+```
+
+Because `scale >= scaleX` and `scale >= scaleY`, rendered dimensions exceed container boundaries. The negative offsets center the cropped stream.
+
+### 2. `contain` Mode (Letterbox / Pillarbox)
+
+In `contain` mode, the entire stream must be visible inside the container without cropping:
+
+```text
+scale = min(scaleX, scaleY)
+renderedWidth = stream.width * scale
+renderedHeight = stream.height * scale
+offsetX = (view.width - renderedWidth) / 2  // >= 0 (black margin bars)
+offsetY = (view.height - renderedHeight) / 2 // >= 0 (black margin bars)
+```
+
+The positive offsets center the stream, leaving pillarbox (side bars) or letterbox (top/bottom bars) margins.
+
+```typescript
+const { scale, offsetX, offsetY, renderedWidth, renderedHeight } = calculateScaleAndOffsets(
+  { width: 390, height: 844 }, // View container
+  { width: 1080, height: 1920 }, // Stream resolution
+  'cover'
+);
+```
+
+---
+
+## Front Camera Mirroring: `mirrorHorizontalBox`
+
+When a user switches to the front camera, previewing unmirrored video feels unnatural because humans expect a mirror image. React Native Vision Camera mirrors the preview video horizontally.
+
+To keep bounding box overlays aligned with the mirrored video, we invert the horizontal coordinate:
+
+```text
+mirroredX = 1 - box.x - box.width
+mirroredY = box.y
+```
+
+```
+Normal (Back Camera):           Mirrored (Front Camera):
+(0,0)                           (0,0)
+  ┌──────┐                        ┌──────┐
+  │[Obj] │                        │      │
+  │ [Box]│       ───────►         │ [Box]│ [Obj]
+  └──────┘                        └──────┘
+  x = 0.2                         x* = 1 - 0.2 - 0.3 = 0.5
+  w = 0.3                         w* = 0.3
+```
+
+```typescript
+const mirrored = mirrorHorizontalBox(originalBox);
+```
+
+---
+
+## Sensor Rotation: `rotateBox`
+
+Mobile camera sensors are physically mounted at fixed orientations (typically landscape 90° on Android phones). When frames are captured in orientations other than standard portrait, bounding boxes must be rotated accordingly:
+
+| Orientation | Angle | Coordinate Mapping |
+| :--- | :--- | :--- |
+| `'portrait'` | 0° | `x' = x, y' = y, w' = w, h' = h` |
+| `'landscape-left'` | 90° CW | `x' = 1 - y - h, y' = x, w' = h, h' = w` |
+| `'portrait-upside-down'` | 180° | `x' = 1 - x - w, y' = 1 - y - h, w' = w, h' = h` |
+| `'landscape-right'` | 270° CW | `x' = y, y' = 1 - x - w, w' = h, h' = w` |
+
+```typescript
+const rotated = rotateBox(box, 'landscape-left');
+```
+
+---
+
+## The Complete Pipeline: `transformNormalizedToPixelBox`
+
+`transformNormalizedToPixelBox` executes the entire projection pipeline in a single worklet-safe call:
+
+```
+[ Normalized Bounding Box in range 0 to 1 ]
+                     │
+                     ▼
+             1. clampBox()
+                     │
+                     ▼
+             2. rotateBox() (if orientation !== 'portrait')
+                     │
+                     ▼
+             3. mirrorHorizontalBox() (if isMirrored === true)
+                     │
+                     ▼
+             4. calculateScaleAndOffsets(view, stream, resizeMode)
+                     │
+                     ▼
+[ Final Screen Pixel Coordinates (x, y, width, height) ]
+```
+
+### Mathematical Formula:
+
+```text
+pixelX = transformed.x * renderedWidth + offsetX
+pixelY = transformed.y * renderedHeight + offsetY
+pixelWidth = transformed.width * renderedWidth
+pixelHeight = transformed.height * renderedHeight
+```
+
+### Code Usage:
+
+```typescript
+import { transformNormalizedToPixelBox } from '@masumdev/rn-camera-ai';
+
+const pixelBox = transformNormalizedToPixelBox(detection.boundingBox, {
+  viewDimensions: { width: 390, height: 844 },
+  streamDimensions: { width: 1080, height: 1920 },
+  resizeMode: 'cover',
+  isMirrored: true, // front camera
+  orientation: 'portrait',
+});
+
+// Result: { x: 58.5, y: 126.6, width: 156.0, height: 211.0 }
+```
+
+---
+
+## Utility Function Reference
+
+### `normalizeCoordinates(pixel, bounds): BoundingBox`
+Converts physical pixel bounding boxes into normalized `[0, 1]` relative coordinates.
+
+### `denormalizeCoordinates(box, bounds): PixelBoundingBox`
+Converts normalized `[0, 1]` bounding boxes into physical pixel dimensions for a given bounds rectangle.

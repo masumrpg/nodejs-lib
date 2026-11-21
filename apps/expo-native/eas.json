@@ -1,0 +1,44 @@
+{
+  "cli": {
+    "version": ">= 24.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development",
+      "bun": "1.4.2",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug -PreactNativeArchitectures=arm64-v8a,x86_64"
+      },
+      "env": {
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a,x86_64",
+        "GRADLE_OPTS": "-Dorg.gradle.jvmargs=\"-Xmx5120m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError\" -Dorg.gradle.project.reactNativeArchitectures=arm64-v8a,x86_64"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "bun": "1.4.2",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "GRADLE_OPTS": "-Dorg.gradle.jvmargs=\"-Xmx5120m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError\""
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "channel": "production",
+      "bun": "1.4.2",
+      "env": {
+        "GRADLE_OPTS": "-Dorg.gradle.jvmargs=\"-Xmx5120m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError\""
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

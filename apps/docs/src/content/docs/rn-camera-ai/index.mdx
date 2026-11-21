@@ -1,0 +1,196 @@
+---
+title: RN Camera AI
+sidebar:
+  label: Overview & Architecture
+  order: 1
+description: High-performance React Native camera preview with zero-JS-thread AI inference overlays, pluggable TFLite adapters, and normalized coordinate math.
+---
+
+import { LinkCard, CardGrid, Card, Badge, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@masumdev/rn-camera-ai` and `@masumdev/rn-camera-ai-tflite` form a modular, production-ready computer vision and on-device AI system for React Native and Expo. They unify real-time camera streaming, on-device machine learning inference, and hardware-accelerated bounding box overlays with zero JS-thread lag.
+
+<div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '16px 0' }}>
+  <Badge text="React Native >= 0.74" variant="note" size="medium" />
+  <Badge text="VisionCamera v5" variant="tip" size="medium" />
+  <Badge text="Reanimated 4" variant="success" size="medium" />
+  <Badge text="Fast TFLite Nitro" variant="caution" size="medium" />
+  <Badge text="TypeScript Strict" variant="note" size="medium" />
+  <Badge text="MIT License" variant="tip" size="medium" />
+</div>
+
+---
+
+## The Problem: Real-Time Mobile Vision Bottlenecks
+
+Building production-grade real-time computer vision applications in React Native traditionally presents three severe architectural hurdles:
+
+1. **JS Bridge Thread Contention**: Sending video frames or high-frequency bounding box arrays across the asynchronous JavaScript bridge causes dropped frames, UI stutters, and battery drain at 30 or 60 FPS.
+2. **Coupled Vendor Logic**: Most camera AI libraries tightly couple camera preview hardware bindings to specific ML runtimes (e.g., hardcoded MLKit or custom C++ builds), making it difficult to swap inference engines or update models independently.
+3. **Coordinate Space Mismatches**: Camera sensors capture frames in landscape or portrait sensor resolutions (e.g., $1920 \times 1080$), while mobile screens display preview views in density-independent pixels with varying aspect ratios (`cover` crop vs. `contain` letterbox) and front-camera selfie mirroring.
+
+`@masumdev/rn-camera-ai` solves these challenges by cleanly separating hardware preview, inference processing, and overlay rendering into decoupled, modular layers.
+
+---
+
+## System Architecture
+
+The monorepo ecosystem divides responsibilities across two dedicated packages and native runtime drivers:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Application Layer                               │
+│              (Expo Prebuild / React Native Mobile App)                 │
+└───────────────────┬────────────────────────────────┬───────────────────┘
+                    │                                │
+                    ▼                                ▼
+┌──────────────────────────────────────┐  ┌──────────────────────────────┐
+│      @masumdev/rn-camera-ai          │  │ @masumdev/rn-camera-ai-tflite│
+│          (Core Library)              │  │      (Inference Adapter)     │
+│  - CameraAI Component                │  │  - TFLiteObjectDetector      │
+│  - DetectionOverlay (Zero-JS Worklet)│◄─┼─  - TFLiteFaceRecognizer     │
+│  - 468 Face Mesh Wireframe Overlay   │  │    (BlazeFace + Mesh + MobileFaceNet)
+│  - Normalized Math Engine [0..1]     │  │  - Hardware Delegate Fallback│
+│  - Pluggable CameraProcessor API     │  │  - 4-Tensor SSD/EffDet Parser│
+└──────────────────────────────────────┘  └──────────────────────────────┘
+                    ▲                                ▲
+                    │                                │
+┌───────────────────┴────────────────────────────────┴───────────────────┐
+│                    Native Driver & Nitro Acceleration                  │
+│   - react-native-vision-camera v5 (Nitro camera preview & FrameOutput) │
+│   - react-native-vision-camera-worklets + react-native-worklets        │
+│   - react-native-fast-tflite v3 (Nitro C++ TensorFlow Lite runtime)    │
+│   - react-native-nitro-image (HybridFrameConverter & GPU/CPU resize)   │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Core Layers Explained
+
+1. **Native Driver & Nitro Acceleration**:
+   - `react-native-vision-camera` (v5) manages low-level camera hardware, camera device enumeration, focus, exposure, and zero-latency preview/frame-output streaming.
+   - `react-native-vision-camera-worklets` and `react-native-worklets` allocate dedicated background worklet runtimes that execute frame outputs without blocking JavaScript execution.
+   - `react-native-fast-tflite` (v3) provides direct Nitro C++ bindings to TensorFlow Lite, executing neural network tensors with `ArrayBuffer` zero-copy overhead.
+   - `react-native-nitro-image` (`HybridFrameConverter`) handles upright frame conversion, resizing, and pixel format normalization (`RGBA`/`BGRA` to packed `RGB` uint8 buffers).
+
+2. **Core Camera & Overlay Package (`@masumdev/rn-camera-ai`)**:
+   - Hosts the primary `<CameraAI />` preview component.
+   - Manages camera permissions, front/rear camera switching, and lifecycle pause/resume states.
+   - Hosts the Reanimated-powered `<DetectionOverlay />` using `SharedValue<DetectionResult[]>` for 60 FPS zero-JS-thread overlay rendering.
+   - Provides pure, worklet-safe mathematical transforms mapping normalized bounding boxes to physical screen coordinates.
+
+3. **Inference Adapter Package (`@masumdev/rn-camera-ai-tflite`)**:
+   - Implements the generic `CameraProcessor` contract.
+   - Loads `.tflite` model binaries from asset bundles, local filesystem URIs, or remote URLs.
+   - Configures hardware acceleration delegates (`android-gpu` OpenCL/OpenGL ES/NNAPI) with automatic fallback to CPU.
+   - Decodes standard 4-tensor object detection outputs (`boxes`, `classes`, `scores`, `num_detections`) into normalized coordinates.
+   - Executes cooperative 3-model **Face Recognition & 468-Point 3D Face Mesh** pipeline (`BlazeFace` + `FaceMesh` + `MobileFaceNet` 192-D embeddings) with live biometric enrollment.
+
+---
+
+## Core Architectural Tenets
+
+### 1. Zero-JS-Thread Overlay Rendering
+
+In standard React Native architectures, pushing detection updates from a frame processor into JavaScript triggers a React state update (`setState(detections)`). This causes a full React render pass and style recalculation on every camera frame (15–60 times per second), choking the JS event loop:
+
+```
+Traditional Approach (JS Thread Bottleneck):
+[ Camera Frame ] ──> [ Frame Output ] ──(scheduleOnRN)──> [ React State Update ] ──> [ React Re-render ] ──> [ Screen Repaint ]
+                                                               ▲ High JS Thread Lag!
+```
+
+With `@masumdev/rn-camera-ai`, detection results can be piped directly into a React Native Reanimated `SharedValue`:
+
+```
+Zero-JS-Thread Architecture:
+[ Camera Frame ] ──> [ Frame Processor Worklet ] ──> [ Reanimated SharedValue ] ──> [ UI Thread Direct Repaint ]
+                                                              │
+                                                              └──> JS Thread remains 100% idle!
+```
+
+Bounding boxes and labels are mapped directly on the UI thread via `useAnimatedStyle`, delivering buttery-smooth 60 FPS overlay tracking even under heavy CPU or network load.
+
+### 2. Pluggable Processor Interface
+
+Inference engines evolve rapidly. `@masumdev/rn-camera-ai` does not hardcode TensorFlow Lite or any specific vendor library. Instead, it defines a lean, universal `CameraProcessor` interface:
+
+```typescript
+export interface CameraProcessor {
+  readonly id?: string;
+  readonly name?: string;
+  readonly status: 'idle' | 'loading' | 'ready' | 'error';
+  readonly targetFps?: number;
+  processFrame(frame: unknown): DetectionResult[];
+  initialize?(): Promise<void> | void;
+  dispose?(): void;
+}
+```
+
+Any machine learning engine — TensorFlow Lite, ONNX Runtime, MediaPipe, MLKit, or a custom C++ JSI module — can be plugged into `<CameraAI processor={customProcessor} />` seamlessly.
+
+### 3. Normalized Math Engine `[0..1]`
+
+All bounding boxes across the system are represented in normalized relative coordinates between `0.0` and `1.0`:
+
+```typescript
+export interface BoundingBox {
+  x: number;      // Top-left horizontal coordinate [0, 1]
+  y: number;      // Top-left vertical coordinate [0, 1]
+  width: number;  // Width fraction [0, 1]
+  height: number; // Height fraction [0, 1]
+}
+```
+
+Because coordinates are independent of the sensor's physical pixel count ($1920 \times 1080$, $1280 \times 720$, etc.) and the device's display resolution ($390 \times 844$, $1080 \times 2400$, etc.), projection math remains completely decoupled. The library's math engine handles:
+- Aspect ratio scaling (`cover` crop vs. `contain` letterbox)
+- Physical camera sensor orientation offsets (0°, 90°, 180°, 270°)
+- Front-camera horizontal selfie mirroring (`x* = 1 - x - width`)
+
+### 4. Transparent Hardware Acceleration & Resilience
+
+On Android, GPU delegates can fail on budget chipsets or corrupted vendor drivers. `@masumdev/rn-camera-ai-tflite` automatically catches GPU initialization exceptions and falls back gracefully to multi-threaded CPU inference without crashing the host application.
+
+---
+
+## Package Ecosystem
+
+<CardGrid>
+  <Card title="@masumdev/rn-camera-ai" icon="laptop">
+    Core camera preview component, permission handling, zero-JS overlay renderer, lifecycle hooks, and projection math engine.
+  </Card>
+  <Card title="@masumdev/rn-camera-ai-tflite" icon="rocket">
+    TensorFlow Lite object detection adapter, model asset loaders, GPU/CPU delegate fallback, and 4-tensor output parser.
+  </Card>
+</CardGrid>
+
+---
+
+## Explore the Documentation
+
+<CardGrid>
+  <LinkCard
+    title="Installation & Quickstart"
+    href="/rn-camera-ai/getting-started/"
+    description="Install packages, configure Android & iOS permissions, and run your first camera AI detector."
+  />
+  <LinkCard
+    title="CameraAI Component & Props"
+    href="/rn-camera-ai/camera-ai/"
+    description="Full props reference, resize modes (cover vs contain), lifecycle states, and custom overlays."
+  />
+  <LinkCard
+    title="TFLite Object Detection Adapter"
+    href="/rn-camera-ai/tflite-adapter/"
+    description="createTFLiteObjectDetector, model loading strategies, GPU fallback, and tensor output decoding."
+  />
+  <LinkCard
+    title="Writing Custom Processors"
+    href="/rn-camera-ai/custom-processors/"
+    description="Learn how to build custom vision processors for Barcode, Face, ONNX, or MediaPipe models."
+  />
+  <LinkCard
+    title="Coordinate Math & Overlays"
+    href="/rn-camera-ai/coordinate-math/"
+    description="Mathematical formulas for normalized scaling, sensor orientation, front-camera mirroring, and clamping."
+  />
+</CardGrid>

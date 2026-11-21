@@ -1,0 +1,374 @@
+---
+title: CameraAI Component
+sidebar:
+  label: CameraAI Component
+  order: 3
+description: Detailed component API reference, props specification, resize modes, lifecycle states, and custom overlay rendering with CameraAI.
+---
+
+import { Tabs, TabItem, Card, CardGrid, Badge } from '@astrojs/starlight/components';
+
+The `<CameraAI />` component is the central hardware preview and vision coordinator in `@masumdev/rn-camera-ai`. It wraps React Native Vision Camera v5 (Nitro) hardware capture, handles camera runtime permissions, runs AI frame processors off the JavaScript thread, and displays bounding box overlays.
+
+```tsx
+import { CameraAI } from '@masumdev/rn-camera-ai';
+```
+
+---
+
+## Component API Reference
+
+```tsx
+<CameraAI
+  processor={myProcessor}
+  cameraPosition="back"
+  resizeMode="cover"
+  isActive={true}
+  fps={15}
+  onDetections={(detections) => console.log(detections)}
+  onError={(error) => console.error(error)}
+  style={styles.camera}
+/>
+```
+
+### Props Table
+
+| Prop | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `processor` | `CameraProcessor` | `undefined` | Pluggable AI inference engine implementing the `CameraProcessor` interface. |
+| `cameraPosition` | `'back' \| 'front'` | `'back'` | Physical camera facing. Automatically flips bounding box coordinates when set to `'front'` to match mirrored selfie preview. |
+| `resizeMode` | `'cover' \| 'contain'` | `'cover'` | Stream aspect ratio scaling mode within the container view. See [Resize Modes](#resize-modes-cover-vs-contain). |
+| `isActive` | `boolean` | `true` | Pauses or resumes camera streaming and frame processor execution without unmounting native resources. |
+| `fps` | `number` | `undefined` | Target frame rate limit for frame processing worklets (e.g. `15` or `30`). Defaults to processor's `targetFps`. |
+| `showBoxes` | `boolean` | `true` | Shows or hides bounding boxes around detected objects/faces while keeping landmarks or labels active. |
+| `boxVariant` | `'solid' \| 'corners' \| 'dashed'` | `'solid'` | Bounding box visual style: full solid rectangle, futuristic 4-corner scanner brackets (`'corners'`), or dashed border. |
+| `boxColor` | `string` | `'#3da441'` | Primary bounding box and label badge color. |
+| `landmarkColor` | `string` | `'#38bdf8'` | Facial landmark dot accent color. |
+| `showLabels` | `boolean` | `true` | Whether to display class/identity label badges on detections. |
+| `showConfidence` | `boolean` | `true` | Whether to append confidence percentage to default label badges. |
+| `showLandmarks` | `boolean` | `true` | Renders 6-point facial keypoints or 468-point 3D Face Mesh when present on detections. |
+| `showMeshLines` | `boolean` | `true` | Renders connected anatomical contour polylines (eyes, brows, lips, nose, oval) in 468-point Face Mesh mode. |
+| `showTesselation` | `boolean` | `true` | Renders interior facial triangle tesselation grid in 468-point Face Mesh mode. |
+| `overlayTheme` | `OverlayThemeConfig` | `undefined` | Unified declarative theme object controlling bounding box geometry, label position, and granular `FaceMeshStyleConfig` colors/radii. |
+| `formatLabel` | `(detection: DetectionResult) => string` | `undefined` | Custom label text formatter function. |
+| `renderBox` | `(params: RenderBoxParams) => React.ReactNode` | `undefined` | Custom per-detection bounding box renderer with pre-projected pixel coordinates. |
+| `renderLabel` | `(params: RenderLabelParams) => React.ReactNode` | `undefined` | Custom per-detection label badge renderer with pre-projected pixel coordinates. |
+| `renderLandmarkDot` | `(params: RenderLandmarkDotParams) => React.ReactNode` | `undefined` | Custom per-landmark vertex dot renderer with pre-projected pixel coordinates. |
+| `renderOverlay` | `(detections, viewDimensions) => React.ReactNode` | `undefined` | Full-canvas custom overlay renderer replacing the default `<DetectionOverlay />`. |
+| `onDetections` | `(detections: DetectionResult[]) => void` | `undefined` | Callback emitted on the JS thread when new detections arrive from the background frame processor. |
+| `onError` | `(error: CameraAIError) => void` | `undefined` | Callback invoked whenever camera hardware, permission request, or inference encounters an error. |
+| `permissionFallback` | `React.ReactNode` | `<PermissionFallbackView />` | Custom UI component displayed when camera permission has been denied by the user. |
+| `cameraUnavailableFallback` | `React.ReactNode` | Fallback View | Custom UI displayed if the requested camera hardware device is missing or physically disabled. |
+| `style` | `StyleProp<ViewStyle>` | `{ flex: 1 }` | Custom container styles applied to the root camera wrapper. |
+
+---
+
+## Resize Modes: `cover` vs `contain`
+
+Camera sensors typically capture video in standard 4:3 or 16:9 sensor aspect ratios (e.g., $1920 \times 1080$, $1280 \times 720$), while modern smartphones have elongated screen aspect ratios (19.5:9, 20:9, etc.).
+
+`CameraAI` supports two distinct scaling modes, matching the standard CSS/React Native image resizing models:
+
+```
+┌──────────────────────────────────────┐     ┌──────────────────────────────────────┐
+│             cover Mode               │     │            contain Mode              │
+│                                      │     │  ┌────────────────────────────────┐  │
+│ ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐  │     │  │       Pillarbox Letterbox      │  │
+│ │                                 │  │     │  ├────────────────────────────────┤  │
+│ │     Video preview scales up     │  │     │  │                                │  │
+│ │     to fill container.          │  │     │  │    Entire stream is visible    │  │
+│ │     Excess edges are cropped.   │  │     │  │    without cropping.           │  │
+│ │                                 │  │     │  │                                │  │
+│ └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘  │     │  ├────────────────────────────────┤  │
+│                                      │     │  │       Pillarbox Letterbox      │  │
+│                                      │     │  └────────────────────────────────┘  │
+└──────────────────────────────────────┘     └──────────────────────────────────────┘
+```
+
+### 1. `cover` (Default)
+- **Visual Behavior**: The stream scales up until both width and height completely cover the container. Any portion of the stream that exceeds the container boundaries is cropped symmetrically.
+- **Offsets**: `offsetX <= 0` and `offsetY <= 0`.
+- **Use Case**: Fullscreen camera views, immersive AR experiences, and standard photo/video capturing viewports.
+
+### 2. `contain`
+- **Visual Behavior**: The stream scales down until the entire frame fits completely inside the container, preserving the stream's full field of view. Black letterbox (top/bottom) or pillarbox (left/right) margins are introduced if aspect ratios differ.
+- **Offsets**: `offsetX >= 0` and `offsetY >= 0`.
+- **Use Case**: Document scanning, bar code inspection where edge-to-edge frame visibility is critical, or embedded camera widgets.
+
+---
+
+## Permission Handling & Fallbacks
+
+`<CameraAI />` automatically inspects camera permission status on mount using Vision Camera's `useCameraPermission()`.
+
+- If permission is not yet determined, `requestPermission()` is called automatically.
+- If permission is denied by the user, `<CameraAI />` displays the `permissionFallback` view and invokes `onError` with code `'PERMISSION_DENIED'`.
+
+### Custom Permission Fallback
+
+You can supply a completely custom component for the denied state via the `permissionFallback` prop:
+
+```tsx
+import { CameraAI } from '@masumdev/rn-camera-ai';
+import { View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
+
+export function MyCameraView() {
+  return (
+    <CameraAI
+      processor={myProcessor}
+      permissionFallback={
+        <View style={styles.permissionDenied}>
+          <Text style={styles.title}>Camera Access Required</Text>
+          <Text style={styles.subtitle}>
+            Please grant camera permissions in system settings to use real-time detection.
+          </Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => Linking.openSettings()}
+          >
+            <Text style={styles.buttonText}>Open Settings</Text>
+          </TouchableOpacity>
+        </View>
+      }
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  permissionDenied: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#111827',
+    padding: 24,
+  },
+  title: { color: '#f9fafb', fontSize: 20, fontWeight: '700', marginBottom: 8 },
+  subtitle: { color: '#9ca3af', fontSize: 14, textAlign: 'center', marginBottom: 24 },
+  button: { backgroundColor: '#3da441', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8 },
+  buttonText: { color: '#ffffff', fontWeight: '600' },
+});
+```
+
+---
+
+## Lifecycle Management (`isActive`)
+
+Mobile cameras and neural network inference consume significant battery and GPU/NPU resources. Use the `isActive` prop to cleanly pause and resume operations:
+
+- **Screen Blur / Navigation**: In React Navigation or Expo Router, pass `isActive={isFocused}` so camera capture halts when users navigate to another screen.
+- **App Backgrounding**: When the application enters the background, set `isActive={false}` to release hardware capture sessions and avoid Android OS battery warnings.
+- **Modal Sheets**: Pause detection while showing a confirmation dialog or action sheet over the camera.
+
+```tsx
+import { useIsFocused } from '@react-navigation/native';
+import { CameraAI } from '@masumdev/rn-camera-ai';
+
+export function Screen() {
+  const isFocused = useIsFocused();
+
+  return (
+    <CameraAI
+      processor={detector}
+      isActive={isFocused}
+    />
+  );
+}
+```
+
+---
+
+## Error Handling Hierarchy
+
+All errors emitted by `CameraAI` inherit from `CameraAIError`:
+
+```typescript
+export class CameraAIError extends Error {
+  readonly code: string;
+  readonly cause?: unknown;
+}
+
+// Emitted for permission denial or missing hardware sensors
+export class CameraError extends CameraAIError {}
+
+// Emitted for invalid model paths, Corrupted weights, or delegate failures
+export class ModelLoadError extends CameraAIError {}
+
+// Emitted during frame processing or tensor execution failures
+export class InferenceError extends CameraAIError {}
+```
+
+### Catching and Responding to Errors
+
+```tsx
+<CameraAI
+  processor={detector}
+  onError={(err) => {
+    switch (err.code) {
+      case 'PERMISSION_DENIED':
+        console.warn('User refused camera permissions');
+        break;
+      case 'CAMERA_UNAVAILABLE':
+        console.warn('Physical camera sensor is missing or busy');
+        break;
+      case 'INFERENCE_ERROR':
+      case 'INFERENCE_FAILED':
+      case 'PROCESSOR_INIT_FAILED':
+        console.error('Frame processing or initialization failed:', err.cause);
+        break;
+      default:
+        console.error('Unexpected camera AI error:', err);
+    }
+  }}
+/>
+```
+
+---
+
+## Declarative Overlay & 468-Point Face Mesh Customization
+
+`<CameraAI />` provides a 3-layer customization architecture for bounding boxes, label badges, and 468-point 3D Face Mesh wireframes without requiring manual coordinate math:
+
+### 1. Declarative `overlayTheme` & `boxVariant`
+
+Switch between `'solid'`, `'corners'` (4-corner scanner brackets), and `'dashed'` bounding boxes, or hide the box entirely (`showBoxes: false`) while customizing every anatomical region of the 468-point Face Mesh:
+
+```tsx
+<CameraAI
+  processor={faceRecognizer}
+  cameraPosition="front"
+  overlayTheme={{
+    showBoxes: true,
+    boxVariant: 'corners',
+    boxColor: '#10b981',
+    unrecognizedBoxColor: '#38bdf8',
+    cornerLength: 24,
+    cornerThickness: 3,
+    labelPosition: 'top-left',
+    formatLabel: (det) =>
+      det.identity?.isRecognized
+        ? `${det.identity.name} (${Math.round(det.identity.similarity * 100)}%)`
+        : det.label,
+    meshStyle: {
+      showMeshLines: true,
+      showTesselation: true,
+      showDots: true,
+      dotRadius: 1.8,
+      eyeDotRadius: 2.5,
+      lineThickness: 1.0,
+      eyeContourColor: '#22d3ee',
+      lipOuterContourColor: '#34d399',
+      faceOvalColor: 'rgba(56, 189, 248, 0.75)',
+      tesselationColor: 'rgba(56, 189, 248, 0.38)',
+    },
+  }}
+/>
+```
+
+### 2. Custom Per-Element Render Slots (`renderBox`, `renderLabel`, `renderLandmarkDot`)
+
+If you want to render your own React Native components for individual boxes, labels, or landmark dots, `<CameraAI />` automatically computes the cover/contain scaling and front-camera mirroring and passes screen-ready pixel coordinates (`pixelBox` / `point`):
+
+```tsx
+<CameraAI
+  processor={faceRecognizer}
+  renderBox={({ detection, pixelBox, color }) => (
+    <View
+      style={{
+        position: 'absolute',
+        left: pixelBox.x,
+        top: pixelBox.y,
+        width: pixelBox.width,
+        height: pixelBox.height,
+        borderWidth: 2,
+        borderColor: color,
+        borderRadius: 16,
+      }}
+    />
+  )}
+  renderLandmarkDot={({ point, color, radius }) => (
+    <View
+      style={{
+        position: 'absolute',
+        left: point.x - radius,
+        top: point.y - radius,
+        width: radius * 2,
+        height: radius * 2,
+        backgroundColor: color,
+      }}
+    />
+  )}
+/>
+```
+
+### 3. Full-Canvas Custom Overlay (`renderOverlay`)
+
+While `<CameraAI />` includes a built-in `<DetectionOverlay />` component, you can also take over the entire overlay canvas using the `renderOverlay` prop:
+
+```tsx
+import { CameraAI, type DetectionResult, type ViewDimensions } from '@masumdev/rn-camera-ai';
+import { View, Text, StyleSheet } from 'react-native';
+
+export function CustomOverlayCamera() {
+  const renderCustomOverlay = (
+    detections: DetectionResult[],
+    viewDimensions: ViewDimensions
+  ) => {
+    return (
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        {detections.map((det) => {
+          // Calculate pixel position
+          const x = det.boundingBox.x * viewDimensions.width;
+          const y = det.boundingBox.y * viewDimensions.height;
+          const width = det.boundingBox.width * viewDimensions.width;
+          const height = det.boundingBox.height * viewDimensions.height;
+
+          return (
+            <View
+              key={det.id}
+              style={[
+                styles.customBox,
+                { left: x, top: y, width, height }
+              ]}
+            >
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {det.label.toUpperCase()} ({Math.round(det.confidence * 100)}%)
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
+  return (
+    <CameraAI
+      processor={myProcessor}
+      renderOverlay={renderCustomOverlay}
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  customBox: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: '#38bdf8',
+    borderRadius: 8,
+  },
+  badge: {
+    backgroundColor: '#38bdf8',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+    borderTopLeftRadius: 6,
+    borderBottomRightRadius: 6,
+  },
+  badgeText: {
+    color: '#0f172a',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+});
+```

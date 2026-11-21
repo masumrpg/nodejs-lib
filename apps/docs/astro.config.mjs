@@ -65,6 +65,18 @@ export default defineConfig({
           ],
         },
         {
+          label: 'RN Camera AI',
+          items: [
+            { label: 'Overview & Architecture', slug: 'rn-camera-ai' },
+            { label: 'Installation & Quickstart', slug: 'rn-camera-ai/getting-started' },
+            { label: 'CameraAI Component', slug: 'rn-camera-ai/camera-ai' },
+            { label: 'TFLite Adapter', slug: 'rn-camera-ai/tflite-adapter' },
+            { label: 'Custom Processors', slug: 'rn-camera-ai/custom-processors' },
+            { label: 'Coordinate Math & Overlays', slug: 'rn-camera-ai/coordinate-math' },
+            { label: 'Changelog', slug: 'rn-camera-ai/changelog' },
+          ],
+        },
+        {
           label: 'RN Tajweed Verse',
           autogenerate: { directory: 'rn-tajweed-verse' },
         },

@@ -1,0 +1,404 @@
+---
+title: TFLite Object Detection Adapter
+sidebar:
+  label: TFLite Adapter
+  order: 4
+description: "Deep dive into @masumdev/rn-camera-ai-tflite: createTFLiteObjectDetector, model loaders, GPU delegates with CPU fallback, and 4-tensor parser."
+---
+
+import { Tabs, TabItem, Card, CardGrid, Badge } from '@astrojs/starlight/components';
+
+`@masumdev/rn-camera-ai-tflite` is the official TensorFlow Lite object detection adapter for `@masumdev/rn-camera-ai`. It wraps `react-native-fast-tflite`'s Nitro C++ runtime to deliver fast on-device inference for standard SSD and EfficientDet architecture models.
+
+```tsx
+import {
+  createTFLiteObjectDetector,
+  parseDetectionOutputs,
+  type TFLiteObjectDetector,
+} from '@masumdev/rn-camera-ai-tflite';
+```
+
+---
+
+## `createTFLiteObjectDetector(config)` API
+
+The `createTFLiteObjectDetector` factory function initializes a model instance and returns a `TFLiteObjectDetector` object conforming to the universal `CameraProcessor` contract.
+
+```typescript
+const detector = await createTFLiteObjectDetector({
+  model: require('./assets/models/detect.tflite'),
+  labels: COCO_LABELS,
+  confidenceThreshold: 0.50,
+  maxResults: 10,
+  useGpu: true,
+  targetFps: 15,
+});
+```
+
+### Configuration Options
+
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `model` | `TFLiteModelSource` | *Required* | Model binary source. Accepts bundled asset number (`require(...)`), local file URI string, or `{ url: string }`. |
+| `labels` | `string[] \| Record<number, string>` | `undefined` | Label array or index-to-string dictionary for mapping numeric class IDs to human-readable names. |
+| `labelOffset` | `number` | `0` | Offset applied to tensor class indices before label lookup (e.g., `-1` for models where index 0 is background). |
+| `confidenceThreshold` | `number` | `0.50` | Minimum confidence score threshold in range `[0, 1]`. Detections below this score are filtered out. |
+| `maxResults` | `number` | `10` | Maximum number of top-ranking detection results returned per frame. |
+| `useGpu` | `boolean` | `true` | Whether to request Android GPU acceleration (`android-gpu` delegate). |
+| `targetFps` | `number` | `15` | Frame rate throttling target for frame processor worklets. |
+| `inputWidth` | `number` | `300` | Expected neural network input tensor width in pixels. |
+| `inputHeight` | `number` | `300` | Expected neural network input tensor height in pixels. |
+| `onDelegateFallback` | `(requested: string, fallback: string) => void` | `undefined` | Callback fired when GPU delegate initialization fails and falls back to CPU. |
+
+---
+
+## Model Loading Strategies
+
+`@masumdev/rn-camera-ai-tflite` supports three flexible model loading sources:
+
+### 1. Bundled App Asset (`require`)
+
+Best for production models that ship directly with your app binary:
+
+```typescript
+const detector = await createTFLiteObjectDetector({
+  model: require('../assets/models/mobilenet_ssd_v2.tflite'),
+  labels: COCO_LABELS,
+});
+```
+
+> **Remember**: Add `tflite` to `resolver.assetExts` in your `metro.config.js` when bundling `.tflite` files.
+
+### 2. Local File URI / Path
+
+Ideal for models downloaded at runtime or stored in application document storage:
+
+```typescript
+import * as FileSystem from 'expo-file-system';
+
+const modelPath = `${FileSystem.documentDirectory}models/custom_detector.tflite`;
+
+const detector = await createTFLiteObjectDetector({
+  model: `file://${modelPath}`,
+  labels: customLabels,
+});
+```
+
+### 3. Remote URL
+
+Ideal for on-demand dynamic model downloads from a CDN or cloud storage:
+
+```typescript
+const detector = await createTFLiteObjectDetector({
+  model: { url: 'https://cdn.example.com/models/efficientdet_lite0.tflite' },
+  labels: COCO_LABELS,
+});
+```
+
+If the model path or URL cannot be resolved, `createTFLiteObjectDetector` throws a `ModelLoadError` with code `'MODEL_LOAD_ERROR'`.
+
+---
+
+## Hardware Delegates & Automatic CPU Fallback
+
+TensorFlow Lite on Android supports multiple execution backends (delegates):
+- **GPU Delegate (`android-gpu`)**: Executes convolution and tensor operations on the mobile GPU via OpenCL or OpenGL ES.
+- **CPU Delegate (Default)**: Multi-threaded execution on the device CPU with XNNPACK optimizations.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│            createTFLiteObjectDetector({ useGpu: true })         │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+                     [ Attempt GPU Delegate ]
+                                │
+            ┌───────────────────┴───────────────────┐
+            │ Success                               │ Exception / Failed
+            ▼                                       ▼
+ ┌──────────────────────┐                ┌──────────────────────┐
+ │ Active Delegate: GPU │                │ Active Delegate: CPU │
+ └──────────────────────┘                └──────────────────────┘
+                                                    │
+                                                    ▼
+                                         [ onDelegateFallback() ]
+```
+
+On fragmented Android devices, GPU drivers can sometimes fail or lack required OpenCL symbols. Rather than terminating your application with a native SIGSEGV or unhandled C++ exception, `@masumdev/rn-camera-ai-tflite` catches GPU initialization failures and automatically transitions to CPU execution:
+
+```typescript
+const detector = await createTFLiteObjectDetector({
+  model: require('./assets/models/detect.tflite'),
+  useGpu: true,
+  onDelegateFallback: (requested, fallback) => {
+    // Notify your telemetry or analytics service
+    console.warn(`[TFLite] ${requested} delegate unsupported on this device. Using ${fallback}.`);
+  },
+});
+
+console.log('Active Delegate:', detector.activeDelegate); // 'gpu' or 'cpu'
+```
+
+---
+
+## Dynamic Runtime Controls
+
+You can adjust detection thresholds and limits on the fly without reloading the model or recreating the detector instance:
+
+```typescript
+// Tighten confidence filter to 80%
+detector.setConfidenceThreshold(0.80);
+
+// Limit results to top 3 detections
+detector.setMaxResults(3);
+```
+
+---
+
+## 4-Tensor SSD/EfficientDet Output Parser
+
+`@masumdev/rn-camera-ai-tflite` includes `parseDetectionOutputs`, a fast and memory-safe tensor parser designed for standard object detection models (MobileNet SSD, EfficientDet-Lite).
+
+### Standard 4-Tensor Output Layout
+
+Standard TensorFlow Lite object detection models produce 4 output tensors:
+
+```
+Tensor 0: Detection Boxes   [1, N, 4] -> [ymin, xmin, ymax, xmax] normalized [0, 1]
+Tensor 1: Detection Classes [1, N]    -> Numeric class IDs
+Tensor 2: Detection Scores  [1, N]    -> Float confidence scores [0, 1]
+Tensor 3: Detection Count   [1]       -> Scalar float indicating number of valid detections
+```
+
+### Parsing Pipeline: `parseDetectionOutputs`
+
+```typescript
+import { parseDetectionOutputs } from '@masumdev/rn-camera-ai-tflite';
+
+const detections = parseDetectionOutputs(
+  [boxesTensor, classesTensor, scoresTensor, countTensor],
+  {
+    labels: COCO_LABELS,
+    labelOffset: 0,
+    confidenceThreshold: 0.5,
+    maxResults: 10,
+  }
+);
+```
+
+The parser executes the following verification pipeline on each frame:
+
+1. **Buffer Bounds Protection**: Checks tensor capacity and takes the minimum safe length across boxes, classes, and scores arrays.
+2. **Loop Bounding**: Sanitizes the scalar `countTensor` against `maxPossible` and `Number.isFinite` to prevent infinite or runaway loops.
+3. **Confidence Filtering**: Discards any prediction with confidence below `confidenceThreshold` or invalid `NaN`/`Infinity` values.
+4. **Coordinate Clamping**: Clamps `ymin, xmin, ymax, xmax` to `[0, 1]` and converts to top-left format:
+   `width = xmax - xmin` and `height = ymax - ymin`.
+   Degenerate boxes where `width <= 0` or `height <= 0` are discarded.
+5. **Label Mapping**: Resolves numeric class IDs to string labels via array indexing or dictionary lookup, accounting for `labelOffset`.
+6. **Descending Sort & Truncation**: Orders remaining candidates by confidence descending and returns the top `maxResults`.
+
+---
+
+## Face Recognition & 468-Point 3D Face Mesh (`createTFLiteFaceRecognizer`)
+
+`@masumdev/rn-camera-ai-tflite` provides a high-accuracy, 3-model cooperative neural network pipeline for real-time face detection, dense 468-point 3D facial mesh wireframe rendering, and biometric identity recognition.
+
+### 3-Model Cooperative Pipeline
+
+```
+┌─────────────────────────┐
+│ Camera Frame (Upright)  │
+└────────────┬────────────┘
+             │
+             ▼
+┌────────────────────────────────────────────────────────┐
+│ 1. BlazeFace (192×192 Full Range, 896 Anchors)         │
+│    • High-recall face detection across wide angles     │
+│    • Emits tight face ROI bounding box & 6 keypoints   │
+└────────────┬───────────────────────────────────────────┘
+             │
+      ┌──────┴───────────────────────────────────┐
+      ▼                                          ▼
+┌───────────────────────────────────┐      ┌───────────────────────────────────┐
+│ 2. MediaPipe FaceMesh (192×192)   │      │ 3. MobileFaceNet (112×112)        │
+│    • Regresses 468 3D landmarks   │      │    • 192-D L2-normalized embedding│
+│    • Anatomical contours + mesh   │      │    • Cosine Similarity matching   │
+└───────────────────────────────────┘      └───────────────────────────────────┘
+```
+
+### Configuration Options (`TFLiteFaceRecognizerConfig`)
+
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `model` | `TFLiteModelSource` | *Required* | BlazeFace detection model (`face_detection_full_range.tflite`). |
+| `faceMeshModel` | `TFLiteModelSource` | `undefined` | MediaPipe 468-point 3D Face Mesh model (`face_landmark.tflite`). |
+| `embeddingModel` | `TFLiteModelSource` | `undefined` | MobileFaceNet 192-D face embedding model (`mobilefacenet.tflite`). |
+| `confidenceThreshold` | `number` | `0.55` | Minimum face detection score in `[0, 1]`. |
+| `similarityThreshold` | `number` | `0.65` | Minimum cosine similarity to recognize an enrolled identity. |
+| `iouThreshold` | `number` | `0.30` | Non-Maximum Suppression (NMS) IoU overlap limit. |
+| `maxResults` | `number` | `5` | Maximum number of faces to detect simultaneously. |
+| `inputWidth` | `number` | `192` | Detector input width in pixels (192 for full-range, 128 for short-range). |
+| `inputHeight` | `number` | `192` | Detector input height in pixels. |
+| `targetFps` | `number` | `24` | Target frame rate limit in FPS. |
+| `useGpu` | `boolean` | `true` | Requests GPU hardware delegate (`android-gpu` or `core-ml`). |
+| `initialFaces` | `EnrolledFaceProfile[]` | `[]` | Pre-loaded list of enrolled face profiles. |
+
+### Recognition Methods
+
+The returned `TFLiteFaceRecognizer` instance provides dynamic runtime controls and 1-tap enrollment:
+
+- **`enrollLastDetectedFace(name: string): EnrolledFaceProfile | null`**  
+  Captures the most recent high-confidence face from the live stream, computes its 192-D embedding, and registers it under `name`.
+- **`enrollFace(name: string, embedding: Float32Array | number[]): EnrolledFaceProfile`**  
+  Registers a profile with an explicit 192-dimensional embedding vector.
+- **`removeEnrolledFace(id: string): boolean`**  
+  Removes an enrolled face profile by its unique ID.
+- **`getEnrolledFaces(): EnrolledFaceProfile[]`**  
+  Returns all currently enrolled biometric profiles.
+- **`clearEnrolledFaces(): void`**  
+  Deletes all enrolled profiles.
+- **`setConfidenceThreshold(threshold: number): void`**  
+  Dynamically updates the face detection confidence cutoff.
+- **`setSimilarityThreshold(threshold: number): void`**  
+  Dynamically updates the cosine similarity recognition threshold.
+
+### Biometric Identity Matching
+
+Identity matching calculates the **Cosine Similarity** between the current frame's face embedding vector `u` and all enrolled profiles `v_i`:
+
+```text
+Cosine Similarity:
+similarity = (u · v_i) / (||u|| * ||v_i||)
+```
+
+Because both embedding vectors are pre-normalized using L2 normalization (`||u|| = 1`), the cosine similarity is simplified to a blazing-fast dot product:
+
+```text
+Fast L2-Normalized Dot Product:
+similarity = sum(u[j] * v_i[j])  for j = 0..191
+```
+
+If the highest similarity score exceeds `similarityThreshold` (default `0.65`), the detection's label is updated to the enrolled person's name with `identity.isRecognized = true`. If unrecognized, it is labeled `"Unknown Face"`.
+
+### Complete Face Recognition & Mesh Example
+
+```tsx
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View, Text, Pressable, TextInput } from 'react-native';
+import { CameraAI } from '@masumdev/rn-camera-ai';
+import {
+  createTFLiteFaceRecognizer,
+  type TFLiteFaceRecognizer,
+  type EnrolledFaceProfile,
+} from '@masumdev/rn-camera-ai-tflite';
+
+export function FaceRecognitionScreen() {
+  const [recognizer, setRecognizer] = useState<TFLiteFaceRecognizer | null>(null);
+  const [personName, setPersonName] = useState('');
+  const [enrolledFaces, setEnrolledFaces] = useState<EnrolledFaceProfile[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    let instance: TFLiteFaceRecognizer | null = null;
+
+    async function init() {
+      const created = await createTFLiteFaceRecognizer({
+        model: require('../../assets/models/face_detection_full_range.tflite'),
+        faceMeshModel: require('../../assets/models/face_landmark.tflite'),
+        embeddingModel: require('../../assets/models/mobilefacenet.tflite'),
+        confidenceThreshold: 0.55,
+        similarityThreshold: 0.65,
+        targetFps: 24,
+        useGpu: true,
+      });
+
+      if (isMounted) {
+        instance = created;
+        setRecognizer(created);
+      } else {
+        created.dispose?.();
+      }
+    }
+
+    init();
+
+    return () => {
+      isMounted = false;
+      instance?.dispose?.();
+    };
+  }, []);
+
+  const handleEnroll = () => {
+    if (!recognizer || !personName.trim()) return;
+    const profile = recognizer.enrollLastDetectedFace(personName.trim());
+    if (profile) {
+      setEnrolledFaces(recognizer.getEnrolledFaces());
+      setPersonName('');
+    } else {
+      alert('No face clearly detected. Look directly into the camera.');
+    }
+  };
+
+  if (!recognizer) return null;
+
+  return (
+    <View style={styles.container}>
+      <CameraAI
+        processor={recognizer}
+        cameraPosition="front"
+        resizeMode="cover"
+        boxVariant="corners"
+        showMeshLines={true}
+        showTesselation={true}
+        overlayTheme={{
+          boxColor: '#3da441',
+          unrecognizedBoxColor: '#f59e0b',
+        }}
+      />
+
+      <View style={styles.enrollmentBar}>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter person name..."
+          placeholderTextColor="#888"
+          value={personName}
+          onChangeText={setPersonName}
+        />
+        <Pressable style={styles.enrollButton} onPress={handleEnroll}>
+          <Text style={styles.enrollButtonText}>Enroll</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#000' },
+  enrollmentBar: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(20, 20, 20, 0.9)',
+    borderRadius: 12,
+    padding: 8,
+    gap: 8,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: '#333',
+    color: '#fff',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+  },
+  enrollButton: {
+    backgroundColor: '#3da441',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  enrollButtonText: { color: '#fff', fontWeight: 'bold' },
+});
+```
+
