@@ -3,6 +3,9 @@ import type {
   DetectionResult,
   FaceLandmark,
   FaceLandmarkType,
+  FaceLivenessMetrics,
+  HeadPoseDirection,
+  SpoofRiskLevel,
 } from '@masumdev/rn-camera-ai';
 import type {
   BlazeFaceAnchor,
@@ -528,11 +531,14 @@ export function decodeFaceMeshOutputs(
   for (let v = 0; v < 468; v++) {
     const rawX = meshFloats[v * 3];
     const rawY = meshFloats[v * 3 + 1];
+    const rawZ = meshFloats[v * 3 + 2];
     const normInRoiX = Number.isFinite(rawX) ? rawX / meshInputSize : 0.5;
     const normInRoiY = Number.isFinite(rawY) ? rawY / meshInputSize : 0.5;
+    const normInRoiZ = Number.isFinite(rawZ) ? rawZ / meshInputSize : 0;
 
     const fullX = Math.max(0, Math.min(1, roiBox.x + normInRoiX * roiBox.width));
     const fullY = Math.max(0, Math.min(1, roiBox.y + normInRoiY * roiBox.height));
+    const fullZ = normInRoiZ * roiBox.width;
 
     if (fullX < minX) minX = fullX;
     if (fullY < minY) minY = fullY;
@@ -542,6 +548,7 @@ export function decodeFaceMeshOutputs(
     landmarks[v] = {
       x: fullX,
       y: fullY,
+      z: fullZ,
     };
   }
 
@@ -647,4 +654,255 @@ export function extractFaceDescriptorFromRgbAndLandmarks(
   }
 
   return l2NormalizeEmbedding(descriptor.slice(0, 128));
+}
+
+function pointDistance2D(a: FaceLandmark, b: FaceLandmark): number {
+  'worklet';
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * Computes hybrid Active (Eye Blink EAR, Mouth/Smile MAR, 3D Head Pose Yaw/Pitch/Roll)
+ * and Passive (3D Z-Depth Relief + RGB Surface Texture / Anti-Moiré / Glare + Optional Neural Score)
+ * face liveness telemetry on the background camera worklet thread.
+ */
+export function computeFaceLivenessMetrics(
+  rgbBuffer: ArrayBuffer | null,
+  imgWidth: number,
+  imgHeight: number,
+  box: BoundingBox,
+  landmarks?: FaceLandmark[],
+  livenessThreshold = 0.62,
+  externalAntiSpoofScore?: number
+): FaceLivenessMetrics {
+  'worklet';
+  let leftEyeEAR = 0.28;
+  let rightEyeEAR = 0.28;
+  let mouthAspectRatio = 0.08;
+  let smileRatio = 0.36;
+  let yawDeg = 0;
+  let pitchDeg = 0;
+  let rollDeg = 0;
+  let depthReliefScore = 0.72;
+
+  if (landmarks && landmarks.length >= 468) {
+    // 1. Left Eye EAR (#33, #160, #158, #133, #153, #144)
+    const l1 = landmarks[33];
+    const l2 = landmarks[160];
+    const l3 = landmarks[158];
+    const l4 = landmarks[133];
+    const l5 = landmarks[153];
+    const l6 = landmarks[144];
+    const leftHoriz = Math.max(1e-5, pointDistance2D(l1, l4));
+    leftEyeEAR = (pointDistance2D(l2, l6) + pointDistance2D(l3, l5)) / (2 * leftHoriz);
+
+    // 2. Right Eye EAR (#362, #385, #387, #263, #373, #380)
+    const r1 = landmarks[362];
+    const r2 = landmarks[385];
+    const r3 = landmarks[387];
+    const r4 = landmarks[263];
+    const r5 = landmarks[373];
+    const r6 = landmarks[380];
+    const rightHoriz = Math.max(1e-5, pointDistance2D(r1, r4));
+    rightEyeEAR = (pointDistance2D(r2, r6) + pointDistance2D(r3, r5)) / (2 * rightHoriz);
+
+    // 3. Mouth Aspect Ratio (MAR) & Smile Ratio (#13, #14, #78, #308, #61, #291, #234, #454)
+    const upperInnerLip = landmarks[13];
+    const lowerInnerLip = landmarks[14];
+    const leftInnerCorner = landmarks[78];
+    const rightInnerCorner = landmarks[308];
+    const innerMouthWidth = Math.max(1e-5, pointDistance2D(leftInnerCorner, rightInnerCorner));
+    mouthAspectRatio = pointDistance2D(upperInnerLip, lowerInnerLip) / innerMouthWidth;
+
+    const leftOuterLip = landmarks[61];
+    const rightOuterLip = landmarks[291];
+    const leftCheek = landmarks[234];
+    const rightCheek = landmarks[454];
+    const jawWidth = Math.max(1e-5, pointDistance2D(leftCheek, rightCheek));
+    const outerMouthWidth = pointDistance2D(leftOuterLip, rightOuterLip);
+    const lipCenterY = (upperInnerLip.y + lowerInnerLip.y) * 0.5;
+    const cornerMeanY = (leftOuterLip.y + rightOuterLip.y) * 0.5;
+    const cornerLift = Math.max(-0.08, Math.min(0.12, (lipCenterY - cornerMeanY) / Math.max(0.05, box.height)));
+    smileRatio = outerMouthWidth / jawWidth + cornerLift * 1.4;
+
+    // 4. 3D Head Pose Estimation (Yaw, Pitch, Roll)
+    const noseTip = landmarks[1];
+    const forehead = landmarks[10];
+    const chin = landmarks[152];
+
+    const distLeftCheek = Math.max(1e-5, Math.abs(noseTip.x - leftCheek.x));
+    const distRightCheek = Math.max(1e-5, Math.abs(rightCheek.x - noseTip.x));
+    const yawAsymmetry = (distRightCheek - distLeftCheek) / (distRightCheek + distLeftCheek);
+    yawDeg = Math.round(Math.max(-45, Math.min(45, yawAsymmetry * 68)));
+
+    const distForehead = Math.max(1e-5, Math.abs(noseTip.y - forehead.y));
+    const distChin = Math.max(1e-5, Math.abs(chin.y - noseTip.y));
+    const pitchAsymmetry = (distChin - distForehead * 0.88) / (distChin + distForehead);
+    pitchDeg = Math.round(Math.max(-35, Math.min(35, pitchAsymmetry * 65)));
+
+    const eyeDy = r4.y - l1.y;
+    const eyeDx = Math.max(1e-5, r4.x - l1.x);
+    rollDeg = Math.round(Math.max(-45, Math.min(45, Math.atan2(eyeDy, eyeDx) * (180 / Math.PI))));
+
+    // 5. 3D Z-Coordinate Depth Relief Score (Nose Tip #1/#4 vs Cheeks #234/#454 & Eyes #33/#263)
+    const noseZ = (landmarks[1].z ?? 0) * 0.6 + (landmarks[4].z ?? 0) * 0.4;
+    const cheekMeanZ = ((leftCheek.z ?? 0) + (rightCheek.z ?? 0)) * 0.5;
+    const eyeMeanZ = ((l1.z ?? 0) + (r4.z ?? 0)) * 0.5;
+    const zDeltaNoseCheek = Math.abs(cheekMeanZ - noseZ);
+    const zDeltaNoseEye = Math.abs(eyeMeanZ - noseZ);
+    const normalizedRelief = (zDeltaNoseCheek * 0.65 + zDeltaNoseEye * 0.35) / Math.max(0.04, box.width);
+
+    if (normalizedRelief > 0.01) {
+      depthReliefScore = Math.max(0.25, Math.min(0.98, 0.55 + normalizedRelief * 3.8));
+    } else {
+      // Fallback when Z is flat (0): indicates planar/2D surface or uncalibrated depth
+      depthReliefScore = 0.35;
+    }
+  } else if (landmarks && landmarks.length >= 6) {
+    // 6-keypoint BlazeFace fallback (rightEye=0, leftEye=1, noseTip=2, mouth=3, rightEar=4, leftEar=5)
+    const rightEye = landmarks[0];
+    const leftEye = landmarks[1];
+    const noseTip = landmarks[2];
+    const rightEar = landmarks[4];
+    const leftEar = landmarks[5];
+
+    const distR = Math.max(1e-5, Math.abs(noseTip.x - rightEar.x));
+    const distL = Math.max(1e-5, Math.abs(leftEar.x - noseTip.x));
+    const yawAsym = (distL - distR) / (distL + distR);
+    yawDeg = Math.round(Math.max(-45, Math.min(45, yawAsym * 65)));
+
+    const eyeMidY = (rightEye.y + leftEye.y) * 0.5;
+    const mouth = landmarks[3];
+    const dEyeNose = Math.max(1e-5, noseTip.y - eyeMidY);
+    const dNoseMouth = Math.max(1e-5, mouth.y - noseTip.y);
+    const pitchAsym = (dNoseMouth - dEyeNose * 0.85) / (dNoseMouth + dEyeNose);
+    pitchDeg = Math.round(Math.max(-35, Math.min(35, pitchAsym * 62)));
+
+    const eyeDy = leftEye.y - rightEye.y;
+    const eyeDx = Math.max(1e-5, leftEye.x - rightEye.x);
+    rollDeg = Math.round(Math.max(-45, Math.min(45, Math.atan2(eyeDy, eyeDx) * (180 / Math.PI))));
+  }
+
+  // Passive RGB Surface Texture, Specular Glare & Screen-Grid Moiré Analysis
+  let textureScore = 0.82;
+  if (rgbBuffer && rgbBuffer.byteLength >= imgWidth * imgHeight * 3 && imgWidth > 8 && imgHeight > 8) {
+    const bytes = new Uint8Array(rgbBuffer);
+    const x0 = Math.max(0, Math.min(1, box.x));
+    const y0 = Math.max(0, Math.min(1, box.y));
+    const bw = Math.max(0.05, Math.min(1 - x0, box.width));
+    const bh = Math.max(0.05, Math.min(1 - y0, box.height));
+
+    const steps = 12;
+    let glareCount = 0;
+    let totalSamples = 0;
+    let lumSum = 0;
+    let lumSqSum = 0;
+    let highFreqOscillations = 0;
+    let prevDiff = 0;
+
+    for (let gy = 0; gy < steps; gy++) {
+      const ny = y0 + ((gy + 0.5) / steps) * bh;
+      const py = Math.max(0, Math.min(imgHeight - 1, Math.floor(ny * imgHeight)));
+      prevDiff = 0;
+      let prevLum = -1;
+
+      for (let gx = 0; gx < steps; gx++) {
+        const nx = x0 + ((gx + 0.5) / steps) * bw;
+        const px = Math.max(0, Math.min(imgWidth - 1, Math.floor(nx * imgWidth)));
+        const idx = (py * imgWidth + px) * 3;
+        if (idx + 2 < bytes.byteLength) {
+          const r = bytes[idx];
+          const g = bytes[idx + 1];
+          const b = bytes[idx + 2];
+          const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+          if (r > 246 && g > 246 && b > 246) {
+            glareCount++;
+          }
+
+          lumSum += lum;
+          lumSqSum += lum * lum;
+          totalSamples++;
+
+          if (prevLum >= 0) {
+            const diff = lum - prevLum;
+            if (prevDiff !== 0 && diff * prevDiff < -0.0018) {
+              highFreqOscillations++;
+            }
+            prevDiff = diff;
+          }
+          prevLum = lum;
+        }
+      }
+    }
+
+    if (totalSamples > 0) {
+      const meanLum = lumSum / totalSamples;
+      const variance = Math.max(0, lumSqSum / totalSamples - meanLum * meanLum);
+      const stdDev = Math.sqrt(variance);
+      const glareRatio = glareCount / totalSamples;
+      const moireRatio = highFreqOscillations / totalSamples;
+
+      // Natural 3D skin exhibits moderate tonal contrast (stdDev ~0.06..0.24), low glare, and low Moiré oscillation
+      const contrastScore = stdDev < 0.015 ? 0.35 : Math.min(0.96, 0.58 + stdDev * 2.2);
+      const glarePenalty = glareRatio * 0.65;
+      const moirePenalty = Math.max(0, moireRatio - 0.35) * 0.8;
+      textureScore = Math.max(0.15, Math.min(0.98, contrastScore - glarePenalty - moirePenalty));
+    }
+  }
+
+  let passiveScore = depthReliefScore * 0.58 + textureScore * 0.42;
+  if (
+    typeof externalAntiSpoofScore === 'number' &&
+    Number.isFinite(externalAntiSpoofScore)
+  ) {
+    const clampedExt = Math.max(0, Math.min(1, externalAntiSpoofScore));
+    passiveScore = passiveScore * 0.45 + clampedExt * 0.55;
+  }
+  passiveScore = Math.max(0, Math.min(1, Number(passiveScore.toFixed(3))));
+
+  const eyeAspectRatio = Number(((leftEyeEAR + rightEyeEAR) * 0.5).toFixed(3));
+  const isBlinking = eyeAspectRatio < 0.195;
+  const isMouthOpen = mouthAspectRatio >= 0.30;
+  const isSmiling = smileRatio >= 0.44;
+
+  let headDirection: HeadPoseDirection = 'center';
+  if (yawDeg <= -14) {
+    headDirection = 'left';
+  } else if (yawDeg >= 14) {
+    headDirection = 'right';
+  } else if (pitchDeg >= 13) {
+    headDirection = 'up';
+  } else if (pitchDeg <= -13) {
+    headDirection = 'down';
+  }
+
+  let spoofRisk: SpoofRiskLevel = 'low';
+  if (passiveScore < livenessThreshold * 0.82) {
+    spoofRisk = 'high';
+  } else if (passiveScore < livenessThreshold) {
+    spoofRisk = 'medium';
+  }
+
+  return {
+    isLive: passiveScore >= livenessThreshold,
+    passiveScore,
+    spoofRisk,
+    depthReliefScore: Number(depthReliefScore.toFixed(3)),
+    textureScore: Number(textureScore.toFixed(3)),
+    eyeAspectRatio,
+    leftEyeEAR: Number(leftEyeEAR.toFixed(3)),
+    rightEyeEAR: Number(rightEyeEAR.toFixed(3)),
+    isBlinking,
+    mouthAspectRatio: Number(mouthAspectRatio.toFixed(3)),
+    isMouthOpen,
+    smileRatio: Number(smileRatio.toFixed(3)),
+    isSmiling,
+    yawDeg,
+    pitchDeg,
+    rollDeg,
+    headDirection,
+  };
 }

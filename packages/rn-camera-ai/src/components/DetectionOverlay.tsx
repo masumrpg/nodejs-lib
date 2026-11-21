@@ -500,35 +500,53 @@ export function projectDetectionsWorklet(
 
 function getLabelPositionStyle(
   position: LabelBadgePosition,
-  pixelBox: PixelBoundingBox
+  pixelBox: PixelBoundingBox,
+  cornerRadius: number,
+  edgeOffset: number
 ): ViewStyle {
-  const clampLeft = pixelBox.x < 8 ? Math.max(-2, 8 - pixelBox.x) : -2;
-  const clampTop = pixelBox.y < 8 ? Math.max(-2, 8 - pixelBox.y) : -2;
+  const innerBadgeRadius = Math.max(4, Math.min(8, cornerRadius));
+  const clampLeft =
+    pixelBox.x < 8 ? Math.max(edgeOffset, 8 - pixelBox.x) : edgeOffset;
+  const clampTop =
+    pixelBox.y < 8 ? Math.max(edgeOffset, 8 - pixelBox.y) : edgeOffset;
 
   switch (position) {
     case 'top-right':
       return {
         alignSelf: 'flex-end',
         marginTop: clampTop,
-        marginRight: -2,
+        marginRight: edgeOffset,
+        borderTopRightRadius: cornerRadius,
+        borderBottomLeftRadius: innerBadgeRadius,
+        borderTopLeftRadius: 4,
+        borderBottomRightRadius: 4,
       };
     case 'bottom-left':
       return {
         position: 'absolute',
-        bottom: -2,
+        bottom: edgeOffset,
         left: clampLeft,
+        borderBottomLeftRadius: cornerRadius,
+        borderTopRightRadius: innerBadgeRadius,
+        borderTopLeftRadius: 4,
+        borderBottomRightRadius: 4,
       };
     case 'bottom-right':
       return {
         position: 'absolute',
-        bottom: -2,
-        right: -2,
+        bottom: edgeOffset,
+        right: edgeOffset,
+        borderBottomRightRadius: cornerRadius,
+        borderTopLeftRadius: innerBadgeRadius,
+        borderTopRightRadius: 4,
+        borderBottomLeftRadius: 4,
       };
     case 'inside-top':
       return {
         alignSelf: 'flex-start',
         marginTop: 6,
         marginLeft: 6,
+        borderRadius: innerBadgeRadius,
       };
     case 'top-left':
     default:
@@ -536,6 +554,10 @@ function getLabelPositionStyle(
         alignSelf: 'flex-start',
         marginTop: clampTop,
         marginLeft: clampLeft,
+        borderTopLeftRadius: cornerRadius,
+        borderBottomRightRadius: innerBadgeRadius,
+        borderTopRightRadius: 4,
+        borderBottomLeftRadius: 4,
       };
   }
 }
@@ -645,16 +667,56 @@ const AnimatedDetectionBox: React.FC<AnimatedDetectionBoxProps> = ({
   });
 
   const resolvedText = labelText ?? '';
+  const edgeOffset = isSolidOrDashed ? -boxBorderWidth : 0;
+  const activeCornerRadius = isCornersMode || isSolidOrDashed ? boxBorderRadius : 4;
+  const innerBadgeRadius = Math.max(4, Math.min(8, activeCornerRadius));
   const StaticPosStyle: ViewStyle =
     labelPosition === 'top-right'
-      ? { alignSelf: 'flex-end', marginTop: -2, marginRight: -2 }
+      ? {
+          alignSelf: 'flex-end',
+          marginTop: edgeOffset,
+          marginRight: edgeOffset,
+          borderTopRightRadius: activeCornerRadius,
+          borderBottomLeftRadius: innerBadgeRadius,
+          borderTopLeftRadius: 4,
+          borderBottomRightRadius: 4,
+        }
       : labelPosition === 'bottom-left'
-        ? { position: 'absolute', bottom: -2, left: -2 }
+        ? {
+            position: 'absolute',
+            bottom: edgeOffset,
+            left: edgeOffset,
+            borderBottomLeftRadius: activeCornerRadius,
+            borderTopRightRadius: innerBadgeRadius,
+            borderTopLeftRadius: 4,
+            borderBottomRightRadius: 4,
+          }
         : labelPosition === 'bottom-right'
-          ? { position: 'absolute', bottom: -2, right: -2 }
+          ? {
+              position: 'absolute',
+              bottom: edgeOffset,
+              right: edgeOffset,
+              borderBottomRightRadius: activeCornerRadius,
+              borderTopLeftRadius: innerBadgeRadius,
+              borderTopRightRadius: 4,
+              borderBottomLeftRadius: 4,
+            }
           : labelPosition === 'inside-top'
-            ? { alignSelf: 'flex-start', marginTop: 6, marginLeft: 6 }
-            : { alignSelf: 'flex-start', marginTop: -2, marginLeft: -2 };
+            ? {
+                alignSelf: 'flex-start',
+                marginTop: 6,
+                marginLeft: 6,
+                borderRadius: innerBadgeRadius,
+              }
+            : {
+                alignSelf: 'flex-start',
+                marginTop: edgeOffset,
+                marginLeft: edgeOffset,
+                borderTopLeftRadius: activeCornerRadius,
+                borderBottomRightRadius: innerBadgeRadius,
+                borderTopRightRadius: 4,
+                borderBottomLeftRadius: 4,
+              };
 
   return (
     <Animated.View
@@ -969,6 +1031,17 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
           ? resolvedFormatLabel(detection)
           : item.formattedText;
 
+        const effectiveCornerRadius = Math.max(
+          0,
+          Math.min(resolvedBoxBorderRadius, armW / 2, armH / 2)
+        );
+        const activeBoxRadius = isCornersMode
+          ? effectiveCornerRadius
+          : resolvedBoxBorderRadius;
+        const labelCornerRadius =
+          isCornersMode || isSolidOrDashed ? activeBoxRadius : 4;
+        const labelEdgeOffset = isSolidOrDashed ? -resolvedBoxBorderWidth : 0;
+
         const labelNode = renderLabel ? (
           renderLabel({
             detection,
@@ -981,7 +1054,12 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
           <View
             style={[
               styles.labelBadge,
-              getLabelPositionStyle(resolvedLabelPosition, pixelBox),
+              getLabelPositionStyle(
+                resolvedLabelPosition,
+                pixelBox,
+                labelCornerRadius,
+                labelEdgeOffset
+              ),
               {
                 backgroundColor: resolvedLabelBg ?? effectiveBoxColor,
               },
@@ -1020,7 +1098,7 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
                       width: pixelBox.width,
                       height: pixelBox.height,
                       borderColor: effectiveBoxColor,
-                      borderRadius: resolvedBoxBorderRadius,
+                      borderRadius: activeBoxRadius,
                       borderWidth: isSolidOrDashed ? resolvedBoxBorderWidth : 0,
                       borderStyle:
                         resolvedBoxVariant === 'dashed' ? 'dashed' : 'solid',
@@ -1042,7 +1120,7 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
                             borderColor: effectiveBoxColor,
                             borderTopWidth: resolvedCornerThickness,
                             borderLeftWidth: resolvedCornerThickness,
-                            borderTopLeftRadius: resolvedBoxBorderRadius,
+                            borderTopLeftRadius: effectiveCornerRadius,
                           },
                         ]}
                       />
@@ -1057,7 +1135,7 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
                             borderColor: effectiveBoxColor,
                             borderTopWidth: resolvedCornerThickness,
                             borderRightWidth: resolvedCornerThickness,
-                            borderTopRightRadius: resolvedBoxBorderRadius,
+                            borderTopRightRadius: effectiveCornerRadius,
                           },
                         ]}
                       />
@@ -1072,7 +1150,7 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
                             borderColor: effectiveBoxColor,
                             borderBottomWidth: resolvedCornerThickness,
                             borderLeftWidth: resolvedCornerThickness,
-                            borderBottomLeftRadius: resolvedBoxBorderRadius,
+                            borderBottomLeftRadius: effectiveCornerRadius,
                           },
                         ]}
                       />
@@ -1087,7 +1165,7 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
                             borderColor: effectiveBoxColor,
                             borderBottomWidth: resolvedCornerThickness,
                             borderRightWidth: resolvedCornerThickness,
-                            borderBottomRightRadius: resolvedBoxBorderRadius,
+                            borderBottomRightRadius: effectiveCornerRadius,
                           },
                         ]}
                       />
@@ -1168,11 +1246,9 @@ const styles = StyleSheet.create({
   },
   labelBadge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 6,
+    paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 4,
-    marginTop: -2,
-    marginLeft: -2,
   },
   labelText: {
     color: '#ffffff',

@@ -387,12 +387,16 @@ export default function FaceRecognitionScreen(): React.JSX.Element {
               <ScanFace size={16} color={CYAN_ACCENT} />
             </View>
             <View style={styles.titleTextGroup}>
-              <Text style={styles.title}>Face Recognition AI</Text>
-              <Text style={styles.subtitle}>
-                468-Pt Face Mesh + MobileFaceNet (192-D)
+              <Text numberOfLines={1} style={styles.title}>
+                Face Recognition AI
+              </Text>
+              <Text numberOfLines={1} style={styles.subtitle}>
+                468-Pt Mesh + MobileFaceNet 192-D
               </Text>
             </View>
+          </View>
 
+          <View style={styles.badgesRow}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Cycle bounding box style"
@@ -433,9 +437,6 @@ export default function FaceRecognitionScreen(): React.JSX.Element {
                 {getMeshModeLabel(meshMode)}
               </Text>
             </Pressable>
-          </View>
-
-          <View style={styles.badgesRow}>
             <View
               style={[
                 styles.badge,

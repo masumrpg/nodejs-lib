@@ -6,6 +6,7 @@ import {
   InferenceError,
 } from '@masumdev/rn-camera-ai';
 import {
+  computeFaceLivenessMetrics,
   cosineSimilarity,
   cropAndResizeFaceToFloat32Buffer,
   cropAndResizeFaceToNormalized01Float32Buffer,
@@ -194,8 +195,11 @@ interface WorkletFaceRecognizerParams {
   modelSync: SyncRef<TensorflowModel | null>;
   embeddingModelSync: SyncRef<TensorflowModel | null>;
   faceMeshModelSync: SyncRef<TensorflowModel | null>;
+  antiSpoofModelSync: SyncRef<TensorflowModel | null>;
   confidenceSync: SyncRef<number>;
   similaritySync: SyncRef<number>;
+  livenessThresholdSync: SyncRef<number>;
+  enableLiveness: boolean;
   iouSync: SyncRef<number>;
   maxResultsSync: SyncRef<number>;
   lastFrameTimeSync: SyncRef<number>;
@@ -209,6 +213,44 @@ interface WorkletFaceRecognizerParams {
   anchors: BlazeFaceAnchor[];
   frameConverter: FrameConverterLike | null;
   fallbackResizePlugin: ResizerModule | null;
+}
+
+function extractAntiSpoofScoreFromOutputs(rawOutputs: unknown[]): number | undefined {
+  'worklet';
+  if (!rawOutputs || !Array.isArray(rawOutputs) || rawOutputs.length === 0) {
+    return undefined;
+  }
+  const first = rawOutputs[0];
+  let values: ArrayLike<number> | null = null;
+  if (first instanceof Float32Array) {
+    values = first;
+  } else if (first instanceof ArrayBuffer) {
+    const usable = first.byteLength - (first.byteLength % 4);
+    values = usable > 0 ? new Float32Array(first, 0, usable / 4) : null;
+  } else if (ArrayBuffer.isView(first)) {
+    const view = first as ArrayBufferView;
+    const usable = view.byteLength - (view.byteLength % 4);
+    values = usable > 0 ? new Float32Array(view.buffer, view.byteOffset, usable / 4) : null;
+  } else if (Array.isArray(first)) {
+    values = first as number[];
+  }
+  if (!values || values.length === 0) {
+    return undefined;
+  }
+  if (values.length === 1) {
+    const v = values[0];
+    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : undefined;
+  }
+  // Standard 2-class or 3-class [spoof, real, ...] logits or probabilities
+  const spoofVal = Number.isFinite(values[0]) ? values[0] : 0;
+  const realVal = Number.isFinite(values[1]) ? values[1] : 0;
+  if (spoofVal >= 0 && realVal >= 0 && Math.abs(spoofVal + realVal - 1) < 0.05) {
+    return Math.max(0, Math.min(1, realVal));
+  }
+  const maxLogit = Math.max(spoofVal, realVal);
+  const expSpoof = Math.exp(spoofVal - maxLogit);
+  const expReal = Math.exp(realVal - maxLogit);
+  return expReal / Math.max(1e-6, expSpoof + expReal);
 }
 
 function extractEmbeddingFromOutputs(rawEmbeddingOutputs: unknown[]): number[] {
@@ -246,8 +288,11 @@ function createTFLiteWorkletProcessFaceFrame(
     modelSync,
     embeddingModelSync,
     faceMeshModelSync,
+    antiSpoofModelSync,
     confidenceSync,
     similaritySync,
+    livenessThresholdSync,
+    enableLiveness,
     iouSync,
     maxResultsSync,
     lastFrameTimeSync,
@@ -479,11 +524,49 @@ function createTFLiteWorkletProcessFaceFrame(
 
     const enrolledProfiles = enrolledFacesSync.getBlocking();
     const similarityThreshold = similaritySync.getBlocking();
+    const livenessThreshold = livenessThresholdSync.getBlocking();
     const activeEmbeddingModel = embeddingModelSync.getBlocking();
+    const activeAntiSpoofModel = antiSpoofModelSync.getBlocking();
 
     for (let i = 0; i < faces.length; i++) {
-      const face = faces[i];
+      let face = faces[i];
       let descriptor: number[] = [];
+
+      if (enableLiveness) {
+        let externalSpoofScore: number | undefined = undefined;
+        if (activeAntiSpoofModel) {
+          try {
+            const spoofRoi = expandFaceRoiBox(face.boundingBox, 1.5);
+            const spoofInput = cropAndResizeFaceToNormalized01Float32Buffer(
+              rgbBuffer,
+              inputWidth,
+              inputHeight,
+              spoofRoi,
+              80,
+              80
+            );
+            const spoofOutputs = activeAntiSpoofModel.runSync([spoofInput]);
+            externalSpoofScore = extractAntiSpoofScoreFromOutputs(spoofOutputs);
+          } catch {
+            externalSpoofScore = undefined;
+          }
+        }
+
+        const livenessMetrics = computeFaceLivenessMetrics(
+          rgbBuffer,
+          inputWidth,
+          inputHeight,
+          face.boundingBox,
+          face.landmarks,
+          livenessThreshold,
+          externalSpoofScore
+        );
+        face = {
+          ...face,
+          liveness: livenessMetrics,
+        };
+        faces[i] = face;
+      }
 
       if (activeEmbeddingModel) {
         try {
@@ -573,6 +656,7 @@ export class TFLiteFaceRecognizerImpl implements TFLiteFaceRecognizer {
   private _activeDelegate: 'gpu' | 'cpu';
   private _confidenceThreshold: number;
   private _similarityThreshold: number;
+  private _livenessThreshold: number;
   private _iouThreshold: number;
   private _maxResults: number;
   private _config: TFLiteFaceRecognizerConfig;
@@ -581,8 +665,10 @@ export class TFLiteFaceRecognizerImpl implements TFLiteFaceRecognizer {
   private _modelSync: SyncRef<TensorflowModel | null>;
   private _embeddingModelSync: SyncRef<TensorflowModel | null>;
   private _faceMeshModelSync: SyncRef<TensorflowModel | null>;
+  private _antiSpoofModelSync: SyncRef<TensorflowModel | null>;
   private _confidenceSync: SyncRef<number>;
   private _similaritySync: SyncRef<number>;
+  private _livenessThresholdSync: SyncRef<number>;
   private _iouSync: SyncRef<number>;
   private _maxResultsSync: SyncRef<number>;
   private _lastFrameTimeSync: SyncRef<number>;
@@ -595,7 +681,8 @@ export class TFLiteFaceRecognizerImpl implements TFLiteFaceRecognizer {
     model: TensorflowModel,
     activeDelegate: 'gpu' | 'cpu',
     embeddingModel: TensorflowModel | null = null,
-    faceMeshModel: TensorflowModel | null = null
+    faceMeshModel: TensorflowModel | null = null,
+    antiSpoofModel: TensorflowModel | null = null
   ) {
     this.id = `tflite-face-recognizer-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     this._config = config;
@@ -613,6 +700,12 @@ export class TFLiteFaceRecognizerImpl implements TFLiteFaceRecognizer {
       Number.isFinite(config.similarityThreshold)
         ? Math.max(0.1, Math.min(0.99, config.similarityThreshold))
         : 0.75;
+
+    this._livenessThreshold =
+      typeof config.livenessThreshold === 'number' &&
+      Number.isFinite(config.livenessThreshold)
+        ? Math.max(0.1, Math.min(0.99, config.livenessThreshold))
+        : 0.62;
 
     this._iouThreshold =
       typeof config.iouThreshold === 'number' && Number.isFinite(config.iouThreshold)
@@ -643,8 +736,13 @@ export class TFLiteFaceRecognizerImpl implements TFLiteFaceRecognizer {
       faceMeshModel,
       false
     );
+    this._antiSpoofModelSync = createSafeSynchronizable<TensorflowModel | null>(
+      antiSpoofModel,
+      false
+    );
     this._confidenceSync = createSafeSynchronizable(this._confidenceThreshold, true);
     this._similaritySync = createSafeSynchronizable(this._similarityThreshold, true);
+    this._livenessThresholdSync = createSafeSynchronizable(this._livenessThreshold, true);
     this._iouSync = createSafeSynchronizable(this._iouThreshold, true);
     this._maxResultsSync = createSafeSynchronizable(this._maxResults, true);
     this._lastFrameTimeSync = createSafeSynchronizable(0, true);
@@ -672,8 +770,11 @@ export class TFLiteFaceRecognizerImpl implements TFLiteFaceRecognizer {
       modelSync: this._modelSync,
       embeddingModelSync: this._embeddingModelSync,
       faceMeshModelSync: this._faceMeshModelSync,
+      antiSpoofModelSync: this._antiSpoofModelSync,
       confidenceSync: this._confidenceSync,
       similaritySync: this._similaritySync,
+      livenessThresholdSync: this._livenessThresholdSync,
+      enableLiveness: config.enableLiveness !== false,
       iouSync: this._iouSync,
       maxResultsSync: this._maxResultsSync,
       lastFrameTimeSync: this._lastFrameTimeSync,
@@ -706,6 +807,10 @@ export class TFLiteFaceRecognizerImpl implements TFLiteFaceRecognizer {
     return this._similarityThreshold;
   }
 
+  get livenessThreshold(): number {
+    return this._livenessThreshold;
+  }
+
   get targetFps(): number | undefined {
     return this._config.targetFps ?? 24;
   }
@@ -721,6 +826,13 @@ export class TFLiteFaceRecognizerImpl implements TFLiteFaceRecognizer {
     if (Number.isFinite(threshold)) {
       this._similarityThreshold = Math.max(0.1, Math.min(0.99, threshold));
       this._similaritySync.setBlocking(this._similarityThreshold);
+    }
+  }
+
+  setLivenessThreshold(threshold: number): void {
+    if (Number.isFinite(threshold)) {
+      this._livenessThreshold = Math.max(0.1, Math.min(0.99, threshold));
+      this._livenessThresholdSync.setBlocking(this._livenessThreshold);
     }
   }
 
@@ -857,11 +969,26 @@ export async function createTFLiteFaceRecognizer(
     }
   }
 
+  let loadedAntiSpoofModel: TensorflowModel | null = null;
+  if (config?.antiSpoofModel !== undefined && config?.antiSpoofModel !== null) {
+    try {
+      const spoofLoaded = await loadModelWithFallback(config.antiSpoofModel, {
+        useGpu: config?.useGpu,
+        platform: config?.platform,
+        loadModel: config?.loadModel,
+      });
+      loadedAntiSpoofModel = spoofLoaded.model;
+    } catch {
+      loadedAntiSpoofModel = null;
+    }
+  }
+
   return new TFLiteFaceRecognizerImpl(
     config,
     loaded.model,
     loaded.activeDelegate,
     loadedEmbeddingModel,
-    loadedFaceMeshModel
+    loadedFaceMeshModel,
+    loadedAntiSpoofModel
   );
 }

@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import type { FaceLandmark } from '@masumdev/rn-camera-ai';
 import {
+  computeFaceLivenessMetrics,
   cosineSimilarity,
   createTFLiteFaceRecognizer,
   decodeBlazeFaceOutputs,
@@ -125,5 +127,89 @@ describe('packages/rn-camera-ai-tflite > faceRecognizer & blazeFaceParser', () =
     expect(recognizer.getEnrolledFaces().length).toBe(0);
     recognizer.dispose?.();
     expect(recognizer.status).toBe('idle');
+  });
+
+  test('computeFaceLivenessMetrics accurately detects eye blink (EAR), mouth open (MAR), 3D head pose, and passive 3D depth relief', () => {
+    const mesh468: FaceLandmark[] = Array.from({ length: 468 }, (_, i) => ({
+      x: 0.3 + ((i % 20) / 20) * 0.4,
+      y: 0.25 + (Math.floor(i / 20) / 24) * 0.5,
+      z: 0.0,
+    }));
+
+    // Configure open eyes (#33, #160, #158, #133, #153, #144 and #362, #385, #387, #263, #373, #380)
+    mesh468[33] = { x: 0.36, y: 0.42, z: 0.02 };
+    mesh468[133] = { x: 0.44, y: 0.42, z: 0.02 };
+    mesh468[160] = { x: 0.39, y: 0.405, z: 0.02 };
+    mesh468[158] = { x: 0.41, y: 0.405, z: 0.02 };
+    mesh468[144] = { x: 0.39, y: 0.435, z: 0.02 };
+    mesh468[153] = { x: 0.41, y: 0.435, z: 0.02 };
+
+    mesh468[362] = { x: 0.56, y: 0.42, z: 0.02 };
+    mesh468[263] = { x: 0.64, y: 0.42, z: 0.02 };
+    mesh468[385] = { x: 0.59, y: 0.405, z: 0.02 };
+    mesh468[387] = { x: 0.61, y: 0.405, z: 0.02 };
+    mesh468[380] = { x: 0.59, y: 0.435, z: 0.02 };
+    mesh468[373] = { x: 0.61, y: 0.435, z: 0.02 };
+
+    // Configure closed mouth (#13, #14, #78, #308, #61, #291)
+    mesh468[78] = { x: 0.44, y: 0.62, z: 0.01 };
+    mesh468[308] = { x: 0.56, y: 0.62, z: 0.01 };
+    mesh468[13] = { x: 0.50, y: 0.618, z: 0.01 };
+    mesh468[14] = { x: 0.50, y: 0.624, z: 0.01 };
+    mesh468[61] = { x: 0.43, y: 0.62, z: 0.01 };
+    mesh468[291] = { x: 0.57, y: 0.62, z: 0.01 };
+
+    // Configure 3D head pose & nose protrusion (#1, #4, #10, #152, #234, #454)
+    mesh468[1] = { x: 0.50, y: 0.52, z: -0.06 };
+    mesh468[4] = { x: 0.50, y: 0.50, z: -0.06 };
+    mesh468[10] = { x: 0.50, y: 0.30, z: 0.03 };
+    mesh468[152] = { x: 0.50, y: 0.74, z: 0.03 };
+    mesh468[234] = { x: 0.30, y: 0.52, z: 0.06 };
+    mesh468[454] = { x: 0.70, y: 0.52, z: 0.06 };
+
+    const faceBox = { x: 0.28, y: 0.25, width: 0.44, height: 0.52 };
+    const openMetrics = computeFaceLivenessMetrics(
+      null,
+      192,
+      192,
+      faceBox,
+      mesh468,
+      0.62
+    );
+
+    expect(openMetrics.isLive).toBe(true);
+    expect(openMetrics.isBlinking).toBe(false);
+    expect(openMetrics.eyeAspectRatio).toBeGreaterThan(0.25);
+    expect(openMetrics.isMouthOpen).toBe(false);
+    expect(openMetrics.headDirection).toBe('center');
+    expect(openMetrics.depthReliefScore).toBeGreaterThan(0.75);
+
+    // Simulate eye blink (collapse upper & lower eyelids) and mouth open
+    mesh468[160] = { x: 0.39, y: 0.419, z: 0.02 };
+    mesh468[158] = { x: 0.41, y: 0.419, z: 0.02 };
+    mesh468[144] = { x: 0.39, y: 0.422, z: 0.02 };
+    mesh468[153] = { x: 0.41, y: 0.422, z: 0.02 };
+    mesh468[385] = { x: 0.59, y: 0.419, z: 0.02 };
+    mesh468[387] = { x: 0.61, y: 0.419, z: 0.02 };
+    mesh468[380] = { x: 0.59, y: 0.422, z: 0.02 };
+    mesh468[373] = { x: 0.61, y: 0.422, z: 0.02 };
+    mesh468[13] = { x: 0.50, y: 0.59, z: 0.01 };
+    mesh468[14] = { x: 0.50, y: 0.66, z: 0.01 };
+    mesh468[1] = { x: 0.61, y: 0.52, z: -0.06 }; // Turn head right
+
+    const activeMetrics = computeFaceLivenessMetrics(
+      null,
+      192,
+      192,
+      faceBox,
+      mesh468,
+      0.62
+    );
+
+    expect(activeMetrics.isBlinking).toBe(true);
+    expect(activeMetrics.eyeAspectRatio).toBeLessThan(0.15);
+    expect(activeMetrics.isMouthOpen).toBe(true);
+    expect(activeMetrics.mouthAspectRatio).toBeGreaterThan(0.4);
+    expect(activeMetrics.headDirection).toBe('left');
   });
 });

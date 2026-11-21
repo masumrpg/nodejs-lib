@@ -49,6 +49,8 @@ export interface FaceLandmark {
   x: number;
   /** Vertical coordinate [0, 1] */
   y: number;
+  /** Optional relative 3D depth coordinate from 468-point Face Mesh */
+  z?: number;
   /** Optional semantic keypoint identifier */
   type?: FaceLandmarkType;
 }
@@ -61,8 +63,72 @@ export interface PixelFaceLandmark {
   x: number;
   /** Vertical coordinate in pixels */
   y: number;
+  /** Optional relative 3D depth coordinate */
+  z?: number;
   /** Optional semantic keypoint identifier */
   type?: FaceLandmarkType;
+}
+
+/**
+ * Semantic 3D head pose facing direction.
+ */
+export type HeadPoseDirection = 'center' | 'left' | 'right' | 'up' | 'down';
+
+/**
+ * Passive anti-spoofing risk classification.
+ */
+export type SpoofRiskLevel = 'low' | 'medium' | 'high';
+
+/**
+ * Interactive active liveness challenge action type.
+ */
+export type LivenessChallengeAction =
+  | 'blink'
+  | 'mouth_open'
+  | 'smile'
+  | 'turn_left'
+  | 'turn_right'
+  | 'nod_up'
+  | 'nod_down';
+
+/**
+ * Hybrid Active + Passive Face Liveness and Anti-Spoofing biometric telemetry.
+ */
+export interface FaceLivenessMetrics {
+  /** Overall liveness verification status (true when passiveScore >= threshold) */
+  isLive: boolean;
+  /** Combined passive anti-spoofing confidence score in [0, 1] */
+  passiveScore: number;
+  /** Spoof risk classification based on passive depth + surface texture */
+  spoofRisk: SpoofRiskLevel;
+  /** 3D mesh Z-coordinate relief score [0, 1] (nose protrusion vs cheek/eye plane) */
+  depthReliefScore: number;
+  /** RGB surface texture & anti-Moiré/glare naturalness score [0, 1] */
+  textureScore: number;
+  /** Average Eye Aspect Ratio (EAR) across both eyes (~0.28 open, <0.19 closed) */
+  eyeAspectRatio: number;
+  /** Left eye openness ratio */
+  leftEyeEAR: number;
+  /** Right eye openness ratio */
+  rightEyeEAR: number;
+  /** True when an eye blink is actively occurring in the current frame */
+  isBlinking: boolean;
+  /** Mouth Aspect Ratio (MAR) measuring inner vertical lip opening */
+  mouthAspectRatio: number;
+  /** True when the mouth is clearly open (MAR >= 0.32) */
+  isMouthOpen: boolean;
+  /** Mouth width & corner elevation ratio indicating a smile */
+  smileRatio: number;
+  /** True when a smile expression is detected */
+  isSmiling: boolean;
+  /** Horizontal head rotation angle in degrees (-45° left to +45° right) */
+  yawDeg: number;
+  /** Vertical head nod angle in degrees (-35° down to +35° up) */
+  pitchDeg: number;
+  /** Head tilt angle in degrees */
+  rollDeg: number;
+  /** Semantic head facing direction */
+  headDirection: HeadPoseDirection;
 }
 
 /**
@@ -97,6 +163,8 @@ export interface DetectionResult {
   landmarks?: FaceLandmark[];
   /** Optional face recognition identity match metadata */
   identity?: FaceIdentityMatch;
+  /** Optional hybrid active + passive face liveness & anti-spoofing telemetry */
+  liveness?: FaceLivenessMetrics;
   /** Optional raw vendor inference data */
   raw?: unknown;
 }

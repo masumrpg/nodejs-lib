@@ -233,6 +233,9 @@ The parser executes the following verification pipeline on each frame:
 | `model` | `TFLiteModelSource` | *Required* | BlazeFace detection model (`face_detection_full_range.tflite`). |
 | `faceMeshModel` | `TFLiteModelSource` | `undefined` | MediaPipe 468-point 3D Face Mesh model (`face_landmark.tflite`). |
 | `embeddingModel` | `TFLiteModelSource` | `undefined` | MobileFaceNet 192-D face embedding model (`mobilefacenet.tflite`). |
+| `antiSpoofModel` | `TFLiteModelSource` | `undefined` | Optional passive anti-spoofing TFLite model (`MiniFASNet`). |
+| `enableLiveness` | `boolean` | `true` | Computes hybrid Active (EAR, MAR, 3D Head Pose) + Passive (3D Z-Depth Relief + Anti-Moiré Texture) liveness telemetry on `detection.liveness`. |
+| `livenessThreshold` | `number` | `0.62` | Minimum passive liveness confidence in `[0, 1]` to classify a face as live (`isLive = true`). |
 | `confidenceThreshold` | `number` | `0.55` | Minimum face detection score in `[0, 1]`. |
 | `similarityThreshold` | `number` | `0.65` | Minimum cosine similarity to recognize an enrolled identity. |
 | `iouThreshold` | `number` | `0.30` | Non-Maximum Suppression (NMS) IoU overlap limit. |

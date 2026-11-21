@@ -18,10 +18,13 @@ Welcome to the **Masum Dev** monorepo. This workspace houses high-performance op
 │   ├── markforge/             # Multi-format document publishing engine & CLI (PDF, DOCX, HTML, TXT)
 │   ├── tscheck/               # TypeScript & AST code auditing engine & interactive CLI
 │   ├── rn-ui/                 # Typed flat UI kit for React Native & Expo (63+ components, design tokens)
+│   ├── rn-camera-ai/          # Zero-JS-thread VisionCamera v5 AI preview, 468 Face Mesh & overlay engine
+│   ├── rn-camera-ai-tflite/   # Fast-TFLite GPU adapter (Object Detection, Face Recognition & e-KYC Liveness)
 │   ├── rn-tajweed-verse/      # Quranic verse Tajweed parser & interactive renderer
 │   └── rn-qr-code/            # High-performance SVG QR code generator with presets & async mode
 ├── apps/
 │   ├── expo-go/               # Interactive Expo Go mobile playground app (iOS / Android / Web)
+│   ├── expo-native/           # Native Expo Dev Client playground for VisionCamera v5 & Fast-TFLite AI
 │   ├── cli/
 │   │   └── markforge/         # MarkForge publishing engine testing & playground environment
 │   └── docs/                  # Astro 5 + Starlight documentation portal (https://lib.masumdev.id)

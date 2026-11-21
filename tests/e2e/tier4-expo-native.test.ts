@@ -81,14 +81,19 @@ mock.module("lucide-react-native", () => ({
   AlertTriangle: createMockIcon("AlertTriangle"),
   ArrowLeft: createMockIcon("ArrowLeft"),
   Box: createMockIcon("Box"),
+  CheckCircle2: createMockIcon("CheckCircle2"),
   ChevronRight: createMockIcon("ChevronRight"),
   Cpu: createMockIcon("Cpu"),
   Eye: createMockIcon("Eye"),
   Pause: createMockIcon("Pause"),
   Play: createMockIcon("Play"),
   RefreshCw: createMockIcon("RefreshCw"),
+  RotateCcw: createMockIcon("RotateCcw"),
   ScanFace: createMockIcon("ScanFace"),
+  ShieldAlert: createMockIcon("ShieldAlert"),
+  ShieldCheck: createMockIcon("ShieldCheck"),
   SlidersHorizontal: createMockIcon("SlidersHorizontal"),
+  Smile: createMockIcon("Smile"),
   Sparkles: createMockIcon("Sparkles"),
   SwitchCamera: createMockIcon("SwitchCamera"),
   Trash2: createMockIcon("Trash2"),
@@ -921,7 +926,22 @@ describe("Tier 4: apps/expo-native Scaffold, Bundled Model & Detector Integratio
       expect(menuTexts).toContain("Camera AI Playground");
       expect(menuTexts).toContain("Object Detection");
       expect(menuTexts).toContain("Face Detection & Recognition");
+      expect(menuTexts).toContain("Face Liveness & Anti-Spoofing");
       menuRenderer.unmount();
+
+      const { default: FaceLivenessScreen } = await import(
+        "../../apps/expo-native/app/liveness-detection"
+      );
+      const livenessRenderer = createScreenTestRenderer();
+      livenessRenderer.mount(React.createElement(FaceLivenessScreen));
+      await React.act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+      const livenessTexts = collectTexts(livenessRenderer.container);
+      expect(livenessTexts).toContain("Liveness & Anti-Spoof");
+      expect(livenessTexts).toContain("Live Telemetry HUD");
+      expect(livenessTexts).toContain("e-KYC Challenge (4 Step)");
+      livenessRenderer.unmount();
 
       const { default: FaceRecognitionScreen } = await import(
         "../../apps/expo-native/app/face-recognition"

@@ -14,7 +14,8 @@ apps/expo-native/
 │   ├── _layout.tsx            # Root Stack Navigator & dark theme wrapper
 │   ├── index.tsx              # Feature Menu Hub (dashboard & status)
 │   ├── object-detection.tsx   # MobileNet SSD object detection & live styling
-│   └── face-recognition.tsx   # 468 Face Mesh + MobileFaceNet face recognition
+│   ├── face-recognition.tsx   # 468 Face Mesh + MobileFaceNet face recognition
+│   └── liveness-detection.tsx # Hybrid Active + Passive Liveness & e-KYC Wizard
 └── assets/
     └── models/                # Bundled local TFLite neural network models
 ```
@@ -43,6 +44,17 @@ apps/expo-native/
 - **1-Tap On-Device Face Registration**:
   - Enter person name and enroll face profile directly from the live video stream.
   - Cosine similarity identity matching against registered profiles.
+
+### 4. Hybrid Face Liveness & Anti-Spoofing (`/liveness-detection`)
+- **Passive Anti-Spoofing Engine (`0% - 100%`)**:
+  - **3D Z-Depth Relief**: Analyzes 3D nose-to-cheek protrusion from the 468-point 3D mesh to reject flat 2D photos/screens.
+  - **Anti-Moiré & Specular Glare Texture Analysis**: Evaluates RGB surface naturalness and penalizes LCD/OLED screen grids.
+- **Active Biometric Signals (`'worklet'`)**:
+  - **Eye Blink Detection (EAR)**: Real-time Eye Aspect Ratio + cumulative blink counter.
+  - **3D Head Pose Estimation**: Real-time `Yaw`, `Pitch`, `Roll` angles and semantic direction (`CENTER`, `LEFT`, `RIGHT`, `UP`, `DOWN`).
+  - **Mouth & Smile Detection (MAR)**: Real-time Mouth Aspect Ratio for `MOUTH OPEN` and `SMILING`.
+- **Interactive 4-Step e-KYC Challenge Wizard**:
+  - Step-by-step interactive challenge verifying passive 3D depth, eye blink, head turn, and mouth expression.
 
 ---
 

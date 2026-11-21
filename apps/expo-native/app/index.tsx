@@ -8,12 +8,14 @@ import {
   Cpu,
   Eye,
   ScanFace,
+  ShieldCheck,
   Sparkles,
   Zap,
 } from "lucide-react-native";
 
 const EMERALD_ACCENT = "#3da441";
 const CYAN_ACCENT = "#38bdf8";
+const VIOLET_ACCENT = "#a855f7";
 
 export default function CameraAIFeatureMenuScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
@@ -25,6 +27,10 @@ export default function CameraAIFeatureMenuScreen(): React.JSX.Element {
 
   const handleOpenFaceRecognition = () => {
     router.push("/face-recognition");
+  };
+
+  const handleOpenLivenessDetection = () => {
+    router.push("/liveness-detection");
   };
 
   return (
@@ -134,10 +140,13 @@ export default function CameraAIFeatureMenuScreen(): React.JSX.Element {
             </View>
             <View style={styles.cardTitleGroup}>
               <View style={styles.cardTagRow}>
-                <Text style={[styles.modelTag, { color: CYAN_ACCENT }]}>
-                  BLAZEFACE FULL (1.1MB) + MOBILEFACENET (5MB)
+                <Text
+                  numberOfLines={1}
+                  style={[styles.modelTag, { color: CYAN_ACCENT }]}
+                >
+                  BLAZEFACE + 468 MESH + MOBILEFACENET
                 </Text>
-                <Text style={styles.resolutionTag}>192x192 + 112x112</Text>
+                <Text style={styles.resolutionTag}>192x192 · 192-D</Text>
               </View>
               <Text style={styles.cardTitle}>
                 Face Detection &amp; Recognition
@@ -147,20 +156,75 @@ export default function CameraAIFeatureMenuScreen(): React.JSX.Element {
           </View>
 
           <Text style={styles.cardDescription}>
-            Bounding box presisi khusus di area wajah, 6 titik landmark wajah
-            (mata, hidung, mulut, telinga), serta fitur pendaftaran &amp;
-            pengenalan nama pemilik wajah secara real-time.
+            Bounding box presisi khusus di area wajah, 468 titik 3D Face Mesh
+            (mata, alis, bibir, hidung, kontur rahang), serta pendaftaran &amp;
+            pengenalan nama pemilik wajah (192-D MobileFaceNet) secara real-time.
           </Text>
 
           <View style={styles.featureBulletsRow}>
             <View style={styles.bulletChipCyan}>
-              <Text style={styles.bulletChipTextCyan}>Tight Face Box</Text>
+              <Text style={styles.bulletChipTextCyan}>468 3D Face Mesh</Text>
             </View>
             <View style={styles.bulletChipCyan}>
-              <Text style={styles.bulletChipTextCyan}>6 Facial Landmarks</Text>
+              <Text style={styles.bulletChipTextCyan}>192-D MobileFaceNet</Text>
             </View>
             <View style={styles.bulletChipCyan}>
               <Text style={styles.bulletChipTextCyan}>1-Tap Face Enroll</Text>
+            </View>
+          </View>
+        </Pressable>
+
+        {/* Feature 3: Hybrid Face Liveness & Anti-Spoofing (e-KYC) */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open Face Liveness and Anti-Spoofing Camera"
+          onPress={handleOpenLivenessDetection}
+          style={({ pressed }) => [
+            styles.featureCard,
+            styles.featureCardViolet,
+            pressed && styles.cardPressed,
+          ]}
+        >
+          <View style={styles.cardHeaderRow}>
+            <View style={[styles.featureIconWrap, styles.iconWrapViolet]}>
+              <ShieldCheck size={22} color={VIOLET_ACCENT} />
+            </View>
+            <View style={styles.cardTitleGroup}>
+              <View style={styles.cardTagRow}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.modelTag, { color: VIOLET_ACCENT }]}
+                >
+                  ACTIVE 3D MESH + PASSIVE DEPTH
+                </Text>
+                <Text style={styles.resolutionTag}>e-KYC</Text>
+              </View>
+              <Text style={styles.cardTitle}>
+                Face Liveness &amp; Anti-Spoofing
+              </Text>
+            </View>
+            <ChevronRight size={20} color="#94a3b8" />
+          </View>
+
+          <Text style={styles.cardDescription}>
+            Verifikasi keaslian wajah gabungan Active Liveness (deteksi kedip
+            mata EAR, buka mulut/senyum MAR, rotasi kepala 3D Yaw/Pitch/Roll)
+            dan Passive Anti-Spoofing (3D Z-Depth Relief &amp; Anti-Moiré layar)
+            lengkap dengan Wizard Challenge e-KYC 4 tahap.
+          </Text>
+
+          <View style={styles.featureBulletsRow}>
+            <View style={styles.bulletChipViolet}>
+              <Text style={styles.bulletChipTextViolet}>Eye Blink (EAR)</Text>
+            </View>
+            <View style={styles.bulletChipViolet}>
+              <Text style={styles.bulletChipTextViolet}>3D Head Pose</Text>
+            </View>
+            <View style={styles.bulletChipViolet}>
+              <Text style={styles.bulletChipTextViolet}>Passive Anti-Spoof</Text>
+            </View>
+            <View style={styles.bulletChipViolet}>
+              <Text style={styles.bulletChipTextViolet}>e-KYC Wizard</Text>
             </View>
           </View>
         </Pressable>
@@ -270,6 +334,9 @@ const styles = StyleSheet.create({
   featureCardCyan: {
     borderColor: "rgba(56, 189, 248, 0.4)",
   },
+  featureCardViolet: {
+    borderColor: "rgba(168, 85, 247, 0.45)",
+  },
   cardPressed: {
     opacity: 0.85,
   },
@@ -294,19 +361,27 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(56, 189, 248, 0.16)",
     borderColor: "rgba(56, 189, 248, 0.45)",
   },
+  iconWrapViolet: {
+    backgroundColor: "rgba(168, 85, 247, 0.16)",
+    borderColor: "rgba(168, 85, 247, 0.45)",
+  },
   cardTitleGroup: {
     flex: 1,
+    minWidth: 0,
     gap: 3,
   },
   cardTagRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
-    gap: 8,
+    columnGap: 8,
+    rowGap: 2,
   },
   modelTag: {
     fontSize: 10,
     fontWeight: "800",
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
+    flexShrink: 1,
   },
   resolutionTag: {
     color: "#64748b",
@@ -351,6 +426,19 @@ const styles = StyleSheet.create({
   },
   bulletChipTextCyan: {
     color: "#7dd3fc",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  bulletChipViolet: {
+    backgroundColor: "rgba(168, 85, 247, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(168, 85, 247, 0.38)",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  bulletChipTextViolet: {
+    color: "#d8b4fe",
     fontSize: 11,
     fontWeight: "600",
   },

@@ -179,6 +179,12 @@ export interface TFLiteFaceRecognizerConfig {
   embeddingModel?: TFLiteModelSource;
   /** Optional MediaPipe 468-point 3D Face Mesh TFLite model source (face_landmark.tflite 192x192) */
   faceMeshModel?: TFLiteModelSource;
+  /** Optional dedicated passive anti-spoofing TFLite model source (e.g. MiniFASNet 80x80 / 128x128) */
+  antiSpoofModel?: TFLiteModelSource;
+  /** Whether to compute hybrid active + passive liveness metrics per face (default: true) */
+  enableLiveness?: boolean;
+  /** Minimum passive liveness confidence threshold in [0, 1] to classify a face as live (default: 0.62) */
+  livenessThreshold?: number;
   /** Minimum face detection confidence threshold in [0, 1] (default: 0.55) */
   confidenceThreshold?: number;
   /** Minimum cosine similarity threshold in [0, 1] to recognize an enrolled identity (default: 0.65) */
@@ -215,10 +221,14 @@ export interface TFLiteFaceRecognizer extends CameraProcessor {
   readonly confidenceThreshold: number;
   /** Current cosine similarity threshold for identity matching */
   readonly similarityThreshold: number;
+  /** Current passive liveness threshold */
+  readonly livenessThreshold: number;
   /** Dynamically updates face detection confidence threshold */
   setConfidenceThreshold(threshold: number): void;
   /** Dynamically updates cosine similarity threshold for identity matching */
   setSimilarityThreshold(threshold: number): void;
+  /** Dynamically updates passive liveness verification threshold */
+  setLivenessThreshold(threshold: number): void;
   /** Enrolls a face profile from the most recently detected face in the camera stream */
   enrollLastDetectedFace(name: string): EnrolledFaceProfile | null;
   /** Enrolls a face profile with an explicit embedding vector */

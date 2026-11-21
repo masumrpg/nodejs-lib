@@ -304,6 +304,9 @@ Creates a face detection, 468-point 3D face mesh, and biometric face recognition
 | `model` | `TFLiteModelSource` | *Required* | BlazeFace detection model (`face_detection_full_range.tflite`). |
 | `faceMeshModel` | `TFLiteModelSource` | `undefined` | MediaPipe 468-point 3D Face Mesh model (`face_landmark.tflite`). |
 | `embeddingModel` | `TFLiteModelSource` | `undefined` | MobileFaceNet 192-D face embedding model (`mobilefacenet.tflite`). |
+| `antiSpoofModel` | `TFLiteModelSource` | `undefined` | Optional passive anti-spoofing TFLite model (`MiniFASNet`). |
+| `enableLiveness` | `boolean` | `true` | Computes hybrid Active (EAR, MAR, 3D Head Pose) + Passive (`3D Z-Relief` + `Anti-Moiré Texture`) liveness telemetry (`detection.liveness`). |
+| `livenessThreshold` | `number` | `0.62` | Minimum passive liveness score in `[0, 1]` to classify a face as live (`isLive = true`). |
 | `confidenceThreshold` | `number` | `0.55` | Minimum face detection score in `[0, 1]`. |
 | `similarityThreshold` | `number` | `0.65` | Minimum cosine similarity to match an enrolled identity. |
 | `iouThreshold` | `number` | `0.30` | Non-Maximum Suppression (NMS) IoU overlap limit. |
@@ -330,6 +333,23 @@ Creates a face detection, 468-point 3D face mesh, and biometric face recognition
   Dynamically updates the face detection confidence cutoff.
 - **`setSimilarityThreshold(threshold: number): void`**  
   Dynamically updates the cosine similarity recognition threshold.
+- **`setLivenessThreshold(threshold: number): void`**  
+  Dynamically updates the passive anti-spoofing liveness threshold.
+
+---
+
+## Hybrid Face Liveness & Anti-Spoofing (`detection.liveness`)
+
+When `enableLiveness: true` (default), every face detection includes `detection.liveness` (`FaceLivenessMetrics`), computed 100% on the **Camera Worklet Thread**:
+
+- **Active Geometric Liveness (from 468-Point 3D Face Mesh)**:
+  - `eyeAspectRatio`, `leftEyeEAR`, `rightEyeEAR`, `isBlinking`: Real-time Eye Aspect Ratio (EAR) blink detection.
+  - `mouthAspectRatio`, `isMouthOpen`, `smileRatio`, `isSmiling`: Mouth opening and smile curvature detection.
+  - `yawDeg`, `pitchDeg`, `rollDeg`, `headDirection` (`'center' | 'left' | 'right' | 'up' | 'down'`): 3D head pose estimation.
+- **Passive Anti-Spoofing**:
+  - `depthReliefScore`: 3D $Z$-depth nose-to-cheek protrusion check rejecting flat 2D photos/screens.
+  - `textureScore`: RGB anti-Moiré screen subpixel and specular glare analysis.
+  - `passiveScore`, `isLive`, `spoofRisk` (`'low' | 'medium' | 'high'`).
 
 ---
 
@@ -341,8 +361,10 @@ Exported for building custom inference loops or testing:
   Decodes standard 4-tensor object detection outputs with NMS and coordinate clamping.
 - **`decodeBlazeFaceOutputs(boxesRaw, scoresRaw, anchors, options): DetectionResult[]`**  
   Decodes BlazeFace SSD bounding boxes and 6 keypoints.
-- **`decodeFaceMeshOutputs(meshRaw, box): FaceLandmark[]`**  
+- **`decodeFaceMeshOutputs(meshRaw, box): { landmarks: FaceLandmark[]; tightBox: BoundingBox } | null`**  
   Decodes 468 3D landmarks ($x, y, z$) from raw tensor output into normalized coordinate space.
+- **`computeFaceLivenessMetrics(rgbBuffer, width, height, box, landmarks, threshold, externalSpoofScore): FaceLivenessMetrics`**  
+  Computes hybrid Active + Passive face liveness and anti-spoofing telemetry inside a worklet.
 - **`cosineSimilarity(vectorA, vectorB): number`**  
   Computes the dot product of two L2-normalized embedding vectors in range `[-1.0, 1.0]`.
 

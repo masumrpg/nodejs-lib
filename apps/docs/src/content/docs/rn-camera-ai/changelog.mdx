@@ -27,6 +27,10 @@ export const releases = [
         text: 'Implemented 1-tap on-device face enrollment (<code>enrollLastDetectedFace</code>, <code>enrollFace</code>, <code>removeEnrolledFace</code>, <code>getEnrolledFaces</code>).',
       },
       {
+        type: 'feat',
+        text: 'Added Hybrid Active + Passive Face Liveness &amp; Anti-Spoofing engine (<code>computeFaceLivenessMetrics</code>, <code>FaceLivenessMetrics</code>): Eye Aspect Ratio (EAR) blink detection, Mouth Aspect Ratio (MAR) &amp; smile detection, 3D Head Pose (Yaw/Pitch/Roll), 3D Z-depth relief verification, anti-Moiré/glare texture analysis, and 4-step e-KYC challenge screen (<code>/liveness-detection</code>).',
+      },
+      {
         type: 'perf',
         text: 'Architected <code>projectDetectionsWorklet</code>: 100% of screen coordinate projections, aspect ratio letterboxing, and 178-mesh-line trigonometry (<code>Math.atan2</code>, <code>Math.sqrt</code>) now execute on the Camera Worklet Thread with 0% JS-thread overhead and zero Reanimated mapper queue lag.',
       },
