@@ -12,9 +12,15 @@ import {
   DatePicker,
   DatePickerCard,
   ExpandableCalendar,
+  FormControl,
+  FormField,
+  FormLabel,
   Progress,
+  RangeSlider,
+  Rating,
   SignaturePad,
   Skeleton,
+  Slider,
   Spinner,
   SwipeableItem,
   ThemeProvider,
@@ -22,7 +28,8 @@ import {
   parseLocalDateString,
   type SignaturePadRef,
 } from "../src";
-import { collectText, findAllNodes, mockUiState, renderUI } from "./setup";
+import { usePanGesture } from "react-native-gesture-handler";
+import { act, collectText, findAllNodes, mockUiState, renderUI } from "./setup";
 
 function wrap(node: React.ReactElement) {
   return React.createElement(ThemeProvider, null, node);
@@ -102,8 +109,11 @@ describe("calendars, date picker, carousel & gesture components", () => {
     expect(text).not.toContain("SET BIRTHDAY");
     expect(text).toContain("Pilih Tanggal");
     expect(
-      findAllNodes(container, (n) => n.type === "rn-flatlist").length,
+      findAllNodes(container, (n) => n.type === "anim-scrollview").length,
     ).toBeGreaterThan(0);
+    expect(
+      findAllNodes(container, (n) => n.type === "rn-flatlist").length,
+    ).toBe(0);
 
     renderUI(
       wrap(
@@ -149,6 +159,12 @@ describe("calendars, date picker, carousel & gesture components", () => {
     expect(collectText(container)).toContain("Slide 1");
     expect(collectText(container)).toContain("Row Item");
     expect(mockUiState.withSpringCallCount).toBe(0);
+
+    const carouselList = findAllNodes(container, (n) => n.type === "rn-flatlist")[0];
+    expect(carouselList).toBeDefined();
+    expect(Array.isArray(carouselList?.props?.snapToOffsets)).toBe(true);
+    expect(carouselList?.props?.disableIntervalMomentum).toBe(true);
+    expect(carouselList?.props?.snapToAlignment).toBeUndefined();
   });
 
   it("renders SignaturePad with viewBox SVG export and cleans up AppState animations on unmount", () => {
@@ -173,5 +189,36 @@ describe("calendars, date picker, carousel & gesture components", () => {
 
     unmount();
     expect(mockUiState.appStateListeners.size).toBe(0);
+  });
+
+  it("enforces RNGH 3 usePanGesture mutual exclusion and renders FormField + SignaturePad cleanly", () => {
+    function InvalidPanProbe() {
+      usePanGesture({ minDistance: 0, activeOffsetX: [-1, 1] });
+      return null;
+    }
+
+    expect(() => renderUI(React.createElement(InvalidPanProbe, null))).toThrow(
+      "It is not supported to use minDistance with activeOffsetX or activeOffsetY",
+    );
+
+    const { container } = renderUI(
+      wrap(
+        React.createElement(
+          FormField,
+          { required: true },
+          React.createElement(FormLabel, null, "Signature"),
+          React.createElement(
+            FormControl,
+            null,
+            React.createElement(SignaturePad, { height: 180 }),
+          ),
+          React.createElement(Slider, { value: 25, min: 0, max: 100 }),
+          React.createElement(RangeSlider, { value: [10, 80], min: 0, max: 100 }),
+          React.createElement(Rating, { value: 4, max: 5 }),
+        ),
+      ),
+    );
+
+    expect(collectText(container)).toContain("Signature");
   });
 });

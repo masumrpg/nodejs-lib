@@ -28,8 +28,13 @@ export function SearchBarSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 1. Standard Filled SearchBar with Debouncing */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Debounced Search
               </Text>
               <Badge tone="primary">Filled Variant</Badge>
@@ -62,8 +67,13 @@ export function SearchBarSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 2. Outline Pill Shape */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Pill Outline Search
               </Text>
               <Badge tone="accent">Outline Pill</Badge>
@@ -85,8 +95,13 @@ export function SearchBarSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 3. Soft Tint Variant */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Soft Tint Search
               </Text>
               <Badge tone="success">Soft Variant</Badge>

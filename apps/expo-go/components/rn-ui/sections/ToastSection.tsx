@@ -270,7 +270,7 @@ export function ToastSection({ ctx }: { ctx: RnUiSectionContext }) {
       <Card outlined>
         <Box gap="lg">
           <Text color="textMuted">
-            Programmatic flat toast alerts with iOS card stack deck, drag-down expansion, live progress bars, rich media avatars, and action callbacks.
+            Programmatic toast notifications with smooth top slide-in/out transitions, swipe-to-dismiss gestures, live progress bars, rich media avatars, and action callbacks.
           </Text>
 
           {/* Progress & Rich Content */}

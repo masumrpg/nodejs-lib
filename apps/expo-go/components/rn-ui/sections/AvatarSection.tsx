@@ -152,17 +152,22 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Sizes and Status Badges */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Avatar Sizes & Status Badges
               </Text>
-              <Badge tone="primary">sm, default, lg, xl</Badge>
+              <Badge tone="primary">sm, md, lg, xl</Badge>
             </Box>
             <Text color="textMuted" variant="bodySmall">
-              Supports 4 predefined sizes (sm = 28px, default = 36px, lg = 44px, xl = 56px) with online, busy, away, and offline status indicators.
+              Supports 4 predefined sizes (sm = 28px, md = 36px, lg = 44px, xl = 56px) with online, busy, away, and offline status indicators.
             </Text>
 
-            <Box row gap="lg" center style={styles.wrap}>
+            <Box row gap="lg" center style={[styles.wrap, { alignItems: "flex-end" }]}>
               {/* Extra Large (XL) with Online Status */}
               <Box center gap="xs">
                 <Avatar size="xl">
@@ -217,8 +222,13 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Shapes & Fallbacks */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Shapes & Broken Image Fallbacks
               </Text>
               <Badge tone="accent">Circle, Square, Rounded</Badge>
@@ -278,8 +288,13 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Notification & Decor Badges */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Notification & Decor Badges
               </Text>
               <Badge tone="danger">Count, Status, Custom</Badge>
@@ -288,7 +303,7 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
               Flexible badge support: pass count numbers (e.g. 1, 99+), custom text, or custom decorative icon components.
             </Text>
 
-            <Box row gap="xl" center style={styles.wrap}>
+            <Box row gap="xl" center style={[styles.wrap, { alignItems: "flex-end" }]}>
               {/* Message count 1 */}
               <Box center gap="xs">
                 <Avatar size="lg" badge={1} badgeTone="danger">
@@ -367,8 +382,13 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Bordered, VIP & Premium Ring Variants */}
         <Card outlined>
           <Box gap="lg">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Ring, Bordered & Default Variants
               </Text>
               <Badge tone="accent">default, bordered, ring</Badge>
@@ -512,8 +532,13 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Custom Ornate Frames & Overlays */}
         <Card outlined>
           <Box gap="lg">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Custom Ornate Frames & Overlays
               </Text>
               <Badge tone="warning">frame, &lt;AvatarFrame&gt;</Badge>
@@ -576,8 +601,13 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Overlapping Avatar Groups */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Overlapping Avatar Groups
               </Text>
               <Badge tone="success">Avatar Group</Badge>

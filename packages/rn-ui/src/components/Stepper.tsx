@@ -17,6 +17,7 @@ import { Text } from "./Text";
 import {
   minTouchHitSlop,
   renderIcon,
+  resolveControlRadius,
   type BaseGlassProps,
   type BaseHapticProps,
   type ComponentSize,
@@ -197,7 +198,8 @@ function StepperComponent({
       ? withAlpha(colors.primary, 0.14)
       : withAlpha(colors.secondary, 0.12);
 
-  const innerRadius = radii.md;
+  const outerRadius = resolveControlRadius("rounded", size, radii);
+  const innerRadius = Math.max(radii.xs, outerRadius - padding);
 
   const canDecrement = !disabled && currentValue > safeMin;
   const canIncrement = !disabled && currentValue < safeMax;
@@ -229,7 +231,7 @@ function StepperComponent({
           minHeight: containerHeight,
           borderWidth,
           borderColor,
-          borderRadius: radii.lg,
+          borderRadius: outerRadius,
           backgroundColor: containerBg,
           padding,
           opacity: disabled ? 0.6 : 1,

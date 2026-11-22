@@ -176,7 +176,7 @@ export const BubbleContent = React.memo(function BubbleContent({
     : {
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm + spacing.xxs,
-        borderRadius: radii.xl + spacing.xs,
+        borderRadius: radii.xl,
         borderWidth:
           variant === "outline"
             ? isTonalOutline

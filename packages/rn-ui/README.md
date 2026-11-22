@@ -37,12 +37,12 @@ Comprehensive guides, component previews, prop tables, and interactive examples 
 - **A11y First**: Enforced accessibility roles, interactive states, SVG icons, and touch targets (>= 44pt).
 - **Strict Type Safety**: 100% TypeScript with zero `any` types and shared base UI prop interfaces.
 
-### Component Highlights (63 Primitives)
+### Component Highlights (62 Primitives)
 
 - **Navigation & Structure**: `Tabs` (Compound TabView with animated indicator & fluid slide/scale transitions), `Breadcrumb`, `Pagination`, `Stepper`
 - **Overlays & Modals**: `Tooltip` (Collision-aware balloons with pointer arrows & tap-and-hold), `SpeedDial` (Expanding FAB with staggered actions), `Alert`, `AlertDialog`, `Toast`, `Popover`, `HoverCard`, `DropdownMenu`, `ContextMenu`, `Command`
 - **Form Controls & Inputs**: `SearchBar` (Debounced input with clear & cancel transition), `Input`, `InputGroup`, `InputOTP`, `DatePicker`, `TimePicker`, `Textarea`, `Checkbox`, `RadioGroup`, `Switch`, `Slider`, `RangeSlider`, `SignaturePad`, `Rating`, `Select`, `Combobox`, `Label`, `FormField`
-- **Buttons & Actions**: `Button`, `IconButton`, `ButtonGroup`, `Chip`, `SegmentedControl`, `FloatingActionButton`
+- **Buttons & Actions**: `Button`, `IconButton`, `Chip`, `SegmentedControl`, `FloatingActionButton`
 - **Typography & Data**: `Text`, `Avatar`, `Badge`, `Item`, `SwipeableItem`, `Bubble`, `Attachment`, `DataList`, `MetricCard`, `Table`, `Timeline`, `Empty`
 - **Layout & Foundations**: `Box`, `Card`, `Divider`, `AspectRatio`, `KeyboardAvoiding`
 - **Disclosure & Loading**: `Accordion`, `Collapsible`, `Carousel`, `Calendar`, `ExpandableCalendar`, `TimelineCalendar`, `Progress`, `Skeleton`, `Spinner`

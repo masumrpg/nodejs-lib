@@ -16,7 +16,9 @@ import {
 import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import Animated, {
   Easing,
+  Extrapolation,
   cancelAnimation,
+  interpolate,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -38,6 +40,7 @@ import {
   minTouchHitSlop,
   renderIcon,
   resolveOutlineBorderColor,
+  webDeps,
   type BaseGlassProps,
   type ComponentTone,
   type RenderIcon,
@@ -136,27 +139,23 @@ export function ToastProvider({
   glass: defaultGlass = false,
   offset,
   duration = 3500,
-  maxToasts = 7,
+  maxToasts = 3,
   swipeToDismiss = true,
   renderToast,
   viewportStyle,
 }: ToastProviderProps) {
+  const { spacing } = useTheme();
+  const insets = useSafeAreaInsets();
   const [toasts, setToasts] = useState<ToastRecord[]>([]);
-  const [expanded, setExpanded] = useState(false);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const toastsRef = useRef<ToastRecord[]>([]);
   toastsRef.current = toasts;
 
-  useEffect(() => {
-    if (toasts.length <= 1) {
-      setExpanded(false);
-    }
-  }, [toasts.length]);
-
-  const handleToggleExpand = useCallback(() => {
-    triggerHaptic("selection");
-    setExpanded((prev) => !prev);
-  }, []);
+  const resolvedViewportOffset =
+    offset ??
+    (placement === "top"
+      ? Math.max(insets.top, StatusBar.currentHeight ?? 0) + spacing.sm
+      : Math.max(insets.bottom, 0) + spacing.md);
 
   const clearTimer = useCallback((id: string) => {
     const timer = timers.current.get(id);
@@ -288,7 +287,7 @@ export function ToastProvider({
     toasts.length > 0 ? (
       <ToastViewport
         placement={placement}
-        offset={offset}
+        offset={resolvedViewportOffset}
         style={viewportStyle}
       >
         {toasts.map((toast, index) =>
@@ -302,8 +301,7 @@ export function ToastProvider({
               toast={toast}
               index={index}
               totalToasts={toasts.length}
-              expanded={expanded}
-              onToggleExpand={toasts.length > 1 ? handleToggleExpand : undefined}
+              viewportOffset={resolvedViewportOffset}
               placement={placement}
               swipeToDismiss={swipeToDismiss}
               onDismiss={() => dismiss(toast.id)}
@@ -356,7 +354,7 @@ export const ToastViewport = React.memo(function ToastViewport({
   const resolvedOffset =
     offset ??
     (placement === "top"
-      ? Math.max(insets.top, StatusBar.currentHeight ?? 0) + spacing.md
+      ? Math.max(insets.top, StatusBar.currentHeight ?? 0) + spacing.sm
       : Math.max(insets.bottom, 0) + spacing.md);
 
   return (
@@ -365,6 +363,8 @@ export const ToastViewport = React.memo(function ToastViewport({
       style={[
         styles.viewport,
         {
+          gap: spacing.sm,
+          flexDirection: placement === "top" ? "column" : "column-reverse",
           left: spacing.lg,
           right: spacing.lg,
           top: placement === "top" ? resolvedOffset : undefined,
@@ -383,6 +383,7 @@ export interface ToastProps extends ViewProps {
   totalToasts?: number;
   expanded?: boolean;
   onToggleExpand?: () => void;
+  viewportOffset?: number;
   placement?: ToastPlacement;
   swipeToDismiss?: boolean;
   onDismiss?: () => void;
@@ -506,8 +507,7 @@ const CLOSE_BUTTON_SIZE = 30;
 
 export const Toast = React.memo(function Toast({
   toast,
-  index = 0,
-  expanded = false,
+  viewportOffset = 56,
   onToggleExpand,
   placement = "top",
   swipeToDismiss = true,
@@ -520,10 +520,14 @@ export const Toast = React.memo(function Toast({
   const reducedMotion = useReducedMotion();
   const { width: windowWidth } = useWindowDimensions();
 
+  const [toastHeight, setToastHeight] = useState(76);
   const progress = useSharedValue(0);
   const translateX = useSharedValue(0);
+  const translateYDrag = useSharedValue(0);
   const rotateValue = useSharedValue(0);
-  const [toastHeight, setToastHeight] = useState(76);
+  const slideDistanceSV = useSharedValue(
+    Math.max(140, toastHeight + viewportOffset + 32),
+  );
   const [appActive, setAppActive] = useState(
     AppState.currentState === "active",
   );
@@ -535,32 +539,9 @@ export const Toast = React.memo(function Toast({
     return () => sub.remove();
   }, []);
 
-  const targetScale = expanded ? 1.0 : Math.max(0.86, 1 - index * 0.05);
-  const targetOffset = expanded
-    ? index * (toastHeight + spacing.sm) * (placement === "top" ? 1 : -1)
-    : index * 10 * (placement === "top" ? 1 : -1);
-
-  const animatedScale = useSharedValue(targetScale);
-  const animatedOffset = useSharedValue(targetOffset);
-
   useEffect(() => {
-    if (toast.open) {
-      translateX.value = 0;
-    }
-    if (reducedMotion) {
-      animatedScale.value = targetScale;
-      animatedOffset.value = targetOffset;
-      return;
-    }
-    animatedScale.value = withTiming(targetScale, {
-      duration: 200,
-      easing: Easing.bezier(...ANIMATION_TIMING.bezier),
-    });
-    animatedOffset.value = withTiming(targetOffset, {
-      duration: 200,
-      easing: Easing.bezier(...ANIMATION_TIMING.bezier),
-    });
-  }, [animatedOffset, animatedScale, reducedMotion, targetOffset, targetScale]);
+    slideDistanceSV.value = Math.max(140, toastHeight + viewportOffset + 32);
+  }, [slideDistanceSV, toastHeight, viewportOffset]);
 
   const tone = useMemo(
     () => getToastTone(toast.tone, colors),
@@ -571,6 +552,7 @@ export const Toast = React.memo(function Toast({
   useEffect(() => {
     if (toast.open) {
       translateX.value = 0;
+      translateYDrag.value = 0;
     }
     if (reducedMotion) {
       progress.value = toast.open ? 1 : 0;
@@ -582,14 +564,29 @@ export const Toast = React.memo(function Toast({
 
     progress.value = withTiming(
       toast.open ? 1 : 0,
-      { duration: 180, easing: Easing.bezier(...ANIMATION_TIMING.bezier) },
+      toast.open
+        ? {
+            duration: 280,
+            easing: Easing.bezier(0.22, 1, 0.36, 1),
+          }
+        : {
+            duration: 230,
+            easing: Easing.bezier(0.4, 0, 1, 1),
+          },
       (finished) => {
         if (finished && !toast.open && onCloseComplete) {
           scheduleOnRN(onCloseComplete);
         }
       },
     );
-  }, [onCloseComplete, progress, reducedMotion, toast.open]);
+  }, [
+    onCloseComplete,
+    progress,
+    reducedMotion,
+    toast.open,
+    translateX,
+    translateYDrag,
+  ]);
 
   useEffect(() => {
     if (isAsyncLoading && appActive && !reducedMotion) {
@@ -607,19 +604,25 @@ export const Toast = React.memo(function Toast({
     return undefined;
   }, [appActive, isAsyncLoading, reducedMotion, rotateValue]);
 
-  const canSwipe = swipeToDismiss && (!expanded || index === 0);
   const exitDistance = windowWidth + 40;
 
   const panGesture = usePanGesture({
-    enabled: canSwipe || Boolean(onToggleExpand),
+    enabled: swipeToDismiss,
     activeOffsetX: [-12, 12],
-    activeOffsetY: [-14, 14],
+    activeOffsetY: [-10, 10],
     onUpdate: (event) => {
       "worklet";
       if (Math.abs(event.translationX) > Math.abs(event.translationY)) {
-        if (canSwipe) {
-          translateX.value = event.translationX;
-        }
+        translateX.value = event.translationX;
+        translateYDrag.value = 0;
+      } else {
+        const towardDismissEdge =
+          placement === "top"
+            ? event.translationY < 0
+            : event.translationY > 0;
+        translateYDrag.value = towardDismissEdge
+          ? event.translationY
+          : event.translationY * 0.15;
       }
     },
     onDeactivate: (event) => {
@@ -629,15 +632,16 @@ export const Toast = React.memo(function Toast({
           duration: ANIMATION_TIMING.transition,
           easing: Easing.bezier(...ANIMATION_TIMING.bezier),
         });
+        translateYDrag.value = withTiming(0, {
+          duration: ANIMATION_TIMING.transition,
+          easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+        });
         return;
       }
       const isHorizontal =
         Math.abs(event.translationX) > Math.abs(event.translationY);
-      const isVertical =
-        Math.abs(event.translationY) > Math.abs(event.translationX);
 
       if (
-        canSwipe &&
         isHorizontal &&
         (Math.abs(event.translationX) > 72 || Math.abs(event.velocityX) > 600)
       ) {
@@ -657,38 +661,55 @@ export const Toast = React.memo(function Toast({
         return;
       }
 
+      const dismissVertically =
+        !isHorizontal &&
+        (placement === "top"
+          ? event.translationY < -32 || event.velocityY < -400
+          : event.translationY > 32 || event.velocityY > 400);
+
+      if (dismissVertically) {
+        const verticalTarget =
+          placement === "top" ? -slideDistanceSV.value : slideDistanceSV.value;
+        translateYDrag.value = withTiming(
+          verticalTarget,
+          { duration: 160, easing: Easing.bezier(0.4, 0, 1, 1) },
+          (finished) => {
+            if (finished && onDismiss) {
+              scheduleOnRN(onDismiss);
+            }
+          },
+        );
+        return;
+      }
+
       translateX.value = withTiming(0, {
         duration: ANIMATION_TIMING.transition,
         easing: Easing.bezier(...ANIMATION_TIMING.bezier),
       });
-
-      if (onToggleExpand && isVertical && Math.abs(event.translationY) > 20) {
-        const isTop = placement === "top";
-        const isSwipeDown = event.translationY > 20;
-        const isSwipeUp = event.translationY < -20;
-
-        if (!expanded && (isTop ? isSwipeDown : isSwipeUp)) {
-          scheduleOnRN(onToggleExpand);
-        } else if (expanded && (isTop ? isSwipeUp : isSwipeDown)) {
-          scheduleOnRN(onToggleExpand);
-        }
-      }
+      translateYDrag.value = withTiming(0, {
+        duration: ANIMATION_TIMING.transition,
+        easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+      });
     },
   });
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity:
-      progress.value * (expanded ? 1.0 : Math.max(0.7, 1 - index * 0.12)),
-    transform: [
-      {
-        translateY:
-          (placement === "top" ? -24 : 24) * (1 - progress.value) +
-          animatedOffset.value,
-      },
-      { translateX: translateX.value },
-      { scale: animatedScale.value },
-    ],
-  }));
+  const animatedStyle = useAnimatedStyle(() => {
+    const travel =
+      placement === "top" ? -slideDistanceSV.value : slideDistanceSV.value;
+    return {
+      opacity: interpolate(
+        progress.value,
+        [0, 0.22, 1],
+        [0, 1, 1],
+        Extrapolation.CLAMP,
+      ),
+      transform: [
+        { translateY: travel * (1 - progress.value) + translateYDrag.value },
+        { translateX: translateX.value },
+        { scale: 0.96 + progress.value * 0.04 },
+      ],
+    };
+  }, webDeps([placement]));
 
   const animatedIconStyle = useAnimatedStyle(() => {
     const raw = Number.isFinite(rotateValue.value) ? rotateValue.value : 0;
@@ -748,8 +769,7 @@ export const Toast = React.memo(function Toast({
           style={[
             styles.toastCard,
             {
-              position: index === 0 && !expanded ? "relative" : "absolute",
-              zIndex: 100 - index,
+              position: "relative",
               borderRadius: radii.xl,
               borderWidth,
               borderColor,
@@ -773,7 +793,7 @@ export const Toast = React.memo(function Toast({
               style={[
                 styles.iconBadge,
                 {
-                  borderRadius: radii.lg,
+                  borderRadius: radii.md,
                   backgroundColor: isSolid
                     ? withAlpha(onToneColor, 0.22)
                     : tone.soft,
@@ -1027,9 +1047,6 @@ const styles = StyleSheet.create({
   },
   toastCard: {
     width: "100%",
-    top: 0,
-    left: 0,
-    right: 0,
     flexDirection: "row",
   },
   mediaWrap: {

@@ -11,6 +11,7 @@ export interface MockUiState {
   withSpringCallCount: number;
   appStateListeners: Set<(state: string) => void>;
   anchorRect: { x: number; y: number; width: number; height: number };
+  portalHostOffset: { x: number; y: number };
   reset(): void;
 }
 
@@ -24,6 +25,7 @@ export const mockUiState: MockUiState = {
   withSpringCallCount: 0,
   appStateListeners: new Set(),
   anchorRect: { x: 24, y: 120, width: 140, height: 44 },
+  portalHostOffset: { x: 0, y: 0 },
   reset() {
     this.colorScheme = "light";
     this.reducedMotion = false;
@@ -34,6 +36,7 @@ export const mockUiState: MockUiState = {
     this.withSpringCallCount = 0;
     this.appStateListeners.clear();
     this.anchorRect = { x: 24, y: 120, width: 140, height: 44 };
+    this.portalHostOffset = { x: 0, y: 0 };
   },
 };
 
@@ -54,6 +57,15 @@ function withLayoutHandle(tag: string) {
         measureInWindow: (
           cb: (x: number, y: number, w: number, h: number) => void,
         ) => {
+          if (props.testID === "rn-ui-portal-host") {
+            cb(
+              mockUiState.portalHostOffset.x,
+              mockUiState.portalHostOffset.y,
+              mockUiState.windowWidth,
+              mockUiState.windowHeight,
+            );
+            return;
+          }
           const r = mockUiState.anchorRect;
           cb(r.x, r.y, r.width, r.height);
         },
@@ -331,10 +343,45 @@ mock.module("react-native-gesture-handler", () => ({
       { "data-gesture": props.gesture },
       props.children,
     ),
-  usePanGesture: (config?: Record<string, unknown>) => ({
-    kind: "pan",
-    config: config ?? {},
-  }),
+  usePanGesture: (config?: Record<string, unknown>) => {
+    const checkOffsetArray = (value: unknown, propName: string) => {
+      if (!Array.isArray(value)) return;
+      const start = Number(value[0]);
+      const end = Number(value[1]);
+      if (start > 0 || end < 0) {
+        throw new Error(
+          `First element of ${propName} should be negative, and the second one should be positive`,
+        );
+      }
+    };
+    if (config) {
+      checkOffsetArray(config.activeOffsetX, "activeOffsetX");
+      checkOffsetArray(config.activeOffsetY, "activeOffsetY");
+      checkOffsetArray(config.failOffsetX, "failOffsetX");
+      checkOffsetArray(config.failOffsetY, "failOffsetY");
+      if (
+        config.minDistance !== undefined &&
+        (config.failOffsetX !== undefined || config.failOffsetY !== undefined)
+      ) {
+        throw new Error(
+          "It is not supported to use minDistance with failOffsetX or failOffsetY, use activeOffsetX and activeOffsetY instead",
+        );
+      }
+      if (
+        config.minDistance !== undefined &&
+        (config.activeOffsetX !== undefined ||
+          config.activeOffsetY !== undefined)
+      ) {
+        throw new Error(
+          "It is not supported to use minDistance with activeOffsetX or activeOffsetY",
+        );
+      }
+    }
+    return {
+      kind: "pan",
+      config: config ?? {},
+    };
+  },
   useTapGesture: (config?: Record<string, unknown>) => ({
     kind: "tap",
     config: config ?? {},

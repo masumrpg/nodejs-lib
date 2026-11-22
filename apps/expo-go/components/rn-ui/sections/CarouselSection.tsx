@@ -53,8 +53,13 @@ export function CarouselSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Variant 1: Interactive Feature Deck */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Interactive Deck Carousel
               </Text>
               <Badge tone="primary" variant="outline">
@@ -82,7 +87,12 @@ export function CarouselSection({ ctx }: { ctx: RnUiSectionContext }) {
                             gap: 12,
                           }}
                         >
-                          <Box row center style={{ justifyContent: "space-between" }}>
+                          <Box
+                            row
+                            wrap
+                            gap="sm"
+                            style={{ alignItems: "center", justifyContent: "space-between" }}
+                          >
                             <Box
                               center
                               style={{
@@ -131,8 +141,13 @@ export function CarouselSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Variant 2: Auto-Play Banner Slideshow */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Auto-Play Banner Carousel
               </Text>
               <Badge tone="success" variant="filled">
@@ -144,12 +159,12 @@ export function CarouselSection({ ctx }: { ctx: RnUiSectionContext }) {
             </Text>
 
             <Box style={{ marginTop: 4 }}>
-              <Carousel autoPlay autoPlayInterval={3000} loop itemWidth={290}>
+              <Carousel autoPlay autoPlayInterval={3000} loop itemWidth={270}>
                 <CarouselContent>
                   <CarouselItem>
                     <Box
                       style={{
-                        width: 280,
+                        width: 256,
                         padding: 18,
                         borderRadius: 16,
                         backgroundColor: isDark ? "#0A2540" : "#EBF5FF",
@@ -170,7 +185,7 @@ export function CarouselSection({ ctx }: { ctx: RnUiSectionContext }) {
                   <CarouselItem>
                     <Box
                       style={{
-                        width: 280,
+                        width: 256,
                         padding: 18,
                         borderRadius: 16,
                         backgroundColor: isDark ? "#1E1B4B" : "#EEF2FF",
@@ -180,7 +195,7 @@ export function CarouselSection({ ctx }: { ctx: RnUiSectionContext }) {
                       }}
                     >
                       <Text weight="700" color="accent">
-                        ⚡ Ultra Fast 120 FPS
+                        Ultra Fast 120 FPS
                       </Text>
 
                       <Text color="textMuted" variant="bodySmall">
@@ -192,7 +207,7 @@ export function CarouselSection({ ctx }: { ctx: RnUiSectionContext }) {
                   <CarouselItem>
                     <Box
                       style={{
-                        width: 280,
+                        width: 256,
                         padding: 18,
                         borderRadius: 16,
                         backgroundColor: isDark ? "#064E3B" : "#ECFDF5",
@@ -202,7 +217,7 @@ export function CarouselSection({ ctx }: { ctx: RnUiSectionContext }) {
                       }}
                     >
                       <Text weight="700" color="success">
-                        🛡️ Safe Area Integrated
+                        Safe Area Integrated
                       </Text>
                       <Text color="textMuted" variant="bodySmall">
                         Automatic safe inset detection for Android & iOS notch.

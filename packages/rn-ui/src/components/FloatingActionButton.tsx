@@ -24,6 +24,7 @@ import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
   ANIMATION_TIMING,
+  markAsPressableTrigger,
   minTouchHitSlop,
   renderIcon,
   resolveOutlineBorderColor,
@@ -220,7 +221,7 @@ function FloatingActionButtonComponent({
           : 0;
 
   const borderRadius =
-    shape === "pill" ? radii.full : shape === "square" ? radii.sm : radii.xl;
+    shape === "pill" ? radii.full : shape === "square" ? radii.xs : radii.lg;
 
   const placementStyle: ViewStyle =
     placement === "none"
@@ -327,7 +328,9 @@ function FloatingActionButtonComponent({
   );
 }
 
-export const FloatingActionButton = React.memo(FloatingActionButtonComponent);
+export const FloatingActionButton = markAsPressableTrigger(
+  React.memo(FloatingActionButtonComponent),
+);
 
 const styles = StyleSheet.create({
   fullWidth: {

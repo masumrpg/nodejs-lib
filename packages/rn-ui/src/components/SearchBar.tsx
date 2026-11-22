@@ -36,6 +36,7 @@ import {
   ANIMATION_TIMING,
   minTouchHitSlop,
   renderIcon,
+  resolveControlRadius,
   resolveToneColors,
   type BaseAnimatedProps,
   type BaseGlassProps,
@@ -291,8 +292,7 @@ export const SearchBar = React.memo(
     const fontSize = SEARCH_FONT_SIZES[size];
     const iconSize = SEARCH_ICON_SIZES[size];
 
-    const borderRadius =
-      shape === "pill" ? radii.full : shape === "square" ? 0 : radii.lg;
+    const borderRadius = resolveControlRadius(shape, size, radii);
 
     const isTonalOutline = components.surface.outlineStyle === "tonal";
 

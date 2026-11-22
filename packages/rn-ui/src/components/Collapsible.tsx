@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -11,22 +11,22 @@ import {
 } from "react-native";
 import Animated, {
   Easing,
+  Extrapolation,
+  interpolate,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { scheduleOnRN } from "react-native-worklets";
 
-import { useDelayedUnmount } from "../utils";
 import { triggerHaptic } from "../utils/haptics";
 import {
-  ANIMATION_TIMING,
   minTouchHitSlop,
-  webDeps,
   type BaseAnimatedProps,
   type BaseHapticProps,
 } from "./types";
+
+const COLLAPSIBLE_DURATION = 240;
 
 export interface CollapsibleProps
   extends Omit<ViewProps, "style">,
@@ -152,70 +152,50 @@ export const CollapsibleContent = React.memo(function CollapsibleContent({
   const reducedMotion = useReducedMotion();
   const shouldAnimate = animated && !reducedMotion;
 
-  const [contentHeight, setContentHeight] = useState(0);
-  const [settledClosed, setSettledClosed] = useState(!open);
-  const openRef = useRef(open);
-  openRef.current = open;
-
+  const measuredHeight = useSharedValue(0);
   const progress = useSharedValue(open ? 1 : 0);
-  const shouldStayMounted = useDelayedUnmount(
-    open,
-    shouldAnimate ? ANIMATION_TIMING.transition + 40 : 0,
-  );
-
-  const handleFinished = useCallback(() => {
-    if (!openRef.current) {
-      setSettledClosed(true);
-    }
-  }, []);
+  const [useAbsoluteInner, setUseAbsoluteInner] = useState(!open);
 
   useEffect(() => {
-    if (open) {
-      setSettledClosed(false);
-    }
-
     if (!shouldAnimate) {
       progress.value = open ? 1 : 0;
-      if (!open) {
-        setSettledClosed(true);
-      }
       return;
     }
 
-    progress.value = withTiming(
-      open ? 1 : 0,
-      {
-        duration: ANIMATION_TIMING.transition + 30,
-        easing: Easing.bezier(...ANIMATION_TIMING.bezier),
-      },
-      (finished) => {
-        if (finished) {
-          scheduleOnRN(handleFinished);
-        }
-      },
-    );
-  }, [handleFinished, open, progress, shouldAnimate]);
+    progress.value = withTiming(open ? 1 : 0, {
+      duration: COLLAPSIBLE_DURATION,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+    });
+  }, [open, progress, shouldAnimate]);
 
-  const handleLayout = useCallback((e: LayoutChangeEvent) => {
-    const h = e.nativeEvent.layout.height;
-    if (h > 0) {
-      setContentHeight((prev) => (Math.abs(prev - h) > 1 ? h : prev));
-    }
-  }, []);
+  const handleLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      const h = e.nativeEvent.layout.height;
+      if (h > 0 && Math.abs(measuredHeight.value - h) > 0.5) {
+        measuredHeight.value = h;
+        setUseAbsoluteInner(true);
+      }
+    },
+    [measuredHeight],
+  );
 
-  const animatedStyle = useAnimatedStyle(() => {
-    if (contentHeight <= 0) {
-      return {
-        opacity: progress.value,
-      };
+  const maskAnimatedStyle = useAnimatedStyle(() => {
+    const h = measuredHeight.value;
+    const p = progress.value;
+    if (h <= 0) {
+      return p > 0 ? { opacity: p } : { height: 0, opacity: 0 };
     }
     return {
-      height: progress.value * contentHeight,
-      opacity: progress.value,
+      height: h * p,
+      opacity: interpolate(p, [0, 0.25, 1], [0, 0.65, 1], Extrapolation.CLAMP),
     };
-  }, webDeps([contentHeight]));
+  });
 
-  if (!open && !shouldStayMounted && settledClosed) {
+  const innerAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: (1 - progress.value) * -6 }],
+  }));
+
+  if (!shouldAnimate && !open) {
     return null;
   }
 
@@ -229,18 +209,19 @@ export const CollapsibleContent = React.memo(function CollapsibleContent({
       pointerEvents={open ? "auto" : "none"}
       accessibilityElementsHidden={!open}
       importantForAccessibility={open ? "yes" : "no-hide-descendants"}
-      style={[styles.mask, animatedStyle]}
+      style={[styles.mask, maskAnimatedStyle]}
     >
-      <View
+      <Animated.View
         onLayout={handleLayout}
         style={[
-          contentHeight > 0 ? styles.measuredInner : undefined,
+          useAbsoluteInner ? styles.measuredInner : undefined,
+          innerAnimatedStyle,
           style,
         ]}
         {...props}
       >
         {childContent}
-      </View>
+      </Animated.View>
     </Animated.View>
   );
 });
@@ -251,6 +232,7 @@ const styles = StyleSheet.create({
   },
   measuredInner: {
     position: "absolute",
+    top: 0,
     left: 0,
     right: 0,
   },

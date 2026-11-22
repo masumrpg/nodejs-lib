@@ -61,8 +61,13 @@ export function TooltipSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 1. Smart Edge Collision & Auto-Flip Test */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Smart Edge Auto-Flip
               </Text>
               <Badge tone="success">Smart Collision</Badge>
@@ -111,8 +116,13 @@ export function TooltipSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 2. Tap & Hold Tooltip Toolbar */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Tap & Hold Action Bar
               </Text>
               <Badge tone="primary">Tap & Hold 250ms</Badge>
@@ -168,8 +178,13 @@ export function TooltipSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 3. Direct Tap Mode */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Direct Tap Mode
               </Text>
               <Badge tone="accent">Press Mode</Badge>
@@ -201,8 +216,13 @@ export function TooltipSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 4. Scrollable List Sample with Action Tooltips */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Scrollable List Test Cases
               </Text>
               <Badge tone="default">5 Items</Badge>
@@ -263,8 +283,13 @@ export function TooltipSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 5. Bottom Card to Test Bottom-Edge Auto-Flip */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Bottom Edge Flip Test
               </Text>
               <Badge tone="warning">Bottom Viewport</Badge>

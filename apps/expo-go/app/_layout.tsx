@@ -167,7 +167,7 @@ const AppLayout = () => {
         waitForStorage={false}
         onColorSchemeChange={handleColorSchemeChange}
       >
-        <ToastProvider placement="top" maxToasts={7} duration={5000}>
+        <ToastProvider placement="top" maxToasts={3} duration={4000}>
           <Stack screenOptions={{ headerShown: false }} />
         </ToastProvider>
       </ThemeProvider>

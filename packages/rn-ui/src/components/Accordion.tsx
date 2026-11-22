@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -10,13 +10,14 @@ import {
 } from "react-native";
 import Animated, {
   Easing,
+  Extrapolation,
+  interpolate,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
-import { scheduleOnRN } from "react-native-worklets";
 
 import { useTheme } from "../theme";
 import { triggerHaptic } from "../utils/haptics";
@@ -29,7 +30,6 @@ import {
   type BaseHapticProps,
   type RenderIcon,
   type VariantProps,
-  webDeps,
 } from "./types";
 
 export type AccordionVariant = "outline" | "flat" | "ghost";
@@ -130,77 +130,66 @@ const DefaultAccordionContent = React.memo(function DefaultAccordionContent({
   style,
 }: AccordionAnimatedContentProps) {
   const reducedMotion = useReducedMotion();
-  const [contentHeight, setContentHeight] = useState(0);
-  const [shouldRender, setShouldRender] = useState(expanded);
-  const expandedRef = useRef(expanded);
-  expandedRef.current = expanded;
-
+  const measuredHeight = useSharedValue(0);
   const progress = useSharedValue(expanded ? 1 : 0);
-
-  const handleCloseComplete = useCallback(() => {
-    if (!expandedRef.current) {
-      setShouldRender(false);
-    }
-  }, []);
+  const [useAbsoluteInner, setUseAbsoluteInner] = useState(!expanded);
 
   useEffect(() => {
-    if (expanded) {
-      setShouldRender(true);
-    }
-
     if (reducedMotion || duration <= 0) {
       progress.value = expanded ? 1 : 0;
-      if (!expanded) {
-        setShouldRender(false);
-      }
       return;
     }
 
-    progress.value = withTiming(
-      expanded ? 1 : 0,
-      { duration, easing: Easing.bezier(...ANIMATION_TIMING.bezier) },
-      (finished) => {
-        if (finished) {
-          scheduleOnRN(handleCloseComplete);
-        }
-      },
-    );
-  }, [duration, expanded, handleCloseComplete, progress, reducedMotion]);
+    progress.value = withTiming(expanded ? 1 : 0, {
+      duration,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+    });
+  }, [duration, expanded, progress, reducedMotion]);
 
-  const animatedStyle = useAnimatedStyle(() => {
-    if (contentHeight <= 0) {
-      return {
-        opacity: progress.value,
-      };
+  const maskAnimatedStyle = useAnimatedStyle(() => {
+    const h = measuredHeight.value;
+    const p = progress.value;
+    if (h <= 0) {
+      return p > 0 ? { opacity: p } : { height: 0, opacity: 0 };
     }
     return {
-      height: progress.value * contentHeight,
-      opacity: progress.value,
+      height: h * p,
+      opacity: interpolate(p, [0, 0.25, 1], [0, 0.65, 1], Extrapolation.CLAMP),
     };
-  }, webDeps([contentHeight]));
+  });
 
-  const handleLayout = useCallback((event: LayoutChangeEvent) => {
-    const nextHeight = event.nativeEvent.layout.height;
-    if (nextHeight > 0) {
-      setContentHeight((prev) => (prev === nextHeight ? prev : nextHeight));
-    }
-  }, []);
+  const innerAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: (1 - progress.value) * -6 }],
+  }));
 
-  if (!shouldRender && !expanded) {
-    return null;
-  }
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const nextHeight = event.nativeEvent.layout.height;
+      if (nextHeight > 0 && Math.abs(measuredHeight.value - nextHeight) > 0.5) {
+        measuredHeight.value = nextHeight;
+        setUseAbsoluteInner(true);
+      }
+    },
+    [measuredHeight],
+  );
 
   return (
-    <Animated.View style={[styles.contentMask, animatedStyle]}>
-      <View
+    <Animated.View
+      pointerEvents={expanded ? "auto" : "none"}
+      accessibilityElementsHidden={!expanded}
+      importantForAccessibility={expanded ? "yes" : "no-hide-descendants"}
+      style={[styles.contentMask, maskAnimatedStyle]}
+    >
+      <Animated.View
         style={[
-          contentHeight > 0 ? styles.measuredAbsolute : undefined,
+          useAbsoluteInner ? styles.measuredAbsolute : undefined,
+          innerAnimatedStyle,
           style,
         ]}
         onLayout={handleLayout}
       >
         {children}
-      </View>
+      </Animated.View>
     </Animated.View>
   );
 });
@@ -246,7 +235,7 @@ export const Accordion = React.memo(function Accordion({
   animated = true,
   glass = false,
   haptic = true,
-  animationDuration = 160,
+  animationDuration = 240,
   animationComponents,
   indicator,
   itemStyle,
@@ -337,7 +326,7 @@ export const Accordion = React.memo(function Accordion({
               styles.itemContainer,
               {
                 backgroundColor: itemBg,
-                borderRadius: isGhost ? 0 : radii.xl,
+                borderRadius: isGhost ? 0 : radii.lg,
                 borderWidth,
                 borderBottomWidth,
                 borderColor: itemBorderColor,
@@ -508,6 +497,7 @@ const styles = StyleSheet.create({
   },
   measuredAbsolute: {
     position: "absolute",
+    top: 0,
     left: 0,
     right: 0,
   },

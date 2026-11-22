@@ -160,7 +160,7 @@ export const CATALOG_CATEGORIES: ComponentCategory[] = [
   },
   {
     title: "Buttons & Action Controls",
-    description: "Interactive buttons, icon buttons, button groups, and FABs.",
+    description: "Interactive buttons, icon buttons, FABs, and badges.",
     iconName: "Sparkles",
     items: [
       {
@@ -173,12 +173,6 @@ export const CATALOG_CATEGORIES: ComponentCategory[] = [
         id: "icon-button",
         name: "IconButton",
         description: "Square or rounded icon action button.",
-        tone: "accent",
-      },
-      {
-        id: "button-group",
-        name: "ButtonGroup",
-        description: "Grouped segment buttons with continuous borders.",
         tone: "accent",
       },
       {
@@ -254,7 +248,7 @@ export const CATALOG_CATEGORIES: ComponentCategory[] = [
       {
         id: "switch",
         name: "Switch",
-        description: "Toggle switch with iOS 26 oval and round variants.",
+        description: "Enhanced fluid oval toggle switch with press-stretch motion.",
         tone: "success",
       },
       {

@@ -31,7 +31,33 @@ interface PortalEntry {
 class PortalStore {
   private entries = new Map<string, PortalEntry>();
   private listeners = new Map<string, Set<() => void>>();
+  private hostRefs = new Map<
+    string,
+    React.RefObject<React.ComponentRef<typeof View> | null>
+  >();
   private seq = 0;
+
+  registerHostRef(
+    host: string,
+    ref: React.RefObject<React.ComponentRef<typeof View> | null>,
+  ) {
+    this.hostRefs.set(host, ref);
+  }
+
+  unregisterHostRef(
+    host: string,
+    ref: React.RefObject<React.ComponentRef<typeof View> | null>,
+  ) {
+    if (this.hostRefs.get(host) === ref) {
+      this.hostRefs.delete(host);
+    }
+  }
+
+  getHostRef(
+    host = "root",
+  ): React.RefObject<React.ComponentRef<typeof View> | null> | null {
+    return this.hostRefs.get(host) ?? null;
+  }
 
   mount(key: string, host: string, layer: PortalLayer, node: ReactNode) {
     const existing = this.entries.get(key);
@@ -113,9 +139,18 @@ export interface PortalHostProps {
 
 export function PortalHost({ name = "root" }: PortalHostProps) {
   const store = usePortalContext();
+  const hostRef = useRef<React.ComponentRef<typeof View>>(null);
   const [entries, setEntries] = useState<PortalEntry[]>(() =>
     store ? store.getEntriesForHost(name) : [],
   );
+
+  useIsoLayoutEffect(() => {
+    if (!store) return;
+    store.registerHostRef(name, hostRef);
+    return () => {
+      store.unregisterHostRef(name, hostRef);
+    };
+  }, [name, store]);
 
   useEffect(() => {
     if (!store) {
@@ -128,12 +163,22 @@ export function PortalHost({ name = "root" }: PortalHostProps) {
     });
   }, [name, store]);
 
-  if (!store || entries.length === 0) {
+  if (!store) {
     return null;
   }
 
   return (
-    <View style={styles.host} pointerEvents="box-none" collapsable={false}>
+    <View
+      ref={hostRef}
+      testID="rn-ui-portal-host"
+      style={styles.host}
+      pointerEvents={entries.length > 0 ? "box-none" : "none"}
+      collapsable={false}
+      accessibilityElementsHidden={entries.length === 0}
+      importantForAccessibility={
+        entries.length === 0 ? "no-hide-descendants" : "auto"
+      }
+    >
       {entries.map((entry) => (
         <React.Fragment key={entry.key}>{entry.node}</React.Fragment>
       ))}

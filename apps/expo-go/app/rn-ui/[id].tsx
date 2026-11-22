@@ -18,7 +18,6 @@ import {
   BoxSection,
   CardSection,
   DividerSection,
-  ButtonGroupsSection,
   ButtonsSection,
   CalendarSection,
   CarouselSection,
@@ -123,8 +122,6 @@ export default function RnUiComponentDetailScreen() {
         return <ButtonsSection ctx={ctx} />;
       case "icon-button":
         return <IconButtonsSection ctx={ctx} />;
-      case "button-group":
-        return <ButtonGroupsSection ctx={ctx} />;
       case "floating-action-button":
         return <FloatingActionButtonSection ctx={ctx} />;
       case "badge":

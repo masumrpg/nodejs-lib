@@ -92,8 +92,13 @@ export function SwipeableItemSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 1. Multi-line Rich Mail Card */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Rich Mail List (Full Swipe Delete)
               </Text>
               <Badge tone="primary">Swipe Left & Right</Badge>
@@ -162,8 +167,12 @@ export function SwipeableItemSection(_props?: { ctx?: RnUiSectionContext }) {
                   onFullSwipeLeft={() => deleteEmail(item.id)}
                 >
                   <Box gap="xs">
-                    <Box row center style={{ justifyContent: "space-between" }}>
-                      <Box row center gap="xs">
+                    <Box
+                      row
+                      gap="sm"
+                      style={{ alignItems: "center", justifyContent: "space-between" }}
+                    >
+                      <Box row center gap="xs" style={{ flex: 1, justifyContent: "flex-start" }}>
                         {item.unread && (
                           <Box
                             style={{
@@ -174,11 +183,11 @@ export function SwipeableItemSection(_props?: { ctx?: RnUiSectionContext }) {
                             }}
                           />
                         )}
-                        <Text weight="700" color="text" numberOfLines={1}>
+                        <Text weight="700" color="text" numberOfLines={1} style={{ flexShrink: 1 }}>
                           {item.sender}
                         </Text>
                       </Box>
-                      <Text variant="caption" color="textMuted">
+                      <Text variant="caption" color="textMuted" style={{ flexShrink: 0 }}>
                         {item.time}
                       </Text>
                     </Box>
@@ -216,8 +225,13 @@ export function SwipeableItemSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 2. Single-Line Task List (1 Baris Teks) */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Single-Line Task Items (1-Line Text)
               </Text>
               <Badge tone="accent">Compact Row</Badge>
@@ -257,9 +271,14 @@ export function SwipeableItemSection(_props?: { ctx?: RnUiSectionContext }) {
                   ]}
                   onFullSwipeLeft={() => deleteTask(task.id)}
                 >
-                  <Box row center style={{ justifyContent: "space-between" }}>
+                  <Box
+                    row
+                    gap="sm"
+                    style={{ alignItems: "center", justifyContent: "space-between" }}
+                  >
                     <Text
                       style={{
+                        flex: 1,
                         fontSize: 13,
                         fontWeight: "500",
                         textDecorationLine: task.done ? "line-through" : "none",

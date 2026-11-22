@@ -339,7 +339,7 @@ export const RadioGroupItem = React.memo(function RadioGroupItem({
                   gap: spacing.md,
                   padding: resolvedSize === "sm" ? spacing.sm : spacing.md,
                   borderWidth: components.borderWidth.strong,
-                  borderRadius: radii.xl,
+                  borderRadius: radii.lg,
                   opacity: isDisabled ? 0.5 : 1,
                 },
                 containerAnimatedStyle,

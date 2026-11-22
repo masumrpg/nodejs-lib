@@ -20,7 +20,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Circle, Line, Path } from "react-native-svg";
 
-import { Portal, useTheme, type ThemeColors } from "../theme";
+import { Portal, usePortalContext, useTheme, type ThemeColors } from "../theme";
 import {
   computeAnchoredPosition,
   measureAnchorNode,
@@ -34,6 +34,8 @@ import {
   ANIMATION_TIMING,
   minTouchHitSlop,
   renderIcon,
+  resolveControlRadius,
+  webDeps,
   type BaseGlassProps,
   type BaseHapticProps,
   type RenderIcon,
@@ -92,6 +94,7 @@ export const Combobox = React.memo(function Combobox({
   children,
 }: ComboboxProps) {
   const { colors } = useTheme();
+  const portalStore = usePortalContext();
   const [uncontrolledValue, setUncontrolledValue] = useState("");
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
@@ -154,17 +157,24 @@ export const Combobox = React.memo(function Combobox({
     [isOpenControlled, onOpenChange],
   );
 
-  const measureTrigger = useCallback((callback?: () => void) => {
-    let called = false;
-    measureAnchorNode(triggerRef, (rect) => {
-      setAnchor(rect);
-      called = true;
-      callback?.();
-    });
-    if (!called) {
-      callback?.();
-    }
-  }, []);
+  const measureTrigger = useCallback(
+    (callback?: () => void) => {
+      let called = false;
+      measureAnchorNode(
+        triggerRef,
+        (rect) => {
+          setAnchor(rect);
+          called = true;
+          callback?.();
+        },
+        portalStore?.getHostRef("root"),
+      );
+      if (!called) {
+        callback?.();
+      }
+    },
+    [portalStore],
+  );
 
   useEffect(() => {
     if (open) {
@@ -325,7 +335,7 @@ export const ComboboxInput = React.memo(function ComboboxInput({
         styles.inputBox,
         {
           height,
-          borderRadius: radii.lg,
+          borderRadius: resolveControlRadius("rounded", size, radii),
           borderWidth: open
             ? components.borderWidth.focus
             : components.borderWidth.strong,
@@ -506,17 +516,20 @@ export const ComboboxContent = React.memo(function ComboboxContent({
   });
 
   const renderAbove = coords.resolvedPlacement === "top";
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [
-      {
-        translateY: renderAbove
-          ? (1 - progress.value) * 6
-          : (1 - progress.value) * -6,
-      },
-      { scale: 0.96 + progress.value * 0.04 },
-    ],
-  }));
+  const animatedStyle = useAnimatedStyle(
+    () => ({
+      opacity: progress.value,
+      transform: [
+        {
+          translateY: renderAbove
+            ? (1 - progress.value) * 6
+            : (1 - progress.value) * -6,
+        },
+        { scale: 0.96 + progress.value * 0.04 },
+      ],
+    }),
+    webDeps([renderAbove]),
+  );
 
   if (!shouldMount && !open) return null;
 
@@ -548,22 +561,34 @@ export const ComboboxContent = React.memo(function ComboboxContent({
               maxHeight,
               backgroundColor: glass
                 ? colors.glassSurfaceStrong
-                : colors.surface,
+                : colors.surfaceRaised,
               borderWidth: components.borderWidth.default,
               borderColor: glass ? colors.glassBorder : colors.border,
-              borderRadius: radii.xl,
+              borderRadius: radii.lg,
             },
             shadows.lg,
             animatedStyle,
             style,
           ]}
         >
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
+          <View
+            style={[
+              styles.contentClip,
+              {
+                borderRadius: Math.max(
+                  0,
+                  radii.lg - components.borderWidth.default,
+                ),
+              },
+            ]}
           >
-            {children}
-          </ScrollView>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {children}
+            </ScrollView>
+          </View>
         </Animated.View>
       </ComboboxContext.Provider>
     </Portal>
@@ -663,7 +688,7 @@ export const ComboboxItem = React.memo(function ComboboxItem({
           paddingVertical: spacing.sm,
           paddingHorizontal: spacing.md,
           marginHorizontal: spacing.xs,
-          borderRadius: radii.md,
+          borderRadius: radii.sm,
           opacity: disabled ? 0.5 : 1,
         },
         style,
@@ -759,6 +784,11 @@ const styles = StyleSheet.create({
   },
   contentCard: {
     position: "absolute",
+  },
+  contentClip: {
+    overflow: "hidden",
+    width: "100%",
+    flexShrink: 1,
   },
   itemRow: {
     minHeight: 44,

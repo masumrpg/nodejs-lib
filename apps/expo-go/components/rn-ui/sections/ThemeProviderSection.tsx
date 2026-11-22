@@ -139,8 +139,15 @@ export function ThemeProviderSection({ ctx }: { ctx: RnUiSectionContext }) {
 
         <Card>
           <Box gap="md">
-            <Box row style={{ alignItems: "center", justifyContent: "space-between" }}>
-              <Text variant="label">Live Reactive Surface Preview</Text>
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text variant="label" style={{ flexShrink: 1 }}>
+                Live Reactive Surface Preview
+              </Text>
               <Badge tone="primary" variant="filled">
                 {themeName.toUpperCase()}
               </Badge>
@@ -166,8 +173,8 @@ export function ThemeProviderSection({ ctx }: { ctx: RnUiSectionContext }) {
               placeholder="Borderless / Bordered Input"
             />
 
-            <Box row style={{ alignItems: "center", justifyContent: "space-between" }}>
-              <Text variant="bodySmall" color="textMuted">
+            <Box row gap="sm" style={{ alignItems: "center", justifyContent: "space-between" }}>
+              <Text variant="bodySmall" color="textMuted" style={{ flexShrink: 1 }}>
                 borderWidth.strong={components.borderWidth.strong} | control=
                 {components.borderWidth.control} | radii.xl={radii.xl} | press=
                 {components.surface.pressEffect}

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   View,
   useWindowDimensions,
+  type GestureResponderEvent,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -16,7 +17,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { Portal, useTheme, type ThemeColors } from "../theme";
+import { Portal, usePortalContext, useTheme, type ThemeColors } from "../theme";
 import {
   computeAnchoredPosition,
   measureAnchorNode,
@@ -27,7 +28,9 @@ import {
 import { triggerHaptic } from "../utils/haptics";
 import {
   ANIMATION_TIMING,
+  isPressableTriggerElement,
   minTouchHitSlop,
+  webDeps,
   type BaseGlassProps,
   type BaseHapticProps,
 } from "./types";
@@ -79,6 +82,7 @@ export const HoverCard = React.memo(function HoverCard({
   children,
 }: HoverCardProps) {
   const { colors } = useTheme();
+  const portalStore = usePortalContext();
   const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
   const [anchor, setAnchor] = useState<AnchorMeasurement | null>(null);
   const triggerRef = useRef<React.ComponentRef<typeof View>>(null);
@@ -98,11 +102,15 @@ export const HoverCard = React.memo(function HoverCard({
 
   useEffect(() => {
     if (open && !anchor) {
-      measureAnchorNode(triggerRef, (rect) => {
-        setAnchor(rect);
-      });
+      measureAnchorNode(
+        triggerRef,
+        (rect) => {
+          setAnchor(rect);
+        },
+        portalStore?.getHostRef("root"),
+      );
     }
-  }, [anchor, open]);
+  }, [anchor, open, portalStore]);
 
   const contextValue = useMemo<HoverCardContextProps>(
     () => ({
@@ -159,6 +167,7 @@ export const HoverCardTrigger = React.memo(function HoverCardTrigger({
     triggerMode,
     haptic,
   } = useHoverCard();
+  const portalStore = usePortalContext();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearTimer = useCallback(() => {
@@ -172,9 +181,13 @@ export const HoverCardTrigger = React.memo(function HoverCardTrigger({
 
   const scheduleOpen = useCallback(() => {
     clearTimer();
-    measureAnchorNode(triggerRef, (rect) => {
-      setAnchor(rect);
-    });
+    measureAnchorNode(
+      triggerRef,
+      (rect) => {
+        setAnchor(rect);
+      },
+      portalStore?.getHostRef("root"),
+    );
     if (openDelay > 0) {
       timerRef.current = setTimeout(() => {
         if (haptic) triggerHaptic("selection");
@@ -184,7 +197,7 @@ export const HoverCardTrigger = React.memo(function HoverCardTrigger({
       if (haptic) triggerHaptic("selection");
       setOpen(true);
     }
-  }, [clearTimer, haptic, openDelay, setAnchor, setOpen, triggerRef]);
+  }, [clearTimer, haptic, openDelay, portalStore, setAnchor, setOpen, triggerRef]);
 
   const scheduleClose = useCallback(() => {
     clearTimer();
@@ -195,35 +208,60 @@ export const HoverCardTrigger = React.memo(function HoverCardTrigger({
     }
   }, [clearTimer, closeDelay, setOpen]);
 
+  const isPressableChild = isPressableTriggerElement(children);
+  const childDisabled = isPressableChild
+    ? Boolean(children.props.disabled)
+    : false;
+  const mergedDisabled = disabled || childDisabled;
+
   const handlePress = useCallback(() => {
-    if (disabled || triggerMode !== "press") return;
+    if (mergedDisabled || triggerMode !== "press") return;
     if (open) {
       scheduleClose();
     } else {
       scheduleOpen();
     }
-  }, [disabled, open, scheduleClose, scheduleOpen, triggerMode]);
+  }, [mergedDisabled, open, scheduleClose, scheduleOpen, triggerMode]);
 
   const handleLongPress = useCallback(() => {
-    if (disabled || triggerMode !== "longPress") return;
+    if (mergedDisabled || triggerMode !== "longPress") return;
     if (haptic) triggerHaptic("medium");
     scheduleOpen();
-  }, [disabled, haptic, scheduleOpen, triggerMode]);
+  }, [haptic, mergedDisabled, scheduleOpen, triggerMode]);
 
   return (
-    <View ref={triggerRef} collapsable={false}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open, disabled }}
-        disabled={disabled}
-        hitSlop={minTouchHitSlop(36)}
-        onPress={handlePress}
-        onLongPress={handleLongPress}
-        delayLongPress={260}
-        style={style}
-      >
-        {children}
-      </Pressable>
+    <View
+      ref={triggerRef}
+      collapsable={false}
+      style={isPressableChild ? style : undefined}
+    >
+      {isPressableChild ? (
+        React.cloneElement(children, {
+          disabled: mergedDisabled,
+          delayLongPress: children.props.delayLongPress ?? 260,
+          onPress: (event: GestureResponderEvent) => {
+            handlePress();
+            children.props.onPress?.(event);
+          },
+          onLongPress: (event: GestureResponderEvent) => {
+            handleLongPress();
+            children.props.onLongPress?.(event);
+          },
+        })
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: open, disabled: mergedDisabled }}
+          disabled={mergedDisabled}
+          hitSlop={minTouchHitSlop(36)}
+          onPress={handlePress}
+          onLongPress={handleLongPress}
+          delayLongPress={260}
+          style={style}
+        >
+          {children}
+        </Pressable>
+      )}
     </View>
   );
 });
@@ -298,17 +336,20 @@ export const HoverCardContent = React.memo(function HoverCardContent({
   });
 
   const renderAbove = coords.resolvedPlacement === "top";
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [
-      {
-        translateY: renderAbove
-          ? (1 - progress.value) * 6
-          : (1 - progress.value) * -6,
-      },
-      { scale: 0.96 + progress.value * 0.04 },
-    ],
-  }));
+  const animatedStyle = useAnimatedStyle(
+    () => ({
+      opacity: progress.value,
+      transform: [
+        {
+          translateY: renderAbove
+            ? (1 - progress.value) * 6
+            : (1 - progress.value) * -6,
+        },
+        { scale: 0.96 + progress.value * 0.04 },
+      ],
+    }),
+    webDeps([renderAbove]),
+  );
 
   if (!shouldMount && !open) return null;
 
@@ -339,10 +380,10 @@ export const HoverCardContent = React.memo(function HoverCardContent({
               maxHeight,
               backgroundColor: glass
                 ? colors.glassSurfaceStrong
-                : colors.surface,
+                : colors.surfaceRaised,
               borderColor: glass ? colors.glassBorder : colors.border,
               borderWidth: components.borderWidth.default,
-              borderRadius: radii.xl,
+              borderRadius: radii.lg,
               padding: spacing.md,
             },
             shadows.lg,

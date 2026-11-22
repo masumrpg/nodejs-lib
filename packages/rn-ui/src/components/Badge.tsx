@@ -144,8 +144,12 @@ function BadgeComponent({
       {typeof children === "string" || typeof children === "number" ? (
         <Text
           variant={textVariant}
+          numberOfLines={1}
+          ellipsizeMode="tail"
           style={{
             color: textColor,
+            flexShrink: 1,
+            includeFontPadding: false,
             ...(size === "xs" ? { fontSize: 10, lineHeight: 14 } : null),
           }}
         >
@@ -164,6 +168,8 @@ export const Badge = React.memo(BadgeComponent);
 const styles = StyleSheet.create({
   container: {
     alignSelf: "flex-start",
+    maxWidth: "100%",
+    flexShrink: 1,
     flexDirection: "row",
     alignItems: "center",
   },

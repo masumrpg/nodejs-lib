@@ -4,10 +4,12 @@ import path from "node:path";
 import React from "react";
 
 import {
+  Accordion,
   Alert,
   Avatar,
   AvatarFallback,
   Badge,
+  Box,
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
@@ -15,7 +17,6 @@ import {
   BreadcrumbSeparator,
   Bubble,
   Button,
-  ButtonGroup,
   Card,
   Chip,
   DataList,
@@ -38,8 +39,9 @@ import {
   TimelineDescription,
   TimelineItem,
   TimelineTitle,
+  lightTheme,
 } from "../src";
-import { collectText, findAllNodes, mockUiState, renderUI } from "./setup";
+import { act, collectText, findAllNodes, mockUiState, renderUI } from "./setup";
 
 function wrap(node: React.ReactElement) {
   return React.createElement(ThemeProvider, null, node);
@@ -168,6 +170,21 @@ describe("typography, primitives & data display components", () => {
     expect(pressables[0]?.props?.disabled).toBe(true);
     expect(pressables[1]?.props?.accessibilityLabel).toBe("Settings");
     expect(pressables[1]?.props?.hitSlop).toBeDefined();
+
+    const iconBtnWrapper = findAllNodes(
+      container,
+      (n) =>
+        n.type === "anim-view" &&
+        findAllNodes(n, (c) => c.props?.accessibilityLabel === "Settings").length >
+          0,
+    )[0];
+    const iconBtnWrapperStyle =
+      (iconBtnWrapper?.props?.style as Record<string, unknown> | undefined) ?? {};
+    expect(iconBtnWrapperStyle.alignSelf).toBeUndefined();
+    expect(iconBtnWrapperStyle.width).toBe(lightTheme.components.iconButton.size.md);
+    expect(iconBtnWrapperStyle.height).toBe(
+      lightTheme.components.iconButton.size.md,
+    );
   });
 
   it("renders Avatar md size, Bubble orthogonal tone/variant, and Item", () => {
@@ -283,40 +300,9 @@ describe("typography, primitives & data display components", () => {
     expect(links.length).toBe(1);
   });
 
-  it("ignores absolute animated overlays inside ButtonGroup and omits native Reanimated dep arrays", async () => {
+  it("omits native Reanimated dep arrays via webDeps across all components", async () => {
     const { webDeps } = await import("../src/components/types");
     expect(webDeps(["dep"])).toBeUndefined();
-
-    const animatedLikeHandle = { viewDescriptors: {}, initial: {} };
-    const { container } = renderUI(
-      wrap(
-        React.createElement(
-          ButtonGroup,
-          { orientation: "horizontal" },
-          React.createElement("rn-view", {
-            testID: "abs-indicator",
-            style: [
-              { position: "absolute", top: 0, left: 0 },
-              animatedLikeHandle as never,
-            ],
-          }),
-          React.createElement(Button, { testID: "bg-first" }, "First"),
-          React.createElement(Button, { testID: "bg-second" }, "Second"),
-        ),
-      ),
-    );
-
-    const first = findAllNodes(container, (n) => n.props?.testID === "bg-first")[0];
-    const second = findAllNodes(container, (n) => n.props?.testID === "bg-second")[0];
-    const firstStyle = (first?.props?.style as Record<string, unknown> | undefined) ?? {};
-    const secondStyle = (second?.props?.style as Record<string, unknown> | undefined) ?? {};
-
-    expect(firstStyle.borderTopRightRadius).toBe(0);
-    expect(firstStyle.borderBottomRightRadius).toBe(0);
-    expect(firstStyle.borderLeftWidth).toBeUndefined();
-    expect(secondStyle.borderTopLeftRadius).toBe(0);
-    expect(secondStyle.borderBottomLeftRadius).toBe(0);
-    expect(secondStyle.borderLeftWidth).toBe(0);
 
     const componentsDir = path.resolve(import.meta.dir, "../src/components");
     for (const entry of fs.readdirSync(componentsDir)) {
@@ -364,5 +350,145 @@ describe("typography, primitives & data display components", () => {
         idx = i + 1;
       }
     }
+  });
+
+  it("constrains Badge overflow, supports Box wrap, and clamps AvatarBadge size with surface cutout border", () => {
+    const { container } = renderUI(
+      wrap(
+        React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(
+            Box,
+            { row: true, wrap: true, gap: "sm", testID: "wrap-box" },
+            React.createElement(
+              Badge,
+              { tone: "accent" },
+              "Very Long Badge Label",
+            ),
+          ),
+          React.createElement(
+            Avatar,
+            { size: "xl", badge: 120 },
+            React.createElement(AvatarFallback, null, "MS"),
+          ),
+        ),
+      ),
+    );
+
+    const wrapBox = findAllNodes(container, (n) => n.props?.testID === "wrap-box")[0];
+    const wrapBoxStyle = (wrapBox?.props?.style as Record<string, unknown> | undefined) ?? {};
+    expect(wrapBoxStyle.flexDirection).toBe("row");
+    expect(wrapBoxStyle.flexWrap).toBe("wrap");
+
+    const badgeView = findAllNodes(
+      container,
+      (n) =>
+        n.type === "rn-view" &&
+        n.props?.accessibilityRole === "text" &&
+        collectText(n).includes("Very Long Badge Label"),
+    )[0];
+    const badgeStyle = (badgeView?.props?.style as Record<string, unknown> | undefined) ?? {};
+    expect(badgeStyle.maxWidth).toBe("100%");
+    expect(badgeStyle.flexShrink).toBe(1);
+
+    const badgeText = badgeView
+      ? findAllNodes(badgeView, (n) => n.type === "rn-text")[0]
+      : undefined;
+    expect(badgeText?.props?.numberOfLines).toBe(1);
+
+    const avatarBadgeView = findAllNodes(
+      container,
+      (n) => n.props?.accessibilityLabel === "Notification count 99+",
+    )[0];
+    const avatarBadgeStyle =
+      (avatarBadgeView?.props?.style as Record<string, unknown> | undefined) ?? {};
+    expect(Number(avatarBadgeStyle.height)).toBeLessThanOrEqual(20);
+    expect(avatarBadgeStyle.borderColor).toBe(lightTheme.colors.surface);
+  });
+
+  it("renders Chip with icon and disabled state via animated opacity cleanly", () => {
+    const { container } = renderUI(
+      wrap(
+        React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(Chip, {
+            label: "Filled Icon Chip",
+            variant: "filled",
+            selected: true,
+            tone: "success",
+            icon: ({ color, size }: { color: string; size: number }) =>
+              React.createElement("rn-view", {
+                testID: "chip-custom-icon",
+                style: { width: size, height: size, backgroundColor: color },
+              }),
+          }),
+          React.createElement(Chip, {
+            label: "Disabled Chip",
+            disabled: true,
+            selected: true,
+          }),
+        ),
+      ),
+    );
+
+    expect(collectText(container)).toContain("Filled Icon Chip");
+    expect(collectText(container)).toContain("Disabled Chip");
+    const customIcon = findAllNodes(
+      container,
+      (n) => n.props?.testID === "chip-custom-icon",
+    )[0];
+    expect(customIcon).toBeDefined();
+    const chipViews = findAllNodes(
+      container,
+      (n) => n.type === "anim-view" && collectText(n).includes("Disabled Chip"),
+    );
+    const disabledChipStyle =
+      (chipViews[0]?.props?.style as Record<string, unknown> | undefined) ?? {};
+    expect(disabledChipStyle.opacity).toBeCloseTo(0.45, 2);
+  });
+
+  it("pre-mounts closed Accordion content with overflow hidden mask and expands smoothly on press", () => {
+    const { container } = renderUI(
+      wrap(
+        React.createElement(Accordion, {
+          defaultOpenIds: [],
+          items: [
+            { id: "acc-1", title: "Section One", content: "Hidden Accordion Body" },
+          ],
+        }),
+      ),
+    );
+
+    expect(collectText(container)).toContain("Hidden Accordion Body");
+    const closedMask = findAllNodes(
+      container,
+      (n) => n.type === "anim-view" && n.props?.accessibilityElementsHidden === true,
+    )[0];
+    expect(closedMask).toBeDefined();
+    const closedMaskStyle =
+      (closedMask?.props?.style as Record<string, unknown> | undefined) ?? {};
+    expect(closedMaskStyle.overflow).toBe("hidden");
+    expect(closedMaskStyle.height).toBe(0);
+
+    const headerBtn = findAllNodes(
+      container,
+      (n) => n.type === "rn-pressable" && collectText(n).includes("Section One"),
+    )[0];
+    expect(headerBtn).toBeDefined();
+    act(() => {
+      (headerBtn?.props?.onPress as (() => void) | undefined)?.();
+    });
+
+    expect(headerBtn?.props?.accessibilityState).toEqual({
+      expanded: true,
+      disabled: false,
+    });
+    const openMask = findAllNodes(
+      container,
+      (n) => n.type === "anim-view" && n.props?.accessibilityElementsHidden === false,
+    )[0];
+    expect(openMask).toBeDefined();
   });
 });

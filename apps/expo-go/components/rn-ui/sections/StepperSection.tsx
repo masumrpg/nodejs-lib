@@ -22,6 +22,8 @@ export function StepperSection({ ctx }: { ctx: RnUiSectionContext }) {
             </Text>
             <Box
               row
+              wrap
+              gap="sm"
               style={{
                 justifyContent: "space-between",
                 alignItems: "center",
@@ -30,7 +32,7 @@ export function StepperSection({ ctx }: { ctx: RnUiSectionContext }) {
                 borderRadius: 12,
               }}
             >
-              <Box gap="xxs">
+              <Box gap="xxs" style={{ flexShrink: 1 }}>
                 <Text variant="label">Item Quantity</Text>
                 <Text variant="bodySmall" color="textMuted">
                   Select quantity to order

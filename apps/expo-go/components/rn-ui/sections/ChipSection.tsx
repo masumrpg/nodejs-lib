@@ -6,10 +6,11 @@ import {
   Text,
 } from "@masumdev/rn-ui";
 import { Sparkles, MapPin, Tag as TagIcon, Plus } from "lucide-react-native";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Section, type RnUiSectionContext } from "../shared";
 
 export function ChipSection(_props?: { ctx?: RnUiSectionContext }) {
+  const nextChipIdRef = useRef(1);
   // Filter chips state
   const [selectedCategories, setSelectedCategories] = useState<string[]>([
     "React Native",
@@ -40,8 +41,13 @@ export function ChipSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 1. Filter Chips (Multi-Selectable) */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Selectable Filter Chips
               </Text>
               <Badge tone="primary">Filter Mode</Badge>
@@ -73,8 +79,13 @@ export function ChipSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 2. Removable Input Chips */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Removable Input Chips
               </Text>
               <Badge tone="accent">onClose Handler</Badge>
@@ -101,7 +112,12 @@ export function ChipSection(_props?: { ctx?: RnUiSectionContext }) {
                   variant="filled"
                   tone="secondary"
                   icon={({ color, size }) => <Plus color={color} size={size} />}
-                  onPress={() => setTags((prev) => [...prev, `New Chip ${prev.length + 1}`])}
+                  onPress={() =>
+                    setTags((prev) => [
+                      ...prev,
+                      `New Chip ${nextChipIdRef.current++}`,
+                    ])
+                  }
                 />
               )}
             </Box>

@@ -19,7 +19,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 
-import { Portal, useTheme, type ThemeColors } from "../theme";
+import { Portal, usePortalContext, useTheme, type ThemeColors } from "../theme";
 import {
   computeAnchoredPosition,
   measureAnchorNode,
@@ -31,8 +31,10 @@ import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
   ANIMATION_TIMING,
+  isPressableTriggerElement,
   minTouchHitSlop,
   renderIcon,
+  webDeps,
   type BaseGlassProps,
   type BaseHapticProps,
   type RenderIcon,
@@ -79,6 +81,7 @@ export const DropdownMenu = React.memo(function DropdownMenu({
   children,
 }: DropdownMenuProps) {
   const { colors } = useTheme();
+  const portalStore = usePortalContext();
   const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
   const [anchor, setAnchor] = useState<AnchorMeasurement | null>(null);
   const triggerRef = useRef<React.ComponentRef<typeof View>>(null);
@@ -98,11 +101,15 @@ export const DropdownMenu = React.memo(function DropdownMenu({
 
   useEffect(() => {
     if (open) {
-      measureAnchorNode(triggerRef, (rect) => {
-        setAnchor(rect);
-      });
+      measureAnchorNode(
+        triggerRef,
+        (rect) => {
+          setAnchor(rect);
+        },
+        portalStore?.getHostRef("root"),
+      );
     }
-  }, [open]);
+  }, [open, portalStore]);
 
   const value = useMemo<DropdownMenuContextProps>(
     () => ({
@@ -139,7 +146,9 @@ export const DropdownMenuTrigger = React.memo(function DropdownMenuTrigger({
   disabled = false,
 }: DropdownMenuTriggerProps) {
   const { open, setOpen, setAnchor, triggerRef, haptic } = useDropdownMenu();
-  const childDisabled = React.isValidElement<{ disabled?: boolean }>(children)
+  const portalStore = usePortalContext();
+  const isPressableChild = isPressableTriggerElement(children);
+  const childDisabled = isPressableChild
     ? Boolean(children.props.disabled)
     : false;
   const mergedDisabled = disabled || childDisabled;
@@ -150,35 +159,29 @@ export const DropdownMenuTrigger = React.memo(function DropdownMenuTrigger({
 
     const nextOpen = !open;
     if (nextOpen) {
-      measureAnchorNode(triggerRef, (rect) => {
-        setAnchor(rect);
-      });
+      measureAnchorNode(
+        triggerRef,
+        (rect) => {
+          setAnchor(rect);
+        },
+        portalStore?.getHostRef("root"),
+      );
       setOpen(true);
     } else {
       setOpen(false);
     }
-  }, [haptic, mergedDisabled, open, setAnchor, setOpen, triggerRef]);
+  }, [haptic, mergedDisabled, open, portalStore, setAnchor, setOpen, triggerRef]);
 
   return (
     <View ref={triggerRef} collapsable={false} style={style}>
-      {React.isValidElement(children) ? (
-        React.cloneElement(
-          children as React.ReactElement<{
-            disabled?: boolean;
-            onPress?: (e: GestureResponderEvent) => void;
-          }>,
-          {
-            disabled: mergedDisabled,
-            onPress: (e: GestureResponderEvent) => {
-              handlePress();
-              (
-                children.props as {
-                  onPress?: (ev: GestureResponderEvent) => void;
-                }
-              )?.onPress?.(e);
-            },
+      {isPressableChild ? (
+        React.cloneElement(children, {
+          disabled: mergedDisabled,
+          onPress: (e: GestureResponderEvent) => {
+            handlePress();
+            children.props.onPress?.(e);
           },
-        )
+        })
       ) : (
         <Pressable
           accessibilityRole="button"
@@ -266,17 +269,20 @@ export const DropdownMenuContent = React.memo(function DropdownMenuContent({
   });
 
   const renderAbove = coords.resolvedPlacement === "top";
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [
-      {
-        translateY: renderAbove
-          ? (1 - progress.value) * 6
-          : (1 - progress.value) * -6,
-      },
-      { scale: 0.95 + progress.value * 0.05 },
-    ],
-  }));
+  const animatedStyle = useAnimatedStyle(
+    () => ({
+      opacity: progress.value,
+      transform: [
+        {
+          translateY: renderAbove
+            ? (1 - progress.value) * 6
+            : (1 - progress.value) * -6,
+        },
+        { scale: 0.95 + progress.value * 0.05 },
+      ],
+    }),
+    webDeps([renderAbove]),
+  );
 
   if (!shouldMount && !open) return null;
 
@@ -312,10 +318,10 @@ export const DropdownMenuContent = React.memo(function DropdownMenuContent({
               maxHeight,
               backgroundColor: glass
                 ? colors.glassSurfaceStrong
-                : colors.surface,
+                : colors.surfaceRaised,
               borderWidth: components.borderWidth.default,
               borderColor: glass ? colors.glassBorder : colors.border,
-              borderRadius: radii.xl,
+              borderRadius: radii.lg,
               padding: spacing.xs,
             },
             shadows.lg,
@@ -376,7 +382,7 @@ export const DropdownMenuItem = React.memo(function DropdownMenuItem({
         {
           paddingVertical: spacing.sm,
           paddingHorizontal: spacing.md,
-          borderRadius: radii.md,
+          borderRadius: radii.sm,
           backgroundColor: pressed
             ? isDestructive
               ? colors.dangerSoft
@@ -445,7 +451,7 @@ export const DropdownMenuCheckboxItem = React.memo(
           {
             paddingVertical: spacing.sm,
             paddingHorizontal: spacing.md,
-            borderRadius: radii.md,
+            borderRadius: radii.sm,
             backgroundColor: pressed ? colors.surfaceMuted : "transparent",
             opacity: disabled ? 0.5 : 1,
             gap: spacing.sm,

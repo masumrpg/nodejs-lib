@@ -19,8 +19,13 @@ export function SpeedDialSection(_props?: { ctx?: RnUiSectionContext }) {
       <Box gap="lg">
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Expanding FAB Menu
               </Text>
               <Badge tone="primary">Spring Stagger</Badge>

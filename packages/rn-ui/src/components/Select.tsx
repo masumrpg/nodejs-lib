@@ -18,7 +18,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 
-import { Portal, useTheme, type ThemeColors } from "../theme";
+import { Portal, usePortalContext, useTheme, type ThemeColors } from "../theme";
 import {
   computeAnchoredPosition,
   measureAnchorNode,
@@ -33,6 +33,8 @@ import {
   ANIMATION_TIMING,
   minTouchHitSlop,
   renderIcon,
+  resolveControlRadius,
+  webDeps,
   type BaseGlassProps,
   type BaseHapticProps,
   type RenderIcon,
@@ -140,6 +142,7 @@ export const Select = React.memo(function Select({
   style,
 }: SelectProps) {
   const { colors, components, radii, shadows, spacing } = useTheme();
+  const portalStore = usePortalContext();
   const field = useFormField();
   const isDisabled = disabled || Boolean(field?.disabled);
   const reducedMotion = useReducedMotion();
@@ -187,11 +190,15 @@ export const Select = React.memo(function Select({
   const openMenu = useCallback(() => {
     if (isDisabled) return;
     if (haptic) triggerHaptic("selection");
-    measureAnchorNode(triggerRef, (rect) => {
-      setAnchor(rect);
-    });
+    measureAnchorNode(
+      triggerRef,
+      (rect) => {
+        setAnchor(rect);
+      },
+      portalStore?.getHostRef("root"),
+    );
     setOpen(true);
-  }, [haptic, isDisabled]);
+  }, [haptic, isDisabled, portalStore]);
 
   const handleSelect = useCallback(
     (option: SelectOption) => {
@@ -241,17 +248,20 @@ export const Select = React.memo(function Select({
   });
 
   const isTopPlacement = coords.resolvedPlacement === "top";
-  const menuAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [
-      {
-        translateY: isTopPlacement
-          ? (1 - progress.value) * 6
-          : (1 - progress.value) * -6,
-      },
-      { scale: 0.96 + progress.value * 0.04 },
-    ],
-  }));
+  const menuAnimatedStyle = useAnimatedStyle(
+    () => ({
+      opacity: progress.value,
+      transform: [
+        {
+          translateY: isTopPlacement
+            ? (1 - progress.value) * 6
+            : (1 - progress.value) * -6,
+        },
+        { scale: 0.96 + progress.value * 0.04 },
+      ],
+    }),
+    webDeps([isTopPlacement]),
+  );
 
   const renderOption = useCallback(
     ({ item }: ListRenderItemInfo<SelectOption>) => {
@@ -338,7 +348,7 @@ export const Select = React.memo(function Select({
             {
               height,
               paddingHorizontal,
-              borderRadius: radii.lg,
+              borderRadius: resolveControlRadius("rounded", size, radii),
               borderWidth: open
                 ? components.borderWidth.focus
                 : components.borderWidth.strong,
@@ -381,7 +391,7 @@ export const Select = React.memo(function Select({
         </Pressable>
       </View>
 
-      {shouldMountMenu ? (
+      {shouldMountMenu && anchor !== null ? (
         <Portal layer="popover">
           <Pressable
             accessibilityRole="button"
@@ -407,8 +417,8 @@ export const Select = React.memo(function Select({
                 maxHeight,
                 backgroundColor: glass
                   ? colors.glassSurfaceStrong
-                  : colors.surface,
-                borderRadius: radii.xl,
+                  : colors.surfaceRaised,
+                borderRadius: radii.lg,
                 borderWidth: components.borderWidth.default,
                 borderColor: glass ? colors.glassBorder : colors.border,
               },
@@ -416,20 +426,32 @@ export const Select = React.memo(function Select({
               menuAnimatedStyle,
             ]}
           >
-            <FlatList
-              data={options}
-              keyExtractor={(item) => item.value}
-              renderItem={renderOption}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              ListEmptyComponent={
-                <View style={{ padding: spacing.md }}>
-                  <Text variant="bodySmall" color="textMuted" align="center">
-                    No options available
-                  </Text>
-                </View>
-              }
-            />
+            <View
+              style={[
+                styles.menuClip,
+                {
+                  borderRadius: Math.max(
+                    0,
+                    radii.lg - components.borderWidth.default,
+                  ),
+                },
+              ]}
+            >
+              <FlatList
+                data={options}
+                keyExtractor={(item) => item.value}
+                renderItem={renderOption}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                  <View style={{ padding: spacing.md }}>
+                    <Text variant="bodySmall" color="textMuted" align="center">
+                      No options available
+                    </Text>
+                  </View>
+                }
+              />
+            </View>
           </Animated.View>
         </Portal>
       ) : null}
@@ -449,6 +471,11 @@ const styles = StyleSheet.create({
   },
   menu: {
     position: "absolute",
+  },
+  menuClip: {
+    overflow: "hidden",
+    width: "100%",
+    flexShrink: 1,
   },
   optionItem: {
     minHeight: 46,

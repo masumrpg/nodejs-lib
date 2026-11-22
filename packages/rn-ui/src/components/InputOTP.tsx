@@ -28,6 +28,7 @@ import { useTheme } from "../theme";
 import { useFormField } from "./FormField";
 import {
   minTouchHitSlop,
+  resolveControlRadius,
   type BaseGlassProps,
   type ComponentSize,
   type SizeProps,
@@ -228,7 +229,7 @@ export const InputOTPGroup = React.memo(function InputOTPGroup({
       style={[
         styles.group,
         {
-          borderRadius: radii.lg,
+          borderRadius: radii.md,
           gap: spacing.sm,
         },
         style,
@@ -280,7 +281,7 @@ export const InputOTPSlot = React.memo(function InputOTPSlot({
               : resolvedGlass
                 ? colors.glassBorder
                 : colors.border,
-          borderRadius: radii.xl,
+          borderRadius: resolveControlRadius("rounded", effectiveSize, radii),
           backgroundColor: resolvedGlass ? colors.glassSurface : colors.input,
         },
         slotShadow,

@@ -2,13 +2,23 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import React from "react";
 
 import {
+  Accordion,
+  Alert,
   Badge,
   Button,
   Card,
   IconButton,
+  Input,
+  InputGroup,
+  InputGroupInput,
+  InputOTP,
+  InputOTPSlot,
   Portal,
   PortalHost,
   PortalProvider,
+  SearchBar,
+  Select,
+  Stepper,
   ThemeProvider,
   builtInThemePresets,
   createHardShadows,
@@ -528,8 +538,10 @@ describe("theme tokens, WCAG AA contrast & utilities", () => {
 
   it("renders Button with calibrated xs-xl proportions, size-aware borderRadius, and 44pt accessible hitSlop", () => {
     const sizes = ["xs", "sm", "md", "lg", "xl"] as const;
+    let api: ReturnType<typeof useTheme> | null = null;
 
     function GeometryProbe() {
+      api = useTheme();
       return React.createElement(
         React.Fragment,
         null,
@@ -550,10 +562,15 @@ describe("theme tokens, WCAG AA contrast & utilities", () => {
           { size: "md", shape: "pill", testID: "btn-pill" },
           "Pill",
         ),
+        React.createElement(
+          Button,
+          { size: "md", loading: true, testID: "btn-loading" },
+          "Saving",
+        ),
       );
     }
 
-    const { container, rerender } = renderUI(
+    const { container } = renderUI(
       React.createElement(
         ThemeProvider,
         {
@@ -568,15 +585,15 @@ describe("theme tokens, WCAG AA contrast & utilities", () => {
     const getPressable = (testID: string) =>
       findAllNodes(container, (n) => n.props?.testID === testID)[0];
 
-    const expectedHeights = { xs: 28, sm: 34, md: 40, lg: 46, xl: 52 };
-    const expectedPaddingX = { xs: 10, sm: 14, md: 18, lg: 22, xl: 26 };
+    const expectedHeights = { xs: 26, sm: 32, md: 36, lg: 42, xl: 48 };
+    const expectedPaddingX = { xs: 10, sm: 12, md: 14, lg: 18, xl: 22 };
 
     for (const s of sizes) {
       const node = getPressable(`btn-${s}`);
       const style = (node?.props?.style as Record<string, unknown> | undefined) ?? {};
       expect(style.minHeight).toBe(expectedHeights[s]);
       expect(style.paddingHorizontal).toBe(expectedPaddingX[s]);
-      if (s === "xs" || s === "sm" || s === "md") {
+      if (s !== "xl") {
         expect(node?.props?.hitSlop).toBeDefined();
       } else {
         expect(node?.props?.hitSlop).toBeUndefined();
@@ -586,34 +603,199 @@ describe("theme tokens, WCAG AA contrast & utilities", () => {
     expect(
       (getPressable("btn-md")?.props?.style as Record<string, unknown> | undefined)
         ?.borderRadius,
-    ).toBe(12);
+    ).toBe(10);
     expect(
       (
         getPressable("btn-square")?.props?.style as
           | Record<string, unknown>
           | undefined
       )?.borderRadius,
-    ).toBe(8);
+    ).toBe(4);
     expect(
       (getPressable("btn-pill")?.props?.style as Record<string, unknown> | undefined)
         ?.borderRadius,
     ).toBe(9999);
+    const loadingBtn = getPressable("btn-loading");
+    expect(loadingBtn).toBeDefined();
+    expect(collectText(loadingBtn!)).toContain("Saving");
 
-    rerender(
+    act(() => {
+      api!.setThemeName("minimal");
+    });
+
+    expect(
+      (getPressable("btn-md")?.props?.style as Record<string, unknown> | undefined)
+        ?.borderRadius,
+    ).toBe(10);
+    expect(
+      (
+        getPressable("btn-square")?.props?.style as
+          | Record<string, unknown>
+          | undefined
+      )?.borderRadius,
+    ).toBe(5);
+  });
+
+  it("maintains consistent border-radius hierarchy across controls, inputs, alerts, and cards for default, minimal, and brutal presets", () => {
+    const iconStub = ({ color, size }: { color: string; size: number }) =>
+      React.createElement("rn-view", { "data-icon": `${color}:${size}` });
+    let api: ReturnType<typeof useTheme> | null = null;
+
+    function RadiusProbe() {
+      api = useTheme();
+      return React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(Button, { size: "md", testID: "rad-btn" }, "Btn"),
+        React.createElement(
+          Button,
+          { size: "md", shape: "square", testID: "rad-btn-sq" },
+          "BtnSq",
+        ),
+        React.createElement(IconButton, {
+          size: "md",
+          shape: "rounded",
+          accessibilityLabel: "RadIcon",
+          testID: "rad-icon-btn",
+          icon: iconStub,
+        }),
+        React.createElement(Input, {
+          size: "md",
+          placeholder: "RadInput",
+          testID: "rad-input",
+        }),
+        React.createElement(Input, {
+          size: "md",
+          shape: "square",
+          placeholder: "RadInputSq",
+          testID: "rad-input-sq",
+        }),
+        React.createElement(
+          "rn-view",
+          { testID: "wrap-search" },
+          React.createElement(SearchBar, { size: "md", placeholder: "Search" }),
+        ),
+        React.createElement(
+          "rn-view",
+          { testID: "wrap-search-sq" },
+          React.createElement(SearchBar, {
+            size: "md",
+            shape: "square",
+            placeholder: "SearchSq",
+          }),
+        ),
+        React.createElement(
+          InputGroup,
+          { size: "md", testID: "rad-input-group" },
+          React.createElement(InputGroupInput, { placeholder: "Grouped" }),
+        ),
+        React.createElement(Stepper, {
+          size: "md",
+          defaultValue: 1,
+          testID: "rad-stepper",
+        }),
+        React.createElement(Select, {
+          size: "md",
+          accessibilityLabel: "RadSelect",
+          options: [{ label: "One", value: "one" }],
+        }),
+        React.createElement(
+          InputOTP,
+          { maxLength: 1, size: "md", value: "1" },
+          React.createElement(InputOTPSlot, { index: 0, testID: "rad-otp-slot" }),
+        ),
+        React.createElement(Card, { testID: "rad-card" }, "CardBody"),
+        React.createElement(Alert, { title: "Notice" }, "Body"),
+        React.createElement(
+          "rn-view",
+          { testID: "wrap-accordion" },
+          React.createElement(Accordion, {
+            items: [{ id: "1", title: "Item", content: "Details" }],
+          }),
+        ),
+      );
+    }
+
+    const { container } = renderUI(
       React.createElement(
         ThemeProvider,
         {
           presets: builtInThemePresets,
           defaultColorScheme: "light",
-          defaultThemeName: "minimal",
+          defaultThemeName: "default",
         },
-        React.createElement(GeometryProbe, null),
+        React.createElement(RadiusProbe, null),
       ),
     );
 
-    expect(
-      (getPressable("btn-md")?.props?.style as Record<string, unknown> | undefined)
-        ?.borderRadius,
-    ).toBe(12);
+    const getRadiusByTestId = (testID: string): unknown => {
+      const node = findAllNodes(container, (n) => n.props?.testID === testID)[0];
+      return (node?.props?.style as Record<string, unknown> | undefined)?.borderRadius;
+    };
+
+    const getDescendantRadius = (wrapperTestId: string): unknown => {
+      const wrap = findAllNodes(
+        container,
+        (n) => n.props?.testID === wrapperTestId,
+      )[0];
+      if (!wrap) return undefined;
+      const styled = findAllNodes(
+        wrap,
+        (n) =>
+          n.props?.testID !== wrapperTestId &&
+          typeof (n.props?.style as Record<string, unknown> | undefined)
+            ?.borderRadius === "number",
+      )[0];
+      return (styled?.props?.style as Record<string, unknown> | undefined)
+        ?.borderRadius;
+    };
+
+    const getRadiusByRole = (
+      role: string,
+      label?: string,
+    ): unknown => {
+      const node = findAllNodes(
+        container,
+        (n) =>
+          n.props?.accessibilityRole === role &&
+          (label === undefined || n.props?.accessibilityLabel === label),
+      )[0];
+      return (node?.props?.style as Record<string, unknown> | undefined)?.borderRadius;
+    };
+
+    const assertPresetRadii = (
+      expected: { xs: number; md: number; lg: number; xl: number },
+    ) => {
+      expect(getRadiusByTestId("rad-btn")).toBe(expected.md);
+      expect(getRadiusByTestId("rad-icon-btn")).toBe(expected.md);
+      expect(getRadiusByTestId("rad-input")).toBe(expected.md);
+      expect(getDescendantRadius("wrap-search")).toBe(expected.md);
+      expect(getRadiusByTestId("rad-input-group")).toBe(expected.md);
+      expect(getRadiusByTestId("rad-stepper")).toBe(expected.md);
+      expect(getRadiusByRole("button", "RadSelect")).toBe(expected.md);
+      expect(getRadiusByTestId("rad-otp-slot")).toBe(expected.md);
+
+      expect(getRadiusByTestId("rad-btn-sq")).toBe(expected.xs);
+      expect(getRadiusByTestId("rad-input-sq")).toBe(expected.xs);
+      expect(getDescendantRadius("wrap-search-sq")).toBe(expected.xs);
+
+      expect(getRadiusByTestId("rad-card")).toBe(expected.xl);
+      expect(getRadiusByRole("alert")).toBe(expected.lg);
+      expect(getDescendantRadius("wrap-accordion")).toBe(expected.lg);
+      expect(expected.xl).toBeGreaterThan(expected.lg);
+      expect(expected.lg).toBeGreaterThan(expected.md);
+    };
+
+    assertPresetRadii({ xs: 4, md: 10, lg: 14, xl: 20 });
+
+    act(() => {
+      api!.setThemeName("minimal");
+    });
+    assertPresetRadii({ xs: 5, md: 10, lg: 14, xl: 20 });
+
+    act(() => {
+      api!.setThemeName("brutal");
+    });
+    assertPresetRadii({ xs: 2, md: 6, lg: 8, xl: 10 });
   });
 });

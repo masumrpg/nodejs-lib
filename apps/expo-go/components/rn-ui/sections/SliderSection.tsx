@@ -13,8 +13,15 @@ export function SliderSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* 1. Single Slider */}
         <Card outlined>
           <Box gap="md">
-            <Box row style={{ justifyContent: "space-between", alignItems: "center" }}>
-              <Text variant="label">Single Value Slider</Text>
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ justifyContent: "space-between", alignItems: "center" }}
+            >
+              <Text variant="label" style={{ flexShrink: 1 }}>
+                Single Value Slider
+              </Text>
               <Text variant="labelSmall" color="primary" style={{ fontWeight: "700" }}>
                 {sliderValue}%
               </Text>
@@ -31,8 +38,13 @@ export function SliderSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* 2. Dual Thumb Range Slider */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Dual-Thumb Price Filter
               </Text>
               <Badge tone="primary">
@@ -57,8 +69,13 @@ export function SliderSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* 3. Age Range Filter */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Age Range Selector
               </Text>
               <Badge tone="accent">

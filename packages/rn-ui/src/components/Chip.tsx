@@ -3,6 +3,7 @@ import {
   Pressable,
   StyleSheet,
   View,
+  type GestureResponderEvent,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
@@ -14,6 +15,7 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withTiming,
+  type SharedValue,
 } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 import { scheduleOnRN } from "react-native-worklets";
@@ -24,10 +26,13 @@ import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
   ANIMATION_TIMING,
+  markAsPressableTrigger,
   minTouchHitSlop,
   renderIcon,
+  resolveControlRadius,
   resolveOutlineBorderColor,
   resolveToneColors,
+  webDeps,
   type BaseAnimatedProps,
   type BaseGlassProps,
   type BaseHapticProps,
@@ -41,6 +46,40 @@ import {
   type ToneProps,
   type VariantProps,
 } from "./types";
+
+interface ChipCheckmarkProps {
+  selectProgress: SharedValue<number>;
+  iconSize: number;
+  color: string;
+}
+
+const ChipCheckmark = React.memo(function ChipCheckmark({
+  selectProgress,
+  iconSize,
+  color,
+}: ChipCheckmarkProps) {
+  const checkmarkAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: selectProgress.value }],
+    opacity: selectProgress.value,
+  }));
+
+  return (
+    <Animated.View style={checkmarkAnimatedStyle}>
+      <Svg
+        width={iconSize}
+        height={iconSize}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={color}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <Path d="M20 6L9 17l-5-5" />
+      </Svg>
+    </Animated.View>
+  );
+});
 
 export type ChipVariant = "filled" | "outline" | "soft";
 
@@ -56,7 +95,10 @@ export interface ChipProps
   label: string;
   selected?: boolean;
   onSelect?: (selected: boolean) => void;
-  onPress?: () => void;
+  onPress?: (event?: GestureResponderEvent) => void;
+  onLongPress?: (event?: GestureResponderEvent) => void;
+  onPressOut?: (event?: GestureResponderEvent) => void;
+  delayLongPress?: number;
   onClose?: () => void;
   icon?: RenderIcon;
   closeIcon?: RenderIcon;
@@ -70,6 +112,9 @@ function ChipComponent({
   selected = false,
   onSelect,
   onPress,
+  onLongPress,
+  onPressOut,
+  delayLongPress,
   onClose,
   icon,
   leftIcon,
@@ -90,7 +135,7 @@ function ChipComponent({
   const reducedMotion = useReducedMotion();
   const shouldAnimate = animated && !reducedMotion;
 
-  const isBodyInteractive = Boolean(onPress || onSelect);
+  const isBodyInteractive = Boolean(onPress || onSelect || onLongPress);
   const isSelectable = onSelect !== undefined;
 
   const pressed = useSharedValue(0);
@@ -118,7 +163,7 @@ function ChipComponent({
     };
   }, [isDismissing, pressed, selectProgress]);
 
-  const handlePress = () => {
+  const handlePress = (event?: GestureResponderEvent) => {
     if (disabled || !isBodyInteractive) return;
     if (haptic) {
       triggerHaptic("selection");
@@ -126,7 +171,7 @@ function ChipComponent({
     if (isSelectable) {
       onSelect?.(!selected);
     }
-    onPress?.();
+    onPress?.(event);
   };
 
   const triggerClose = () => {
@@ -233,23 +278,20 @@ function ChipComponent({
     borderWidth = components.borderWidth.default;
   }
 
-  const borderRadius =
-    shape === "pill" ? radii.full : shape === "square" ? radii.xs : radii.md;
+  const borderRadius = resolveControlRadius(shape, size, radii);
 
-  const animatedChipStyle = useAnimatedStyle(() => ({
-    transform: [
-      {
-        scale:
-          (shouldAnimate ? 1 - pressed.value * 0.04 : 1) * isDismissing.value,
-      },
-    ],
-    opacity: isDismissing.value,
-  }));
-
-  const checkmarkAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: selectProgress.value }],
-    opacity: selectProgress.value,
-  }));
+  const animatedChipStyle = useAnimatedStyle(
+    () => ({
+      transform: [
+        {
+          scale:
+            (shouldAnimate ? 1 - pressed.value * 0.04 : 1) * isDismissing.value,
+        },
+      ],
+      opacity: (disabled ? 0.45 : 1) * isDismissing.value,
+    }),
+    webDeps([disabled, shouldAnimate]),
+  );
 
   const leadIcon = leftIcon ?? icon;
   const hitSlop = minTouchHitSlop(height);
@@ -259,20 +301,11 @@ function ChipComponent({
       {leadIcon ? renderIcon(leadIcon, textColor, iconSize) : null}
 
       {selected && !leadIcon && (
-        <Animated.View style={checkmarkAnimatedStyle}>
-          <Svg
-            width={iconSize}
-            height={iconSize}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke={textColor}
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <Path d="M20 6L9 17l-5-5" />
-          </Svg>
-        </Animated.View>
+        <ChipCheckmark
+          selectProgress={selectProgress}
+          iconSize={iconSize}
+          color={textColor}
+        />
       )}
 
       <Text
@@ -310,7 +343,6 @@ function ChipComponent({
           borderWidth,
           borderColor,
           gap: spacing.xs + spacing.xxs,
-          opacity: disabled ? 0.45 : 1,
         },
         chipShadow,
         style,
@@ -326,7 +358,9 @@ function ChipComponent({
           accessibilityLabel={label}
           disabled={disabled}
           hitSlop={hitSlop}
+          delayLongPress={delayLongPress}
           onPress={handlePress}
+          onLongPress={onLongPress}
           onPressIn={() => {
             if (!shouldAnimate) return;
             pressed.value = withTiming(1, {
@@ -334,12 +368,14 @@ function ChipComponent({
               easing: Easing.bezier(...ANIMATION_TIMING.bezier),
             });
           }}
-          onPressOut={() => {
-            if (!shouldAnimate) return;
-            pressed.value = withTiming(0, {
-              duration: ANIMATION_TIMING.pressOut,
-              easing: Easing.bezier(...ANIMATION_TIMING.bezier),
-            });
+          onPressOut={(event) => {
+            if (shouldAnimate) {
+              pressed.value = withTiming(0, {
+                duration: ANIMATION_TIMING.pressOut,
+                easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+              });
+            }
+            onPressOut?.(event);
           }}
           style={[styles.bodyRow, { gap: spacing.xs + spacing.xxs }]}
         >
@@ -388,7 +424,7 @@ function ChipComponent({
   );
 }
 
-export const Chip = React.memo(ChipComponent);
+export const Chip = markAsPressableTrigger(React.memo(ChipComponent));
 
 const styles = StyleSheet.create({
   container: {

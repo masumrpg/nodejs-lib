@@ -11,6 +11,7 @@ import {
   StyleSheet,
   View,
   useWindowDimensions,
+  type GestureResponderEvent,
   type LayoutChangeEvent,
   type StyleProp,
   type TextStyle,
@@ -24,7 +25,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { Portal, useTheme } from "../theme";
+import { Portal, usePortalContext, useTheme } from "../theme";
 import {
   measureAnchorNode,
   useDelayedUnmount,
@@ -35,8 +36,10 @@ import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
   ANIMATION_TIMING,
+  isPressableTriggerElement,
   minTouchHitSlop,
   resolveToneColors,
+  webDeps,
   type BaseAnimatedProps,
   type BaseGlassProps,
   type BaseHapticProps,
@@ -102,6 +105,7 @@ export const Tooltip = React.memo(function Tooltip({
   children,
 }: TooltipProps) {
   const { colors, components, radii, shadows, spacing, isDark } = useTheme();
+  const portalStore = usePortalContext();
   const reducedMotion = useReducedMotion();
   const shouldAnimate = animated && !reducedMotion;
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -151,34 +155,42 @@ export const Tooltip = React.memo(function Tooltip({
   }, [clearTimers, setOpenState]);
 
   const measureAndShow = useCallback(() => {
-    measureAnchorNode(triggerRef, (rect) => {
-      setAnchor(rect);
+    measureAnchorNode(
+      triggerRef,
+      (rect) => {
+        setAnchor(rect);
 
-      const activate = () => {
-        if (haptic) triggerHaptic("light");
-        setOpenState(true);
-        if (duration > 0) {
-          durationTimerRef.current = setTimeout(() => {
-            setOpenState(false);
-          }, duration);
+        const activate = () => {
+          if (haptic) triggerHaptic("light");
+          setOpenState(true);
+          if (duration > 0) {
+            durationTimerRef.current = setTimeout(() => {
+              setOpenState(false);
+            }, duration);
+          }
+        };
+
+        if (delay > 0) {
+          delayTimerRef.current = setTimeout(activate, delay);
+        } else {
+          activate();
         }
-      };
-
-      if (delay > 0) {
-        delayTimerRef.current = setTimeout(activate, delay);
-      } else {
-        activate();
-      }
-    });
-  }, [delay, duration, haptic, setOpenState]);
+      },
+      portalStore?.getHostRef("root"),
+    );
+  }, [delay, duration, haptic, portalStore, setOpenState]);
 
   useEffect(() => {
     if (isOpen && !anchor) {
-      measureAnchorNode(triggerRef, (rect) => {
-        setAnchor(rect);
-      });
+      measureAnchorNode(
+        triggerRef,
+        (rect) => {
+          setAnchor(rect);
+        },
+        portalStore?.getHostRef("root"),
+      );
     }
-  }, [anchor, isOpen]);
+  }, [anchor, isOpen, portalStore]);
 
   useEffect(() => {
     if (isOpen && anchor) {
@@ -344,7 +356,7 @@ export const Tooltip = React.memo(function Tooltip({
         { scale: 0.94 + animProgress.value * 0.06 },
       ],
     };
-  });
+  }, webDeps([resolvedPosition]));
 
   const handlePress = useCallback(() => {
     if (triggerMode !== "press") return;
@@ -378,6 +390,7 @@ export const Tooltip = React.memo(function Tooltip({
   }, []);
 
   const canShowPortal = (shouldMount || isOpen) && anchor !== null;
+  const isPressableChild = isPressableTriggerElement(children);
 
   return (
     <>
@@ -387,23 +400,49 @@ export const Tooltip = React.memo(function Tooltip({
         style={[styles.triggerWrapper, style]}
         onLayout={() => {
           if (isOpen && !anchor) {
-            measureAnchorNode(triggerRef, (rect) => {
-              setAnchor(rect);
-            });
+            measureAnchorNode(
+              triggerRef,
+              (rect) => {
+                setAnchor(rect);
+              },
+              portalStore?.getHostRef("root"),
+            );
           }
         }}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityHint="Displays tooltip"
-          hitSlop={minTouchHitSlop(32)}
-          delayLongPress={delayLongPress}
-          onPress={handlePress}
-          onLongPress={handleLongPress}
-          onPressOut={handlePressOut}
-        >
-          {children}
-        </Pressable>
+        {isPressableChild ? (
+          React.cloneElement(children, {
+            delayLongPress: children.props.delayLongPress ?? delayLongPress,
+            onPress: (event: GestureResponderEvent) => {
+              if (triggerMode === "press") {
+                handlePress();
+              }
+              children.props.onPress?.(event);
+            },
+            onLongPress: (event: GestureResponderEvent) => {
+              if (triggerMode === "longPress") {
+                handleLongPress();
+              }
+              children.props.onLongPress?.(event);
+            },
+            onPressOut: (event: GestureResponderEvent) => {
+              handlePressOut();
+              children.props.onPressOut?.(event);
+            },
+          })
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityHint="Displays tooltip"
+            hitSlop={minTouchHitSlop(32)}
+            delayLongPress={delayLongPress}
+            onPress={handlePress}
+            onLongPress={handleLongPress}
+            onPressOut={handlePressOut}
+          >
+            {children}
+          </Pressable>
+        )}
       </View>
 
       {canShowPortal ? (

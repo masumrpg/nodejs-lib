@@ -21,7 +21,6 @@ import { useTheme } from "../theme";
 import { withAlpha } from "../utils";
 import { triggerHaptic } from "../utils/haptics";
 import {
-  ANIMATION_TIMING,
   minTouchHitSlop,
   renderIcon,
   resolveToneColors,
@@ -32,7 +31,6 @@ import {
   type ComponentSize,
   type ComponentTone,
   type RenderIcon,
-  type ShapeProps,
   type SizeProps,
   type ToneProps,
   type VariantProps,
@@ -40,8 +38,11 @@ import {
 
 export type SwitchSize = ComponentSize;
 export type SwitchVariant = "filled" | "outline";
-export type SwitchShape = "pill" | "oval" | "rounded";
 export type SwitchTone = ComponentTone;
+
+const SWITCH_EASING: readonly [number, number, number, number] = [
+  0.22, 1, 0.36, 1,
+];
 
 export interface SwitchRenderThumbParams {
   checked: boolean;
@@ -60,7 +61,6 @@ export interface SwitchProps
     VariantProps<SwitchVariant>,
     ToneProps<SwitchTone>,
     SizeProps<SwitchSize>,
-    ShapeProps<SwitchShape>,
     BaseGlassProps,
     BaseHapticProps,
     BaseAnimatedProps {
@@ -89,7 +89,6 @@ function SwitchComponent({
   invalid = false,
   size = "md",
   variant = "filled",
-  shape = "pill",
   tone = "primary",
   glass = false,
   haptic = true,
@@ -110,7 +109,7 @@ function SwitchComponent({
   accessibilityLabel,
   ...props
 }: SwitchProps) {
-  const { colors, components, radii, isDark } = useTheme();
+  const { colors, components, radii, shadows, isDark } = useTheme();
   const reducedMotion = useReducedMotion();
   const shouldAnimate = animated && !reducedMotion;
 
@@ -128,8 +127,8 @@ function SwitchComponent({
       return;
     }
     progress.value = withTiming(checked ? 1 : 0, {
-      duration: ANIMATION_TIMING.transition,
-      easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+      duration: 210,
+      easing: Easing.bezier(...SWITCH_EASING),
     });
   }, [checked, progress, shouldAnimate]);
 
@@ -142,26 +141,38 @@ function SwitchComponent({
 
   const toneColors = resolveToneColors(invalid ? "danger" : tone, colors);
   const activeColor = toneColors.solid;
+  const isBrutal = components.surface.pressEffect === "offset";
 
   const thumbIcon = checked ? activeIcon : inactiveIcon;
   const selectedThumbContent =
     (checked ? activeThumbContent : inactiveThumbContent) ?? thumbContent;
-  const isOval = shape === "oval";
-  const isRounded = shape === "rounded";
 
   const baseWidth = components.switch.width[size];
-  const width = isOval ? Math.round(baseWidth * 1.14) : baseWidth;
+  const width = Math.round(baseWidth * 1.16);
   const height = components.switch.height[size];
-  const baseThumbSize = components.switch.thumbSize[size];
-  const thumbWidth = isOval ? Math.round(baseThumbSize * 1.18) : baseThumbSize;
-  const thumbHeight = baseThumbSize;
   const iconSize = components.switch.iconSize[size];
-  const borderWidth = components.borderWidth.control;
-  const inset = Math.max(2, (height - thumbHeight) / 2);
-  const travel = Math.max(0, width - thumbWidth - (inset + borderWidth) * 2);
 
-  const trackBorderRadius = isRounded ? radii.md : radii.full;
-  const thumbBorderRadius = isRounded ? radii.sm : radii.full;
+  const trackBorderWidth =
+    variant === "outline" || invalid
+      ? components.borderWidth.control
+      : glass
+        ? Math.max(1, components.borderWidth.hairline)
+        : components.borderWidth.filled;
+
+  const baseThumbSize = components.switch.thumbSize[size];
+  const innerHeight = Math.max(8, height - trackBorderWidth * 2);
+  const minInset = size === "xs" ? 2 : 3;
+  const thumbHeight = Math.min(baseThumbSize, Math.max(8, innerHeight - minInset * 2));
+  const thumbWidth = Math.round(thumbHeight * 1.28);
+  const inset = Math.max(1.5, (innerHeight - thumbHeight) / 2);
+  const travel = Math.max(0, width - trackBorderWidth * 2 - inset * 2 - thumbWidth);
+  const stretch = Math.min(
+    Math.round(thumbWidth * 0.22),
+    Math.max(0, Math.floor(travel * 0.45)),
+  );
+
+  const trackBorderRadius = radii.full;
+  const thumbBorderRadius = radii.full;
 
   const inactiveTrackColor = disabled
     ? colors.disabled
@@ -171,12 +182,12 @@ function SwitchComponent({
         ? colors.transparent
         : isDark
           ? colors.surfaceRaised
-          : colors.backgroundMuted;
+          : colors.backgroundSubtle;
 
   const activeTrackColor = disabled
     ? colors.disabled
     : variant === "outline"
-      ? withAlpha(activeColor, 0.14)
+      ? withAlpha(activeColor, isDark ? 0.22 : 0.14)
       : activeColor;
 
   const inactiveBorderColor = invalid
@@ -189,7 +200,9 @@ function SwitchComponent({
     ? colors.disabled
     : invalid
       ? colors.danger
-      : activeColor;
+      : variant === "filled" && isBrutal
+        ? colors.border
+        : activeColor;
 
   const inactiveThumbColor = disabled
     ? colors.disabledText
@@ -203,9 +216,27 @@ function SwitchComponent({
       ? activeColor
       : toneColors.on;
 
-  const inactiveThumbBorder = colors.transparent;
-  const activeThumbBorder =
-    variant === "outline" ? colors.transparent : withAlpha(activeColor, 0.25);
+  const thumbBorderWidth = isBrutal
+    ? components.borderWidth.hairline
+    : variant === "outline"
+      ? 0
+      : components.borderWidth.hairline;
+
+  const inactiveThumbBorder = isBrutal ? colors.border : colors.transparent;
+  const activeThumbBorder = isBrutal
+    ? colors.border
+    : variant === "outline"
+      ? colors.transparent
+      : withAlpha(activeColor, 0.22);
+
+  const thumbElevationStyle: ViewStyle | undefined =
+    !disabled && !isBrutal && variant === "filled"
+      ? {
+          boxShadow: isDark
+            ? "0px 1px 3px rgba(0, 0, 0, 0.45)"
+            : "0px 1px 3px rgba(15, 23, 42, 0.22)",
+        }
+      : undefined;
 
   const handlePress = (event: GestureResponderEvent) => {
     if (disabled) return;
@@ -224,8 +255,8 @@ function SwitchComponent({
     onPressIn?.(event);
     if (shouldAnimate) {
       pressed.value = withTiming(1, {
-        duration: ANIMATION_TIMING.pressIn,
-        easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+        duration: 120,
+        easing: Easing.bezier(...SWITCH_EASING),
       });
     }
   };
@@ -235,8 +266,8 @@ function SwitchComponent({
     onPressOut?.(event);
     if (shouldAnimate) {
       pressed.value = withTiming(0, {
-        duration: ANIMATION_TIMING.pressOut,
-        easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+        duration: 160,
+        easing: Easing.bezier(...SWITCH_EASING),
       });
     }
   };
@@ -263,31 +294,30 @@ function SwitchComponent({
   );
 
   const thumbAnimatedStyle = useAnimatedStyle(
-    () => ({
-      transform: [
-        { translateX: progress.value * travel },
-        {
-          scaleX: isOval ? 1 + pressed.value * 0.1 : 1 + pressed.value * 0.05,
-        },
-        { scaleY: 1 - pressed.value * 0.04 },
-      ],
-      backgroundColor: interpolateColor(
-        progress.value,
-        [0, 1],
-        [inactiveThumbColor, activeThumbColor],
-      ),
-      borderColor: interpolateColor(
-        progress.value,
-        [0, 1],
-        [inactiveThumbBorder, activeThumbBorder],
-      ),
-    }),
+    () => {
+      const dynamicStretch = pressed.value * stretch;
+      return {
+        width: thumbWidth + dynamicStretch,
+        transform: [{ translateX: progress.value * (travel - dynamicStretch) }],
+        backgroundColor: interpolateColor(
+          progress.value,
+          [0, 1],
+          [inactiveThumbColor, activeThumbColor],
+        ),
+        borderColor: interpolateColor(
+          progress.value,
+          [0, 1],
+          [inactiveThumbBorder, activeThumbBorder],
+        ),
+      };
+    },
     webDeps([
       activeThumbBorder,
       activeThumbColor,
       inactiveThumbBorder,
       inactiveThumbColor,
-      isOval,
+      stretch,
+      thumbWidth,
       travel,
     ]),
   );
@@ -298,7 +328,9 @@ function SwitchComponent({
       ? variant === "outline"
         ? toneColors.on
         : activeColor
-      : colors.textSubtle;
+      : isDark
+        ? colors.surface
+        : colors.textSubtle;
 
   const safeIconColor =
     checked && variant !== "outline" && tone === "warning" && !isDark
@@ -328,10 +360,12 @@ function SwitchComponent({
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      style={({ pressed: isPressed }) => [
+      style={[
         styles.wrapper,
         {
-          opacity: disabled ? 0.55 : isPressed ? 0.9 : 1,
+          width,
+          height,
+          opacity: disabled ? 0.52 : 1,
         },
         style,
       ]}
@@ -344,9 +378,10 @@ function SwitchComponent({
             width,
             height,
             borderRadius: trackBorderRadius,
-            borderWidth,
+            borderWidth: trackBorderWidth,
             padding: inset,
           },
+          isBrutal && !disabled ? shadows.sm : undefined,
           trackAnimatedStyle,
           trackStyle,
         ]}
@@ -358,8 +393,9 @@ function SwitchComponent({
               width: thumbWidth,
               height: thumbHeight,
               borderRadius: thumbBorderRadius,
-              borderWidth: components.borderWidth.hairline,
+              borderWidth: thumbBorderWidth,
             },
+            thumbElevationStyle,
             thumbAnimatedStyle,
             thumbStyle,
           ]}
@@ -381,7 +417,8 @@ export const Switch = React.memo(SwitchComponent);
 
 const styles = StyleSheet.create({
   wrapper: {
-    alignSelf: "flex-start",
+    alignItems: "center",
+    justifyContent: "center",
   },
   track: {
     justifyContent: "center",

@@ -302,7 +302,7 @@ function AlertComponent({
           backgroundColor,
           borderColor,
           borderWidth: resolvedBorderWidth,
-          borderRadius: radii.xl,
+          borderRadius: radii.lg,
           padding: spacing.lg,
           gap: spacing.md,
           overflow: hasActiveShadow(feedbackShadow) ? "visible" : "hidden",

@@ -20,7 +20,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 
-import { Portal, useTheme } from "../theme";
+import { Portal, usePortalContext, useTheme } from "../theme";
 import {
   measureAnchorNode,
   useDelayedUnmount,
@@ -295,6 +295,7 @@ export const SpeedDial = React.memo(function SpeedDial({
   labelStyle,
 }: SpeedDialProps) {
   const { colors, components, shadows, spacing, isDark } = useTheme();
+  const portalStore = usePortalContext();
   const reducedMotion = useReducedMotion();
   const shouldAnimate = animated && !reducedMotion;
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -335,10 +336,14 @@ export const SpeedDial = React.memo(function SpeedDial({
   );
 
   const refreshAnchor = useCallback(() => {
-    measureAnchorNode(fabAnchorRef, (rect) => {
-      setAnchor(rect);
-    });
-  }, []);
+    measureAnchorNode(
+      fabAnchorRef,
+      (rect) => {
+        setAnchor(rect);
+      },
+      portalStore?.getHostRef("root"),
+    );
+  }, [portalStore]);
 
   useEffect(() => {
     if (isOpen) {

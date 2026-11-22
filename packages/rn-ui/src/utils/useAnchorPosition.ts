@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type ComponentRef,
+  type RefObject,
+} from "react";
 import { useWindowDimensions, type View } from "react-native";
 
 export interface AnchorMeasurement {
@@ -135,22 +141,45 @@ export interface MeasurableAnchorNode {
 }
 
 export function measureAnchorNode(
-  ref: RefObject<View | MeasurableAnchorNode | null>,
+  ref: RefObject<ComponentRef<typeof View> | MeasurableAnchorNode | null>,
   onMeasured: (rect: AnchorMeasurement) => void,
+  hostRef?:
+    | RefObject<ComponentRef<typeof View> | MeasurableAnchorNode | null>
+    | null,
 ) {
   const node = ref.current as MeasurableAnchorNode | null;
   if (!node) return;
 
+  const resolveWithHost = (rect: AnchorMeasurement) => {
+    const hostNode = hostRef?.current as MeasurableAnchorNode | null | undefined;
+    if (hostNode && typeof hostNode.measureInWindow === "function") {
+      hostNode.measureInWindow((hx, hy, hw, hh) => {
+        if (hw > 0 && hh > 0 && Number.isFinite(hx) && Number.isFinite(hy)) {
+          onMeasured({
+            x: rect.x - hx,
+            y: rect.y - hy,
+            width: rect.width,
+            height: rect.height,
+          });
+          return;
+        }
+        onMeasured(rect);
+      });
+      return;
+    }
+    onMeasured(rect);
+  };
+
   if (typeof node.measureInWindow === "function") {
     node.measureInWindow((x, y, width, height) => {
       if (width > 0 && height > 0) {
-        onMeasured({ x, y, width, height });
+        resolveWithHost({ x, y, width, height });
         return;
       }
       if (typeof node.measure === "function") {
         node.measure((_x, _y, mw, mh, pageX, pageY) => {
           if (mw > 0 && mh > 0) {
-            onMeasured({
+            resolveWithHost({
               x: pageX ?? 0,
               y: pageY ?? 0,
               width: mw,
@@ -164,19 +193,28 @@ export function measureAnchorNode(
 }
 
 export function useAnchorPosition(
-  triggerRef: RefObject<View | MeasurableAnchorNode | null>,
+  triggerRef: RefObject<
+    ComponentRef<typeof View> | MeasurableAnchorNode | null
+  >,
+  hostRef?:
+    | RefObject<ComponentRef<typeof View> | MeasurableAnchorNode | null>
+    | null,
 ) {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [anchor, setAnchor] = useState<AnchorMeasurement | null>(null);
 
   const measure = useCallback(
     (onReady?: (rect: AnchorMeasurement) => void) => {
-      measureAnchorNode(triggerRef, (rect) => {
-        setAnchor(rect);
-        onReady?.(rect);
-      });
+      measureAnchorNode(
+        triggerRef,
+        (rect) => {
+          setAnchor(rect);
+          onReady?.(rect);
+        },
+        hostRef,
+      );
     },
-    [triggerRef],
+    [hostRef, triggerRef],
   );
 
   return {

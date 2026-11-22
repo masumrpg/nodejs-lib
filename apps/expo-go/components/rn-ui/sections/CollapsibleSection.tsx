@@ -25,8 +25,9 @@ export function CollapsibleSection({ ctx }: { ctx: RnUiSectionContext }) {
             <CollapsibleTrigger>
               <Box
                 row
-                center
+                gap="sm"
                 style={{
+                  alignItems: "center",
                   justifyContent: "space-between",
                   paddingVertical: 8,
                   paddingHorizontal: 12,
@@ -37,9 +38,9 @@ export function CollapsibleSection({ ctx }: { ctx: RnUiSectionContext }) {
                   width: "100%",
                 }}
               >
-                <Box row center gap="sm">
+                <Box row center gap="sm" style={{ flexShrink: 1 }}>
                   <Package color={colors.primary} size={20} />
-                  <Text weight="700" color="text">
+                  <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                     Order #4189 Details
                   </Text>
                 </Box>
@@ -62,7 +63,8 @@ export function CollapsibleSection({ ctx }: { ctx: RnUiSectionContext }) {
                 {/* Status Card */}
                 <Box
                   row
-                  center
+                  wrap
+                  gap="sm"
                   style={{
                     paddingHorizontal: 16,
                     paddingVertical: 12,
@@ -70,6 +72,7 @@ export function CollapsibleSection({ ctx }: { ctx: RnUiSectionContext }) {
                     borderColor: colors.border,
                     borderRadius: 10,
                     backgroundColor: colors.surfaceMuted,
+                    alignItems: "center",
                     justifyContent: "space-between",
                   }}
                 >

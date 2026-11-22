@@ -4,8 +4,6 @@ import {
   Pressable,
   StyleSheet,
   View,
-  type FlatList,
-  type ListRenderItemInfo,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   type StyleProp,
@@ -227,11 +225,12 @@ export function WheelPickerColumn<T = string | number>({
   style,
 }: WheelPickerColumnProps<T>) {
   const { colors } = useTheme();
-  const listRef = useRef<FlatList<number>>(null);
+  const scrollRef = useRef<React.ComponentRef<typeof Animated.ScrollView>>(null);
   const containerHeight = itemHeight * visibleItems;
   const paddingCount = Math.floor(visibleItems / 2);
   const scrollY = useSharedValue(0);
 
+  const hasInitialScrolledRef = useRef(false);
   const isDraggingRef = useRef(false);
   const isMomentumRef = useRef(false);
   const dragCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -241,25 +240,31 @@ export function WheelPickerColumn<T = string | number>({
     return idx >= 0 ? idx : 0;
   }, [items, selectedValue]);
 
-  const itemIndices = useMemo(
-    () => Array.from({ length: items.length }, (_, i) => i),
-    [items.length],
-  );
-
   useEffect(() => {
     scrollY.value = selectedIndex * itemHeight;
     if (
       !isDraggingRef.current &&
       !isMomentumRef.current &&
-      listRef.current &&
+      scrollRef.current &&
       items.length > 0
     ) {
-      listRef.current.scrollToOffset({
-        offset: selectedIndex * itemHeight,
+      scrollRef.current.scrollTo({
+        y: selectedIndex * itemHeight,
         animated: false,
       });
     }
   }, [selectedIndex, itemHeight, items.length, scrollY]);
+
+  const handleLayout = useCallback(() => {
+    if (!hasInitialScrolledRef.current && items.length > 0) {
+      hasInitialScrolledRef.current = true;
+      scrollY.value = selectedIndex * itemHeight;
+      scrollRef.current?.scrollTo({
+        y: selectedIndex * itemHeight,
+        animated: false,
+      });
+    }
+  }, [itemHeight, items.length, scrollY, selectedIndex]);
 
   useEffect(
     () => () => {
@@ -333,8 +338,8 @@ export function WheelPickerColumn<T = string | number>({
 
   const handleItemPress = useCallback(
     (index: number) => {
-      listRef.current?.scrollToOffset({
-        offset: index * itemHeight,
+      scrollRef.current?.scrollTo({
+        y: index * itemHeight,
         animated: true,
       });
       if (haptic) triggerHaptic(hapticType);
@@ -346,60 +351,15 @@ export function WheelPickerColumn<T = string | number>({
     [haptic, hapticType, itemHeight, items, onValueChange, selectedValue],
   );
 
-  const renderWheelRow = useCallback(
-    ({ item: idx }: ListRenderItemInfo<number>) => {
-      const option = items[idx];
-      if (!option) return null;
-      return (
-        <AnimatedWheelItem
-          label={option.label}
-          index={idx}
-          isSelected={idx === selectedIndex}
-          scrollY={scrollY}
-          itemHeight={itemHeight}
-          onPress={handleItemPress}
-          textColor={colors.text}
-          itemStyle={itemStyle}
-          selectedItemStyle={selectedItemStyle}
-        />
-      );
-    },
-    [
-      colors.text,
-      handleItemPress,
-      itemHeight,
-      itemStyle,
-      items,
-      scrollY,
-      selectedIndex,
-      selectedItemStyle,
-    ],
-  );
-
-  const getItemLayout = useCallback(
-    (_: ArrayLike<number> | null | undefined, index: number) => ({
-      length: itemHeight,
-      offset: itemHeight * index,
-      index,
-    }),
-    [itemHeight],
-  );
-
   return (
     <View style={[styles.wheelColumn, { height: containerHeight }, style]}>
-      <Animated.FlatList<number>
-        ref={listRef}
-        data={itemIndices}
-        keyExtractor={(idx) => `${idx}`}
-        renderItem={renderWheelRow}
-        getItemLayout={getItemLayout}
-        windowSize={5}
-        initialNumToRender={visibleItems + 4}
-        maxToRenderPerBatch={10}
+      <Animated.ScrollView
+        ref={scrollRef}
         nestedScrollEnabled
         snapToInterval={itemHeight}
         decelerationRate="fast"
         showsVerticalScrollIndicator={false}
+        onLayout={handleLayout}
         onScroll={scrollHandler}
         onScrollBeginDrag={handleScrollBeginDrag}
         onScrollEndDrag={handleScrollEndDrag}
@@ -409,7 +369,22 @@ export function WheelPickerColumn<T = string | number>({
         contentContainerStyle={{
           paddingVertical: paddingCount * itemHeight,
         }}
-      />
+      >
+        {items.map((option, idx) => (
+          <AnimatedWheelItem
+            key={`${idx}-${String(option.value)}`}
+            label={option.label}
+            index={idx}
+            isSelected={idx === selectedIndex}
+            scrollY={scrollY}
+            itemHeight={itemHeight}
+            onPress={handleItemPress}
+            textColor={colors.text}
+            itemStyle={itemStyle}
+            selectedItemStyle={selectedItemStyle}
+          />
+        ))}
+      </Animated.ScrollView>
     </View>
   );
 }

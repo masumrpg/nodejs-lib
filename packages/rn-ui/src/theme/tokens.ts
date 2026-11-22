@@ -33,10 +33,10 @@ export const radii: ThemeRadii = {
   none: 0,
   xs: 4,
   sm: 8,
-  md: 12,
-  lg: 16,
+  md: 10,
+  lg: 14,
   xl: 20,
-  xxl: 28,
+  xxl: 24,
   full: 9999,
 };
 
@@ -158,15 +158,15 @@ const components: ThemeComponents = {
     pressOffset: 0,
   },
   button: {
-    height: { xs: 28, sm: 34, md: 40, lg: 46, xl: 52 },
-    paddingX: { xs: 10, sm: 14, md: 18, lg: 22, xl: 26 },
-    fontSize: { xs: 12, sm: 13, md: 14, lg: 15, xl: 16 },
-    iconSize: { xs: 13, sm: 15, md: 17, lg: 19, xl: 21 },
-    gap: { xs: 4, sm: 6, md: 8, lg: 8, xl: 10 },
+    height: { xs: 26, sm: 32, md: 36, lg: 42, xl: 48 },
+    paddingX: { xs: 10, sm: 12, md: 14, lg: 18, xl: 22 },
+    fontSize: { xs: 11, sm: 13, md: 14, lg: 15, xl: 16 },
+    iconSize: { xs: 12, sm: 14, md: 16, lg: 18, xl: 20 },
+    gap: { xs: 4, sm: 6, md: 6, lg: 8, xl: 8 },
   },
   iconButton: {
-    size: { xs: 28, sm: 34, md: 40, lg: 46, xl: 52 },
-    iconSize: { xs: 14, sm: 16, md: 19, lg: 21, xl: 24 },
+    size: { xs: 26, sm: 32, md: 36, lg: 42, xl: 48 },
+    iconSize: { xs: 13, sm: 15, md: 18, lg: 20, xl: 22 },
     badge: {
       size: 16,
       minWidth: 16,

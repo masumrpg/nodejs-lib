@@ -3,6 +3,7 @@ import React from "react";
 
 import {
   AlertDialog,
+  Button,
   Combobox,
   ComboboxContent,
   ComboboxEmpty,
@@ -21,12 +22,14 @@ import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
+  IconButton,
   Popover,
   PopoverContent,
   PopoverTrigger,
   Select,
   SpeedDial,
   ThemeProvider,
+  Toast,
   ToastProvider,
   Tooltip,
   computeAnchoredPosition,
@@ -279,5 +282,197 @@ describe("overlays, portals, toasts & anchored menus", () => {
     expect(collectText(container)).toContain("Hover Details");
     expect(collectText(container)).toContain("Menu Item");
     expect(collectText(container)).toContain("Inspect");
+  });
+
+  it("compensates PortalHost window offset in Select positioning and clips menu rows inside rounded corners", () => {
+    mockUiState.portalHostOffset = { x: 0, y: -48 };
+    mockUiState.anchorRect = { x: 36, y: 252, width: 318, height: 44 };
+
+    const { container } = renderUI(
+      wrap(
+        React.createElement(Select, {
+          placeholder: "Anchor Select",
+          options: [
+            { label: "First", value: "first", description: "One" },
+            { label: "Second", value: "second", description: "Two" },
+          ],
+        }),
+      ),
+    );
+
+    const trigger = findAllNodes(
+      container,
+      (n) =>
+        n.type === "rn-pressable" &&
+        n.props?.accessibilityLabel === "Anchor Select",
+    )[0];
+    expect(trigger).toBeDefined();
+
+    act(() => {
+      (trigger?.props?.onPress as (() => void) | undefined)?.();
+    });
+
+    const menuNode = findAllNodes(
+      container,
+      (n) => n.type === "anim-view" && n.props?.accessibilityRole === "menu",
+    )[0];
+    expect(menuNode).toBeDefined();
+    const menuStyle =
+      (menuNode?.props?.style as Record<string, unknown> | undefined) ?? {};
+    // Adjusted anchor y = 252 - (-48) = 300; top = 300 + 44 (height) + 6 (offset) = 350
+    expect(menuStyle.top).toBe(350);
+    expect(menuStyle.left).toBe(36);
+
+    const clippedInner = menuNode
+      ? findAllNodes(
+          menuNode,
+          (n) =>
+            n.type === "rn-view" &&
+            (n.props?.style as Record<string, unknown> | undefined)?.overflow ===
+              "hidden",
+        )[0]
+      : undefined;
+    expect(clippedInner).toBeDefined();
+  });
+
+  it("opens Popover when pressing inner Button trigger without nested Pressable swallowing", () => {
+    const { container } = renderUI(
+      wrap(
+        React.createElement(
+          Popover,
+          null,
+          React.createElement(
+            PopoverTrigger,
+            null,
+            React.createElement(Button, null, "Toggle Popover"),
+          ),
+          React.createElement(PopoverContent, null, "Popover Content"),
+        ),
+      ),
+    );
+
+    expect(collectText(container)).not.toContain("Popover Content");
+    const buttonTrigger = findAllNodes(
+      container,
+      (n) => n.type === "rn-pressable" && collectText(n).includes("Toggle Popover"),
+    )[0];
+    expect(buttonTrigger).toBeDefined();
+
+    act(() => {
+      (buttonTrigger?.props?.onPress as ((e: unknown) => void) | undefined)?.({});
+    });
+
+    expect(collectText(container)).toContain("Popover Content");
+  });
+
+  it("opens Tooltip on longPress of Button and on press of IconButton", () => {
+    const { container } = renderUI(
+      wrap(
+        React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(
+            Tooltip,
+            { content: "Hold Tip", triggerMode: "longPress" },
+            React.createElement(Button, null, "Left Edge"),
+          ),
+          React.createElement(
+            Tooltip,
+            { content: "Tap Tip", triggerMode: "press" },
+            React.createElement(IconButton, {
+              accessibilityLabel: "Inspect key",
+              icon: React.createElement("rn-view", null),
+            }),
+          ),
+        ),
+      ),
+    );
+
+    const holdBtn = findAllNodes(
+      container,
+      (n) => n.type === "rn-pressable" && collectText(n).includes("Left Edge"),
+    )[0];
+    expect(holdBtn).toBeDefined();
+
+    act(() => {
+      (holdBtn?.props?.onLongPress as ((e: unknown) => void) | undefined)?.({});
+    });
+    expect(collectText(container)).toContain("Hold Tip");
+
+    const tapBtn = findAllNodes(
+      container,
+      (n) =>
+        n.type === "rn-pressable" &&
+        n.props?.accessibilityLabel === "Inspect key",
+    )[0];
+    expect(tapBtn).toBeDefined();
+
+    act(() => {
+      (tapBtn?.props?.onPress as ((e: unknown) => void) | undefined)?.({});
+    });
+    expect(collectText(container)).toContain("Tap Tip");
+  });
+
+  it("renders non-overlapping Toast cards capped cleanly and slides top toasts from off-screen", () => {
+    let api: ReturnType<typeof useToast> | null = null;
+    function Driver() {
+      api = useToast();
+      return null;
+    }
+
+    const { container } = renderUI(
+      wrap(
+        React.createElement(
+          ToastProvider,
+          { placement: "top" },
+          React.createElement(Driver, null),
+        ),
+      ),
+    );
+
+    act(() => {
+      api!.show({ title: "Toast 1", duration: 0 });
+      api!.show({ title: "Toast 2", duration: 0 });
+      api!.show({ title: "Toast 3", duration: 0 });
+      api!.show({ title: "Toast 4", duration: 0 });
+    });
+
+    const alerts = findAllNodes(
+      container,
+      (n) => n.type === "anim-view" && n.props?.accessibilityRole === "alert",
+    );
+    expect(alerts.length).toBe(3);
+    for (const alertNode of alerts) {
+      const st = (alertNode.props?.style as Record<string, unknown> | undefined) ?? {};
+      expect(st.position).toBe("relative");
+    }
+
+    const closedTopToast = renderUI(
+      wrap(
+        React.createElement(Toast, {
+          placement: "top",
+          viewportOffset: 56,
+          toast: {
+            id: "offscreen-toast",
+            title: "Offscreen",
+            tone: "info",
+            variant: "subtle",
+            duration: 0,
+            open: false,
+          },
+        }),
+      ),
+    );
+
+    const closedAlert = findAllNodes(
+      closedTopToast.container,
+      (n) => n.type === "anim-view" && n.props?.accessibilityRole === "alert",
+    )[0];
+    const transforms =
+      ((closedAlert?.props?.style as Record<string, unknown> | undefined)
+        ?.transform as Array<Record<string, number>> | undefined) ?? [];
+    const ty = transforms.find((t) => typeof t.translateY === "number")?.translateY;
+    expect(ty).toBeDefined();
+    expect(ty!).toBeLessThanOrEqual(-140);
   });
 });

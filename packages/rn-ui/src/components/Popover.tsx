@@ -18,7 +18,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { Portal, useTheme } from "../theme";
+import { Portal, usePortalContext, useTheme } from "../theme";
 import {
   computeAnchoredPosition,
   measureAnchorNode,
@@ -28,7 +28,9 @@ import {
 import { triggerHaptic } from "../utils/haptics";
 import {
   ANIMATION_TIMING,
+  isPressableTriggerElement,
   minTouchHitSlop,
+  webDeps,
   type BaseGlassProps,
   type BaseHapticProps,
 } from "./types";
@@ -58,6 +60,7 @@ export const Popover = React.memo(function Popover({
   haptic = true,
   children,
 }: PopoverProps) {
+  const portalStore = usePortalContext();
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const [anchor, setAnchor] = useState<AnchorMeasurement | null>(null);
   const triggerRef = useRef<React.ComponentRef<typeof View>>(null);
@@ -77,21 +80,31 @@ export const Popover = React.memo(function Popover({
 
   useEffect(() => {
     if (currentOpen) {
-      measureAnchorNode(triggerRef, (rect) => {
-        setAnchor(rect);
-      });
+      measureAnchorNode(
+        triggerRef,
+        (rect) => {
+          setAnchor(rect);
+        },
+        portalStore?.getHostRef("root"),
+      );
     }
-  }, [currentOpen]);
+  }, [currentOpen, portalStore]);
 
   const measureAndToggle = useCallback(() => {
     const nextOpen = !currentOpen;
-    if (nextOpen) {
-      measureAnchorNode(triggerRef, (rect) => {
-        setAnchor(rect);
-      });
+    if (nextOpen && triggerRef.current) {
+      measureAnchorNode(
+        triggerRef,
+        (rect) => {
+          setAnchor(rect);
+          setOpen(true);
+        },
+        portalStore?.getHostRef("root"),
+      );
+      return;
     }
     setOpen(nextOpen);
-  }, [currentOpen, setOpen]);
+  }, [currentOpen, portalStore, setOpen]);
 
   const value = useMemo<PopoverContextValue>(
     () => ({
@@ -121,6 +134,7 @@ export const PopoverTrigger = React.memo(function PopoverTrigger({
   triggerMode = "press",
   disabled,
   hitSlop,
+  delayLongPress,
   onPress,
   onLongPress,
   style,
@@ -128,47 +142,73 @@ export const PopoverTrigger = React.memo(function PopoverTrigger({
 }: PopoverTriggerProps) {
   const context = React.useContext(PopoverContext);
 
+  const isPressableChild = isPressableTriggerElement(children);
+  const childDisabled = isPressableChild
+    ? Boolean(children.props.disabled)
+    : false;
+  const mergedDisabled = Boolean(disabled) || childDisabled;
+
   const handlePress = useCallback(
     (event: GestureResponderEvent) => {
-      if (disabled) return;
+      if (mergedDisabled) return;
       if (triggerMode === "press") {
         if (context?.haptic) triggerHaptic("selection");
         context?.measureAndToggle();
       }
       onPress?.(event);
     },
-    [context, disabled, onPress, triggerMode],
+    [context, mergedDisabled, onPress, triggerMode],
   );
 
   const handleLongPress = useCallback(
     (event: GestureResponderEvent) => {
-      if (disabled) return;
+      if (mergedDisabled) return;
       if (triggerMode === "longPress") {
         if (context?.haptic) triggerHaptic("medium");
         context?.measureAndToggle();
       }
       onLongPress?.(event);
     },
-    [context, disabled, onLongPress, triggerMode],
+    [context, mergedDisabled, onLongPress, triggerMode],
   );
 
   return (
-    <View ref={context?.triggerRef} collapsable={false}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{
-          expanded: Boolean(context?.open),
-          disabled: Boolean(disabled),
-        }}
-        disabled={disabled}
-        hitSlop={hitSlop ?? minTouchHitSlop(36)}
-        onPress={handlePress}
-        onLongPress={handleLongPress}
-        style={style}
-        {...props}
-      >
-        {children}
-      </Pressable>
+    <View
+      ref={context?.triggerRef}
+      collapsable={false}
+      style={isPressableChild && typeof style !== "function" ? style : undefined}
+    >
+      {isPressableChild ? (
+        React.cloneElement(children, {
+          disabled: mergedDisabled,
+          delayLongPress: children.props.delayLongPress ?? delayLongPress,
+          onPress: (event: GestureResponderEvent) => {
+            handlePress(event);
+            children.props.onPress?.(event);
+          },
+          onLongPress: (event: GestureResponderEvent) => {
+            handleLongPress(event);
+            children.props.onLongPress?.(event);
+          },
+        })
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{
+            expanded: Boolean(context?.open),
+            disabled: mergedDisabled,
+          }}
+          disabled={mergedDisabled}
+          hitSlop={hitSlop ?? minTouchHitSlop(36)}
+          delayLongPress={delayLongPress}
+          onPress={handlePress}
+          onLongPress={handleLongPress}
+          style={style}
+          {...props}
+        >
+          {children}
+        </Pressable>
+      )}
     </View>
   );
 });
@@ -243,17 +283,20 @@ export const PopoverContent = React.memo(function PopoverContent({
   });
 
   const isTopPlacement = coords.resolvedPlacement === "top";
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [
-      {
-        translateY: isTopPlacement
-          ? (1 - progress.value) * 6
-          : (1 - progress.value) * -6,
-      },
-      { scale: 0.96 + progress.value * 0.04 },
-    ],
-  }));
+  const animatedStyle = useAnimatedStyle(
+    () => ({
+      opacity: progress.value,
+      transform: [
+        {
+          translateY: isTopPlacement
+            ? (1 - progress.value) * 6
+            : (1 - progress.value) * -6,
+        },
+        { scale: 0.96 + progress.value * 0.04 },
+      ],
+    }),
+    webDeps([isTopPlacement]),
+  );
 
   if (!shouldMount && !isOpen) return null;
 
@@ -277,12 +320,12 @@ export const PopoverContent = React.memo(function PopoverContent({
             left: coords.left,
             width: resolvedWidth,
             maxHeight,
-            borderRadius: radii.xl,
+            borderRadius: radii.lg,
             borderWidth: components.borderWidth.default,
             borderColor: glass ? colors.glassBorder : colors.border,
             backgroundColor: glass
               ? colors.glassSurfaceStrong
-              : colors.surface,
+              : colors.surfaceRaised,
             padding: spacing.md,
           },
           shadows.lg,

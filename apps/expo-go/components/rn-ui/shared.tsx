@@ -89,13 +89,21 @@ export function ColorBox({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
+        gap: 8,
         paddingVertical: 6,
         paddingHorizontal: 8,
         borderRadius: 8,
         backgroundColor: "rgba(150, 150, 150, 0.06)",
       }}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          flexShrink: 1,
+        }}
+      >
         <View
           style={{
             width: 20,

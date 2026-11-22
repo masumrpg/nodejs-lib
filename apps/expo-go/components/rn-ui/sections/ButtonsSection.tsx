@@ -87,7 +87,7 @@ export function ButtonsSection({ ctx }: { ctx: RnUiSectionContext }) {
               <Button loading>Loading</Button>
               <Button disabled>Disabled</Button>
             </Box>
-            <Button fullWidth rightIcon={icon(ArrowRight)}>
+            <Button fullWidth size="lg" rightIcon={icon(ArrowRight)}>
               Continue Action
             </Button>
           </Box>

@@ -23,8 +23,10 @@ import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
   ANIMATION_TIMING,
+  markAsPressableTrigger,
   minTouchHitSlop,
   renderIcon,
+  resolveControlRadius,
   resolveOutlineBorderColor,
   resolveToneColors,
   webDeps,
@@ -64,11 +66,11 @@ export interface ButtonProps
 }
 
 const BUTTON_LINE_HEIGHT: Record<ButtonSize, number> = {
-  xs: 16,
-  sm: 18,
-  md: 20,
-  lg: 22,
-  xl: 24,
+  xs: 14,
+  sm: 16,
+  md: 18,
+  lg: 20,
+  xl: 22,
 };
 
 function coalesceTextChildren(
@@ -245,18 +247,7 @@ function ButtonComponent({
   const fontSize = components.button.fontSize[size];
   const lineHeight = BUTTON_LINE_HEIGHT[size];
   const iconSize = components.button.iconSize[size];
-  const borderRadius =
-    shape === "pill"
-      ? radii.full
-      : shape === "square"
-        ? size === "xs" || size === "sm"
-          ? radii.xs
-          : radii.sm
-        : size === "xs" || size === "sm"
-          ? radii.sm
-          : size === "xl"
-            ? radii.lg
-            : radii.md;
+  const borderRadius = resolveControlRadius(shape, size, radii);
   const textVariant = size === "xs" || size === "sm" ? "labelSmall" : "label";
   const resolvedHitSlop = hitSlop ?? minTouchHitSlop(height);
 
@@ -340,25 +331,23 @@ function ButtonComponent({
         {loading ? (
           <ActivityIndicator size="small" color={foregroundColor} />
         ) : (
-          <>
-            {renderIcon(leftIcon, foregroundColor, iconSize)}
-            {coalesceTextChildren(
-              children,
-              foregroundColor,
-              textVariant,
-              fontSize,
-              lineHeight,
-              textStyle,
-            )}
-            {renderIcon(rightIcon, foregroundColor, iconSize)}
-          </>
+          renderIcon(leftIcon, foregroundColor, iconSize)
         )}
+        {coalesceTextChildren(
+          children,
+          foregroundColor,
+          textVariant,
+          fontSize,
+          lineHeight,
+          textStyle,
+        )}
+        {!loading && renderIcon(rightIcon, foregroundColor, iconSize)}
       </Pressable>
     </Animated.View>
   );
 }
 
-export const Button = React.memo(ButtonComponent);
+export const Button = markAsPressableTrigger(React.memo(ButtonComponent));
 
 const styles = StyleSheet.create({
   fullWidth: {

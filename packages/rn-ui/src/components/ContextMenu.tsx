@@ -5,6 +5,7 @@ import {
   StyleSheet,
   View,
   useWindowDimensions,
+  type GestureResponderEvent,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
@@ -18,7 +19,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 
-import { Portal, useTheme, type ThemeColors } from "../theme";
+import { Portal, usePortalContext, useTheme, type ThemeColors } from "../theme";
 import {
   computeAnchoredPosition,
   measureAnchorNode,
@@ -30,8 +31,10 @@ import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
   ANIMATION_TIMING,
+  isPressableTriggerElement,
   minTouchHitSlop,
   renderIcon,
+  webDeps,
   type BaseGlassProps,
   type BaseHapticProps,
   type RenderIcon,
@@ -76,6 +79,7 @@ export const ContextMenu = React.memo(function ContextMenu({
   children,
 }: ContextMenuProps) {
   const { colors } = useTheme();
+  const portalStore = usePortalContext();
   const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
   const [anchor, setAnchor] = useState<AnchorMeasurement | null>(null);
   const triggerRef = useRef<React.ComponentRef<typeof View>>(null);
@@ -95,11 +99,15 @@ export const ContextMenu = React.memo(function ContextMenu({
 
   useEffect(() => {
     if (open) {
-      measureAnchorNode(triggerRef, (rect) => {
-        setAnchor(rect);
-      });
+      measureAnchorNode(
+        triggerRef,
+        (rect) => {
+          setAnchor(rect);
+        },
+        portalStore?.getHostRef("root"),
+      );
     }
-  }, [open]);
+  }, [open, portalStore]);
 
   const contextValue = useMemo<ContextMenuContextProps>(
     () => ({
@@ -136,30 +144,56 @@ export const ContextMenuTrigger = React.memo(function ContextMenuTrigger({
   disabled = false,
 }: ContextMenuTriggerProps) {
   const { open, setOpen, setAnchor, triggerRef, haptic } = useContextMenu();
+  const portalStore = usePortalContext();
+
+  const isPressableChild = isPressableTriggerElement(children);
+  const childDisabled = isPressableChild
+    ? Boolean(children.props.disabled)
+    : false;
+  const mergedDisabled = disabled || childDisabled;
 
   const handleLongPress = useCallback(() => {
-    if (disabled) return;
+    if (mergedDisabled) return;
     if (haptic) triggerHaptic("medium");
-    measureAnchorNode(triggerRef, (rect) => {
-      setAnchor(rect);
-    });
+    measureAnchorNode(
+      triggerRef,
+      (rect) => {
+        setAnchor(rect);
+      },
+      portalStore?.getHostRef("root"),
+    );
     setOpen(true);
-  }, [disabled, haptic, setAnchor, setOpen, triggerRef]);
+  }, [haptic, mergedDisabled, portalStore, setAnchor, setOpen, triggerRef]);
 
   return (
-    <View ref={triggerRef} collapsable={false}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityHint="Long press to open context menu"
-        accessibilityState={{ expanded: open, disabled }}
-        disabled={disabled}
-        hitSlop={minTouchHitSlop(36)}
-        onLongPress={handleLongPress}
-        delayLongPress={420}
-        style={style}
-      >
-        {children}
-      </Pressable>
+    <View
+      ref={triggerRef}
+      collapsable={false}
+      style={isPressableChild ? style : undefined}
+    >
+      {isPressableChild ? (
+        React.cloneElement(children, {
+          disabled: mergedDisabled,
+          delayLongPress: children.props.delayLongPress ?? 420,
+          onLongPress: (event: GestureResponderEvent) => {
+            handleLongPress();
+            children.props.onLongPress?.(event);
+          },
+        })
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityHint="Long press to open context menu"
+          accessibilityState={{ expanded: open, disabled: mergedDisabled }}
+          disabled={mergedDisabled}
+          hitSlop={minTouchHitSlop(36)}
+          onLongPress={handleLongPress}
+          delayLongPress={420}
+          style={style}
+        >
+          {children}
+        </Pressable>
+      )}
     </View>
   );
 });
@@ -231,13 +265,16 @@ export const ContextMenuContent = React.memo(function ContextMenuContent({
   });
 
   const renderAbove = coords.resolvedPlacement === "top";
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [
-      { translateY: (renderAbove ? 8 : -8) * (1 - progress.value) },
-      { scale: 0.96 + progress.value * 0.04 },
-    ],
-  }));
+  const animatedStyle = useAnimatedStyle(
+    () => ({
+      opacity: progress.value,
+      transform: [
+        { translateY: (renderAbove ? 8 : -8) * (1 - progress.value) },
+        { scale: 0.96 + progress.value * 0.04 },
+      ],
+    }),
+    webDeps([renderAbove]),
+  );
 
   if (!shouldMount && !open) return null;
 
@@ -273,10 +310,10 @@ export const ContextMenuContent = React.memo(function ContextMenuContent({
               maxHeight,
               backgroundColor: glass
                 ? colors.glassSurfaceStrong
-                : colors.surface,
+                : colors.surfaceRaised,
               borderWidth: components.borderWidth.default,
               borderColor: glass ? colors.glassBorder : colors.border,
-              borderRadius: radii.xl,
+              borderRadius: radii.lg,
               padding: spacing.xs,
             },
             shadows.lg,
@@ -336,7 +373,7 @@ export const ContextMenuItem = React.memo(function ContextMenuItem({
         {
           paddingVertical: spacing.sm,
           paddingHorizontal: spacing.md,
-          borderRadius: radii.md,
+          borderRadius: radii.sm,
           backgroundColor: pressed
             ? isDestructive
               ? colors.dangerSoft
@@ -458,7 +495,7 @@ export const ContextMenuCheckboxItem = React.memo(
           {
             paddingVertical: spacing.sm,
             paddingHorizontal: spacing.md,
-            borderRadius: radii.md,
+            borderRadius: radii.sm,
             backgroundColor: pressed ? colors.surfaceMuted : "transparent",
             opacity: disabled ? 0.5 : 1,
           },

@@ -56,8 +56,15 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
       <Section title="Skeleton Loaders">
         <Card outlined>
           <Box gap="md">
-            <Box row style={{ justifyContent: "space-between", alignItems: "center" }}>
-              <Text variant="title">Skeleton Shimmer</Text>
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ justifyContent: "space-between", alignItems: "center" }}
+            >
+              <Text variant="title" style={{ flexShrink: 1 }}>
+                Skeleton Shimmer
+              </Text>
               <Button
                 size="xs"
                 variant="outline"
@@ -113,8 +120,15 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
           <Box gap="lg">
             {/* Header & Controls */}
             <Box gap="sm">
-              <Box row style={{ justifyContent: "space-between", alignItems: "center" }}>
-                <Text variant="title">Live Content Transition</Text>
+              <Box
+                row
+                wrap
+                gap="sm"
+                style={{ justifyContent: "space-between", alignItems: "center" }}
+              >
+                <Text variant="title" style={{ flexShrink: 1 }}>
+                  Live Content Transition
+                </Text>
                 {isLoading ? (
                   <Box row center gap="xs">
                     <Spinner size="xs" variant="circular" tone="warning" />

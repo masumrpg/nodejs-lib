@@ -13,7 +13,6 @@ export { AspectRatioSection } from './sections/AspectRatioSection';
 export { AttachmentsSection } from './sections/AttachmentsSection';
 export { AvatarSection } from './sections/AvatarSection';
 export { ChatBubblesSection } from './sections/ChatBubblesSection';
-export { ButtonGroupsSection } from './sections/ButtonGroupsSection';
 export { CalendarSection } from './sections/CalendarSection';
 export { CarouselSection } from './sections/CarouselSection';
 export { CheckboxSection } from './sections/CheckboxSection';

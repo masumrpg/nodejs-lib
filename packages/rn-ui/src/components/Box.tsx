@@ -18,6 +18,7 @@ export interface BoxProps extends ViewProps {
   my?: Space;
   flex?: number;
   row?: boolean;
+  wrap?: boolean;
   center?: boolean;
   gap?: Space;
 }
@@ -34,6 +35,7 @@ function BoxComponent({
   my,
   flex,
   row,
+  wrap,
   center,
   gap,
   style,
@@ -59,6 +61,7 @@ function BoxComponent({
       ...(my ? { marginVertical: spacing[my] } : null),
       ...(flex !== undefined ? { flex } : null),
       ...(row ? { flexDirection: "row" } : null),
+      ...(wrap ? { flexWrap: "wrap" } : null),
       ...(center ? { alignItems: "center", justifyContent: "center" } : null),
       ...(gap ? { gap: spacing[gap] } : null),
     }),
@@ -79,6 +82,7 @@ function BoxComponent({
       radii,
       radius,
       row,
+      wrap,
       spacing,
     ],
   );

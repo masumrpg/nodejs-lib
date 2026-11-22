@@ -20,11 +20,16 @@ export function SegmentedControlSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 1. Basic 3-item Segmented Control */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Cupertino Tab Switcher
               </Text>
-              <Badge tone="primary">Spring Animation</Badge>
+              <Badge tone="primary">Smooth Timing</Badge>
             </Box>
             <Text color="textMuted" variant="bodySmall">
               Smooth sliding pill with spring physics and haptic feedback.
@@ -41,8 +46,13 @@ export function SegmentedControlSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 2. Icons and Badges */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 With Icons & Badge Counts
               </Text>
               <Badge tone="accent">Rich Options</Badge>

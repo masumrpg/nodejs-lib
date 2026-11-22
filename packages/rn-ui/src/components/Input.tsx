@@ -13,6 +13,7 @@ import { withAlpha } from "../utils";
 import { useFormField } from "./FormField";
 import {
   minTouchHitSlop,
+  resolveControlRadius,
   type BaseGlassProps,
   type ComponentShape,
   type ComponentSize,
@@ -88,8 +89,7 @@ export const Input: React.NamedExoticComponent<
     const height = inputTokens.height[size];
     const paddingX = inputTokens.paddingX[size];
 
-    const borderRadius =
-      shape === "pill" ? radii.full : shape === "square" ? radii.sm : radii.lg;
+    const borderRadius = resolveControlRadius(shape, size, radii);
 
     const borderColor = isDisabled
       ? colors.disabled

@@ -23,8 +23,10 @@ import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
   ANIMATION_TIMING,
+  markAsPressableTrigger,
   minTouchHitSlop,
   renderIcon,
+  resolveControlRadius,
   resolveOutlineBorderColor,
   resolveToneColors,
   webDeps,
@@ -95,15 +97,7 @@ function IconButtonComponent({
   const borderRadius =
     shape === "pill"
       ? containerSize / 2
-      : shape === "square"
-        ? size === "xs" || size === "sm"
-          ? radii.xs
-          : radii.sm
-        : size === "xs" || size === "sm"
-          ? radii.sm
-          : size === "xl"
-            ? radii.lg
-            : radii.md;
+      : resolveControlRadius(shape, size, radii);
 
   const pressProgress = useSharedValue(0);
 
@@ -230,7 +224,13 @@ function IconButtonComponent({
   );
 
   return (
-    <Animated.View style={[styles.wrapper, animatedStyle]}>
+    <Animated.View
+      style={[
+        styles.wrapper,
+        { width: containerSize, height: containerSize },
+        animatedStyle,
+      ]}
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityState={{
@@ -299,11 +299,14 @@ function IconButtonComponent({
   );
 }
 
-export const IconButton = React.memo(IconButtonComponent);
+export const IconButton = markAsPressableTrigger(
+  React.memo(IconButtonComponent),
+);
 
 const styles = StyleSheet.create({
   wrapper: {
-    alignSelf: "flex-start",
+    alignItems: "center",
+    justifyContent: "center",
   },
   button: {
     alignItems: "center",

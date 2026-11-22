@@ -249,7 +249,7 @@ export const AlertDialog = React.memo(function AlertDialog({
           style={{
             width: isCentered ? 56 : 44,
             height: isCentered ? 56 : 44,
-            borderRadius: isCentered ? 28 : radii.lg,
+            borderRadius: isCentered ? radii.full : radii.md,
             backgroundColor: withAlpha(toneColor, 0.14),
             borderWidth: components.borderWidth.strong,
             borderColor: withAlpha(toneColor, 0.28),

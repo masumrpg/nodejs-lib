@@ -7,6 +7,8 @@ import {
   type FlatList,
   type LayoutChangeEvent,
   type ListRenderItemInfo,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -27,6 +29,7 @@ import { triggerHaptic } from "../utils/haptics";
 import {
   minTouchHitSlop,
   renderIcon,
+  webDeps,
   type BaseHapticProps,
   type RenderIcon,
 } from "./types";
@@ -45,6 +48,7 @@ export interface CarouselProps extends BaseHapticProps {
 
 export interface CarouselContextProps {
   scrollX: SharedValue<number>;
+  snapStepSV: SharedValue<number>;
   itemWidth: number;
   snapStep: number;
   containerWidth: number;
@@ -52,6 +56,7 @@ export interface CarouselContextProps {
   totalItems: number;
   showPagination: boolean;
   haptic: boolean;
+  isDraggingRef: React.RefObject<boolean>;
   setTotalItems: React.Dispatch<React.SetStateAction<number>>;
   scrollPrev: () => void;
   scrollNext: () => void;
@@ -77,11 +82,11 @@ const CarouselDot = React.memo(function CarouselDot({
 }: {
   index: number;
 }) {
-  const { colors } = useTheme();
-  const { scrollX, snapStep, scrollToIndex } = useCarousel();
+  const { colors, radii } = useTheme();
+  const { scrollX, snapStepSV, scrollToIndex } = useCarousel();
 
   const animatedStyle = useAnimatedStyle(() => {
-    const step = Math.max(1, snapStep);
+    const step = Math.max(1, snapStepSV.value);
     const inputRange = [
       (index - 1) * step,
       index * step,
@@ -106,7 +111,7 @@ const CarouselDot = React.memo(function CarouselDot({
       width,
       opacity,
     };
-  });
+  }, webDeps([index]));
 
   return (
     <Pressable
@@ -118,7 +123,7 @@ const CarouselDot = React.memo(function CarouselDot({
       <Animated.View
         style={[
           styles.dot,
-          { backgroundColor: colors.primary },
+          { backgroundColor: colors.primary, borderRadius: radii.full },
           animatedStyle,
         ]}
       />
@@ -149,11 +154,22 @@ export const Carousel = React.memo(function Carousel({
 
   const activeIndexRef = useRef(0);
   const didMountRef = useRef(false);
+  const isDraggingRef = useRef(false);
   const scrollX = useSharedValue(0);
   const listRef = useRef<FlatList<React.ReactElement>>(null);
 
-  const resolvedItemWidth = Math.max(1, itemWidth || containerWidth * 0.78);
+  const resolvedItemWidth = Math.max(
+    1,
+    itemWidth
+      ? Math.min(itemWidth, containerWidth)
+      : Math.round(containerWidth * 0.78),
+  );
   const snapStep = resolvedItemWidth + gap;
+  const snapStepSV = useSharedValue(snapStep);
+
+  useEffect(() => {
+    snapStepSV.value = snapStep;
+  }, [snapStep, snapStepSV]);
 
   const scrollToIndex = useCallback(
     (index: number) => {
@@ -191,6 +207,7 @@ export const Carousel = React.memo(function Carousel({
     if (!autoPlay || totalItems <= 1) return;
 
     const timer = setInterval(() => {
+      if (isDraggingRef.current) return;
       const curr = activeIndexRef.current;
       const nextIndex =
         curr < totalItems - 1 ? curr + 1 : loop ? 0 : totalItems - 1;
@@ -225,6 +242,7 @@ export const Carousel = React.memo(function Carousel({
   const contextValue = useMemo<CarouselContextProps>(
     () => ({
       scrollX,
+      snapStepSV,
       itemWidth: resolvedItemWidth,
       snapStep,
       containerWidth,
@@ -232,6 +250,7 @@ export const Carousel = React.memo(function Carousel({
       totalItems,
       showPagination,
       haptic,
+      isDraggingRef,
       setTotalItems,
       scrollPrev,
       scrollNext,
@@ -254,6 +273,7 @@ export const Carousel = React.memo(function Carousel({
       scrollX,
       showPagination,
       snapStep,
+      snapStepSV,
       totalItems,
     ],
   );
@@ -295,10 +315,12 @@ export const CarouselContent = React.memo(function CarouselContent({
 }: CarouselContentProps) {
   const {
     scrollX,
+    snapStepSV,
     itemWidth,
     snapStep,
     containerWidth,
     listRef,
+    isDraggingRef,
     setTotalItems,
     setActiveIndex,
   } = useCarousel();
@@ -312,10 +334,17 @@ export const CarouselContent = React.memo(function CarouselContent({
   );
   const total = items.length;
   const gap = Math.max(0, snapStep - itemWidth);
+  const totalSV = useSharedValue(total);
 
   useEffect(() => {
+    totalSV.value = total;
     setTotalItems(total);
-  }, [setTotalItems, total]);
+  }, [setTotalItems, total, totalSV]);
+
+  const snapOffsets = useMemo(
+    () => items.map((_, i) => i * snapStep),
+    [items, snapStep],
+  );
 
   const updateActiveIndex = useCallback(
     (index: number) => {
@@ -329,14 +358,31 @@ export const CarouselContent = React.memo(function CarouselContent({
   const handleScroll = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollX.value = event.contentOffset.x;
-      const step = Math.max(1, snapStep);
+      const step = Math.max(1, snapStepSV.value);
+      const count = totalSV.value;
       const index = Math.round(event.contentOffset.x / step);
-      if (index >= 0 && index < total && index !== lastActiveIndex.value) {
+      if (index >= 0 && index < count && index !== lastActiveIndex.value) {
         lastActiveIndex.value = index;
         scheduleOnRN(updateActiveIndex, index);
       }
     },
   });
+
+  const handleScrollBeginDrag = useCallback(() => {
+    isDraggingRef.current = true;
+  }, [isDraggingRef]);
+
+  const handleScrollSettle = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      isDraggingRef.current = false;
+      const step = Math.max(1, snapStep);
+      const index = Math.round(event.nativeEvent.contentOffset.x / step);
+      if (index >= 0 && index < total) {
+        setActiveIndex((prev) => (prev !== index ? index : prev));
+      }
+    },
+    [isDraggingRef, setActiveIndex, snapStep, total],
+  );
 
   const sidePadding = Math.max(0, (containerWidth - itemWidth) / 2);
 
@@ -370,12 +416,15 @@ export const CarouselContent = React.memo(function CarouselContent({
         getItemLayout={getItemLayout}
         horizontal
         pagingEnabled={false}
-        snapToInterval={snapStep > 0 ? snapStep : undefined}
-        snapToAlignment="center"
+        snapToOffsets={snapOffsets}
+        disableIntervalMomentum
         decelerationRate="fast"
+        nestedScrollEnabled
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={handleScroll}
+        onScrollBeginDrag={handleScrollBeginDrag}
+        onMomentumScrollEnd={handleScrollSettle}
         contentContainerStyle={[
           { paddingHorizontal: sidePadding },
           style,
@@ -397,10 +446,10 @@ export const CarouselItem = React.memo(function CarouselItem({
   children,
   ...props
 }: CarouselItemProps) {
-  const { scrollX, itemWidth, snapStep } = useCarousel();
+  const { scrollX, itemWidth, snapStepSV } = useCarousel();
 
   const animatedStyle = useAnimatedStyle(() => {
-    const step = Math.max(1, snapStep);
+    const step = Math.max(1, snapStepSV.value);
     const inputRange = [
       (index - 1) * step,
       index * step,
@@ -425,7 +474,7 @@ export const CarouselItem = React.memo(function CarouselItem({
         },
       ],
     };
-  });
+  }, webDeps([index]));
 
   return (
     <Animated.View
@@ -571,7 +620,6 @@ const styles = StyleSheet.create({
   },
   dot: {
     height: 6,
-    borderRadius: 999,
   },
   itemContainer: {
     justifyContent: "center",

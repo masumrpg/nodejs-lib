@@ -1,11 +1,72 @@
 import React, { type ReactNode } from "react";
-import { Platform, type Insets } from "react-native";
+import {
+  Platform,
+  type GestureResponderEvent,
+  type Insets,
+} from "react-native";
 
-import type { ThemeColors, ThemeShadow, ThemeSurfaceStyle } from "../theme";
+import type { ThemeColors, ThemeRadii, ThemeShadow, ThemeSurfaceStyle } from "../theme";
 import { withAlpha } from "../utils/color";
+
+export const RN_UI_PRESSABLE_TRIGGER = Symbol.for(
+  "@masumdev/rn-ui/pressable-trigger",
+);
+
+export function markAsPressableTrigger<T>(component: T): T {
+  (component as unknown as Record<symbol, boolean>)[RN_UI_PRESSABLE_TRIGGER] =
+    true;
+  return component;
+}
+
+export function isPressableTriggerElement(
+  node: unknown,
+): node is React.ReactElement<{
+  disabled?: boolean;
+  onPress?: (event: GestureResponderEvent) => void;
+  onLongPress?: (event: GestureResponderEvent) => void;
+  onPressOut?: (event: GestureResponderEvent) => void;
+  delayLongPress?: number;
+}> {
+  if (!React.isValidElement(node)) return false;
+  const type = node.type as unknown;
+  if (typeof type === "object" || typeof type === "function") {
+    if ((type as Record<symbol, unknown>)[RN_UI_PRESSABLE_TRIGGER]) {
+      return true;
+    }
+    const named = type as { displayName?: string; name?: string };
+    const name = named.displayName ?? named.name ?? "";
+    if (name === "Pressable" || name.startsWith("Touchable")) {
+      return true;
+    }
+  }
+  const props = node.props as Record<string, unknown> | null;
+  if (
+    props &&
+    (typeof props.onPress === "function" ||
+      typeof props.onLongPress === "function")
+  ) {
+    return true;
+  }
+  return false;
+}
 
 export function webDeps(deps: Array<unknown>): Array<unknown> | undefined {
   return Platform.OS === "web" ? deps : undefined;
+}
+
+export function resolveControlRadius(
+  shape: ComponentShape,
+  size: ComponentSize,
+  radii: ThemeRadii,
+): number {
+  if (shape === "pill") return radii.full;
+  if (shape === "square") {
+    return size === "lg" || size === "xl" ? radii.sm : radii.xs;
+  }
+  if (size === "xs") return radii.xs;
+  if (size === "sm") return radii.sm;
+  if (size === "xl") return radii.lg;
+  return radii.md;
 }
 
 export function hasActiveShadow(shadow: ThemeShadow): boolean {

@@ -23,8 +23,13 @@ export function TabsSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 1. Classic Line Variant with Sliding Underline */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Underline Tabs
               </Text>
               <Badge tone="primary">Slide Transition</Badge>
@@ -94,8 +99,13 @@ export function TabsSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 2. Cupertino Capsule Pill Variant */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Pill Capsule Tabs
               </Text>
               <Badge tone="accent">Scale Transition</Badge>
@@ -150,8 +160,13 @@ export function TabsSection(_props?: { ctx?: RnUiSectionContext }) {
         {/* 3. Soft Tint Variant */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Soft Tint Tabs
               </Text>
               <Badge tone="success">Fade Transition</Badge>

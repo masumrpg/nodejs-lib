@@ -133,7 +133,7 @@ export const Item = React.memo(function Item({
     minHeight,
     paddingHorizontal: paddingX,
     paddingVertical: paddingY,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     borderWidth:
       resolvedVariant === "outline" && !isTonalOutline
         ? components.borderWidth.default

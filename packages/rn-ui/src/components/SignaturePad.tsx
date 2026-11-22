@@ -139,8 +139,6 @@ export const SignaturePad = React.forwardRef<SignaturePadRef, SignaturePadProps>
     const panConfig = useMemo(
       () => ({
         minDistance: 0,
-        activeOffsetX: [-1, 1] as [number, number],
-        activeOffsetY: [-1, 1] as [number, number],
         shouldCancelWhenOutside: false,
         onBegin: (event: { x: number; y: number }) => {
           "worklet";

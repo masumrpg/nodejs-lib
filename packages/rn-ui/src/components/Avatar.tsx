@@ -443,7 +443,7 @@ export const AvatarBadge = React.memo(function AvatarBadge({
       borderRadius: dotSize / 2,
       backgroundColor: statusColor,
       borderWidth: components.borderWidth.focus,
-      borderColor: colors.background,
+      borderColor: colors.surface,
       zIndex: 10,
     };
 
@@ -469,21 +469,21 @@ export const AvatarBadge = React.memo(function AvatarBadge({
   const isNumericOrShortText =
     typeof content === "string" || typeof content === "number";
 
-  const minBadgeHeight = Math.max(14, Math.round(dimension * 0.42));
-  const fontSize = Math.max(8, Math.round(dimension * 0.25));
+  const minBadgeHeight = Math.min(20, Math.max(14, Math.round(dimension * 0.34)));
+  const fontSize = Math.min(11, Math.max(8, Math.round(dimension * 0.2)));
 
   const customBadgeStyle: ViewStyle = {
     position: "absolute",
     ...positionStyle,
     minWidth: minBadgeHeight,
     height: minBadgeHeight,
-    paddingHorizontal: isNumericOrShortText ? 4 : 2,
+    paddingHorizontal: isNumericOrShortText ? 5 : 2,
     borderRadius: radii.full,
     backgroundColor: badgeBg,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: components.borderWidth.focus,
-    borderColor: colors.background,
+    borderColor: colors.surface,
     zIndex: 10,
   };
 
@@ -506,6 +506,7 @@ export const AvatarBadge = React.memo(function AvatarBadge({
               fontSize,
               fontWeight: "700",
               lineHeight: fontSize + 2,
+              includeFontPadding: false,
               textAlign: "center",
             },
             textStyle,

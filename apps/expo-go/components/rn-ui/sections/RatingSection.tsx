@@ -19,8 +19,15 @@ export function RatingSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
         <Box gap="lg">
           {/* Default Star Rating with Full Precision */}
           <Box gap="xs">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text variant="label">Standard Star Rating (Full Step)</Text>
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text variant="label" style={{ flexShrink: 1 }}>
+                Standard Star Rating (Full Step)
+              </Text>
               <Text variant="labelSmall" color="textMuted">
                 {starRating} / 5
               </Text>
@@ -39,8 +46,15 @@ export function RatingSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
 
           {/* Half Precision Star Rating */}
           <Box gap="xs">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text variant="label">Half Star Precision (0.5 Step)</Text>
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text variant="label" style={{ flexShrink: 1 }}>
+                Half Star Precision (0.5 Step)
+              </Text>
               <Text variant="labelSmall" color="textMuted">
                 {halfRating} / 5
               </Text>
@@ -57,8 +71,15 @@ export function RatingSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
 
           {/* Heart Shape Rating */}
           <Box gap="xs">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text variant="label">Heart Shape (Love / Favorite)</Text>
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text variant="label" style={{ flexShrink: 1 }}>
+                Heart Shape (Love / Favorite)
+              </Text>
               <Text variant="labelSmall" color="danger">
                 {heartRating} / 5 ❤️
               </Text>
@@ -110,8 +131,15 @@ export function RatingSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
 
           {/* Exact Precision & Custom Render Item */}
           <Box gap="xs">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text variant="label">Exact Fractional Review Display (4.7)</Text>
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text variant="label" style={{ flexShrink: 1 }}>
+                Exact Fractional Review Display (4.7)
+              </Text>
               <Text variant="labelSmall" color="textMuted">
                 Read-only display
               </Text>

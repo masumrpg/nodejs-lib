@@ -11,8 +11,13 @@ export function BadgesSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* All Badge Variants */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Badge Variants
               </Text>
               <Badge tone="primary" variant="filled">
@@ -48,8 +53,13 @@ export function BadgesSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* All Component Tones */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Component Tones with Icons
               </Text>
               <Badge tone="success" variant="outline">
@@ -112,8 +122,13 @@ export function BadgesSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Sizes Scale */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Badge Sizes Scale
               </Text>
               <Badge tone="warning" size="sm">

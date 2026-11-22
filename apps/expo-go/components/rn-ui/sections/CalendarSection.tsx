@@ -243,10 +243,15 @@ export function CalendarSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Multi-Dot Event Calendar & Agenda */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Box row center gap="xs">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Box row center gap="xs" style={{ flexShrink: 1 }}>
                 <Sparkles color={colors.accent} size={18} />
-                <Text weight="700" color="text">
+                <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                   Multi-Dot Events & Schedule
                 </Text>
               </Box>
@@ -290,10 +295,15 @@ export function CalendarSection({ ctx }: { ctx: RnUiSectionContext }) {
                 gap: 10,
               }}
             >
-              <Box row center style={{ justifyContent: "space-between" }}>
-                <Box row center gap="xs">
+              <Box
+                row
+                wrap
+                gap="sm"
+                style={{ alignItems: "center", justifyContent: "space-between" }}
+              >
+                <Box row center gap="xs" style={{ flexShrink: 1 }}>
                   <CalendarIcon color={colors.primary} size={15} />
-                  <Text weight="600" color="text" variant="bodySmall">
+                  <Text weight="600" color="text" variant="bodySmall" style={{ flexShrink: 1 }}>
                     Agenda for {eventDate}
                   </Text>
                 </Box>
@@ -377,10 +387,15 @@ export function CalendarSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Single Selection & Fast Month/Year Picker */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Box row center gap="xs">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Box row center gap="xs" style={{ flexShrink: 1 }}>
                 <Layers color={colors.primary} size={18} />
-                <Text weight="700" color="text">
+                <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                   Fast Month & Year Selector
                 </Text>
               </Box>
@@ -408,8 +423,13 @@ export function CalendarSection({ ctx }: { ctx: RnUiSectionContext }) {
                 gap: 8,
               }}
             >
-              <Box row center style={{ justifyContent: "space-between" }}>
-                <Text weight="600" color="text" variant="bodySmall">
+              <Box
+                row
+                wrap
+                gap="sm"
+                style={{ alignItems: "center", justifyContent: "space-between" }}
+              >
+                <Text weight="600" color="text" variant="bodySmall" style={{ flexShrink: 1 }}>
                   Selected: {selectedDate}
                 </Text>
                 <Badge tone="success" variant="outline">
@@ -438,8 +458,13 @@ export function CalendarSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Range Selection Calendar */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Period & Date Range Selection
               </Text>
               <Badge tone="accent" variant="outline">
@@ -481,10 +506,15 @@ export function CalendarSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Expandable Calendar Showcase */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Box row center gap="xs">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Box row center gap="xs" style={{ flexShrink: 1 }}>
                 <ChevronDown color={colors.primary} size={18} />
-                <Text weight="700" color="text">
+                <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                   Expandable Week / Month Calendar
                 </Text>
               </Box>
@@ -564,10 +594,15 @@ export function CalendarSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Dedicated Timeline Calendar Screen Launcher */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Box row center gap="xs">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Box row center gap="xs" style={{ flexShrink: 1 }}>
                 <Clock color={colors.accent} size={18} />
-                <Text weight="700" color="text">
+                <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                   Dedicated Timeline Calendar
                 </Text>
               </Box>

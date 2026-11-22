@@ -23,6 +23,7 @@ import { Text } from "./Text";
 import {
   hasActiveShadow,
   minTouchHitSlop,
+  resolveControlRadius,
   type BaseGlassProps,
   type ComponentSize,
   type SizeProps,
@@ -157,7 +158,7 @@ export const InputGroup = React.memo(function InputGroup({
           styles.group,
           {
             minHeight: components.input.height[size],
-            borderRadius: radii.xl,
+            borderRadius: resolveControlRadius("rounded", size, radii),
             borderWidth: focused
               ? components.borderWidth.focus
               : components.borderWidth.strong,

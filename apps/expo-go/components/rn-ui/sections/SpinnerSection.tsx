@@ -37,8 +37,13 @@ export function SpinnerSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Interactive Playground Card */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Live Spinner Playground
               </Text>
               <Button
@@ -203,8 +208,13 @@ export function SpinnerSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Card Overlay Loading Simulation */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Card Overlay Simulation
               </Text>
               <Button

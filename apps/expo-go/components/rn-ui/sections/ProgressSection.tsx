@@ -43,8 +43,13 @@ export function ProgressSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
         {/* Interactive Progress Demo */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Live Interactive Progress
               </Text>
               <Text weight="700" color="primary">
@@ -83,8 +88,13 @@ export function ProgressSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
         {/* Sizes Showcase */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Progress Bar Sizes
               </Text>
               <Badge tone="accent">xs, sm, md, lg, xl</Badge>
@@ -135,8 +145,13 @@ export function ProgressSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
         {/* Indeterminate & Circular Progress */}
         <Card outlined>
           <Box gap="md">
-            <Box row center style={{ justifyContent: "space-between" }}>
-              <Text weight="700" color="text">
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
                 Indeterminate & Circular Progress Ring
               </Text>
               <Badge tone="success">Rounded Ring</Badge>

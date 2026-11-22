@@ -471,7 +471,6 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                   <FormDescription>Enable express turnaround delivery.</FormDescription>
                 </Box>
                 <Switch
-                  shape="oval"
                   value={formData.fastTrack}
                   onValueChange={(val) => setFormData((prev) => ({ ...prev, fastTrack: val }))}
                 />
@@ -481,8 +480,13 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
 
           {/* 16. Digital Signature (SignaturePad) */}
           <FormField error={errors.hasSignature} required>
-            <Box row center style={{ justifyContent: "space-between", width: "100%", marginBottom: 6 }}>
-              <FormLabel style={{ flex: 1, marginRight: 8 }}>16. Digital Signature (SignaturePad)</FormLabel>
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ alignItems: "center", justifyContent: "space-between", width: "100%", marginBottom: 6 }}
+            >
+              <FormLabel style={{ flexShrink: 1 }}>16. Digital Signature (SignaturePad)</FormLabel>
               <Box row style={{ gap: 6, flexShrink: 0 }}>
                 <Button
                   size="xs"

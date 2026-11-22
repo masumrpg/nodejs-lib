@@ -23,8 +23,15 @@ export function PopoverSection({ ctx }: { ctx: RnUiSectionContext }) {
 
             <PopoverContent width={320}>
               <Box gap="sm">
-                <Box row style={{ justifyContent: "space-between", alignItems: "center" }}>
-                  <Text variant="h3" weight="700">Quick Actions</Text>
+                <Box
+                  row
+                  wrap
+                  gap="sm"
+                  style={{ justifyContent: "space-between", alignItems: "center" }}
+                >
+                  <Text variant="h3" weight="700" style={{ flexShrink: 1 }}>
+                    Quick Actions
+                  </Text>
                   <Button
                     variant="ghost"
                     tone="secondary"

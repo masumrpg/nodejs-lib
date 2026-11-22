@@ -21,10 +21,10 @@ This document is optimized for LLMs and AI coding assistants writing React Nativ
    - **`tone` (Semantic Intent)**: `"default"` | `"primary"` | `"secondary"` | `"accent"` | `"success"` | `"warning"` | `"danger"` | `"info"`.
    - **`variant` (Visual Treatment)**: `"filled"` | `"outline"` | `"ghost"` | `"soft"` (with component-specific structural variants such as `"accent"` on `Alert`, `"flat"` on `Accordion` / `Toast`, `"line"` / `"pill"` on `Tabs`).
    - **CRITICAL CONVENTIONS (`v0.7.0`)**:
-     - Use `variant="filled"` on `Button`, `Badge`, `Alert`, `Bubble`, `ButtonGroup`, `IconButton`, and `Chip` (do **NOT** use `variant="solid"` on those components).
+     - Use `variant="filled"` on `Button`, `Badge`, `Alert`, `Bubble`, `IconButton`, and `Chip` (do **NOT** use `variant="solid"` on those components).
      - Use `variant="outline"` on `Accordion`, `Alert`, `Badge`, `Bubble`, `Button`, `Chip`, `Toast`, `Select`, and `Combobox` (do **NOT** use `variant="outlined"`).
      - Use `size="md"` instead of `size="default"` across `ComponentSize` props (`Avatar`, `Badge`, `Button`, `Chip`, `EmptyMedia`, `Progress`, `Spinner`).
-     - Use `shape="pill" | "oval" | "rounded"` on `Switch` (not `variant="round" | "oval"`), and `glass?: boolean` instead of `variant="glass"` on `Alert` / `Accordion`.
+     - `Switch` uses a single unified fluid oval silhouette (do **NOT** pass a `shape` prop), and `glass?: boolean` replaces `variant="glass"` on `Switch` / `Alert` / `Accordion`.
      - Use `tone="default"` for neutral styling in `ComponentTone` (do **NOT** use `tone="neutral"`).
 3. **Zero-Bounce Animation Policy**:
    - All Reanimated transitions MUST use `withTiming` with cubic easing (`Easing.bezier(0.23, 1, 0.32, 1)` / `ANIMATION_TIMING`) and respect `useReducedMotion()`.
@@ -266,7 +266,6 @@ export function LoginForm() {
       <Box row align="center" justify="space-between">
         <Text>Receive daily digest notifications</Text>
         <Switch
-          shape="pill"
           value={notifications}
           onValueChange={setNotifications}
         />
@@ -468,13 +467,13 @@ export function NavigationExamples() {
 | `<Button variant="solid">` / `<Badge variant="subtle">` | `<Button variant="filled">` / `<Badge variant="soft">` | Canonical variants are `"filled"`, `"outline"`, `"soft"`, `"ghost"`. |
 | `<Alert variant="glass">` / `<Accordion variant="glass">` | `<Alert variant="soft" glass>` / `<Accordion variant="outline" glass>` | `glass` is an orthogonal boolean prop across components. |
 | `<Spinner size="default">` / `<Progress size="default">` | `<Spinner size="md">` / `<Progress size="md">` | `ComponentSize` uses `"xs" | "sm" | "md" | "lg" | "xl"`. |
-| `<Switch variant="oval">` | `<Switch shape="oval">` | Corner geometry moved to `shape="pill" | "oval" | "rounded"`. |
+| `<Switch variant="oval">` / `<Switch shape="pill">` | `<Switch />` | Unified into one enhanced fluid oval silhouette; remove `shape` and legacy `variant="oval"`. |
 | `import { Loader, Tag, FormMessage, TimePickerDialog } from '@masumdev/rn-ui'` | Use `Spinner`, `Chip`, `FormError`, `TimePickerModal` | Legacy aliases were removed in `v0.7.0`. |
 | `withSpring(val, { bounciness: 12 })` | `withTiming(val, { duration: 180, easing: Easing.bezier(0.23, 1, 0.32, 1) })` | Strict Zero-Bounce `withTiming` + `useReducedMotion()` policy. |
 
 ---
 
-## Full Catalog (63 Component Modules + ThemeProvider / Portal)
+## Full Catalog (62 Component Modules + ThemeProvider / Portal)
 
 All components are imported directly from `@masumdev/rn-ui`:
 
@@ -491,11 +490,10 @@ All components are imported directly from `@masumdev/rn-ui`:
 - `KeyboardAvoiding`: Safe keyboard avoiding layout wrapper.
 - `Empty`, `EmptyMedia`, `EmptyHeader`, `EmptyTitle`, `EmptyDescription`, `EmptyContent`: Empty state placeholder primitives.
 
-### Typography & Actions (8)
+### Typography & Actions (7)
 - `Text`: Theme-aware typography primitive preserving custom font weights and header roles.
 - `Button`: Pressable button with loading spinner, icon slots (`leftIcon`, `rightIcon`), `variant`, `tone`, and `glass`.
 - `IconButton`: Compact square, rounded, or circular icon action button.
-- `ButtonGroup`: Horizontally attached segmented button cluster.
 - `FloatingActionButton`: Fixed-position floating action button.
 - `SpeedDial`: Expanding FAB action menu rendered inside `Portal`.
 - `SwipeableItem`: Gesture-driven swipeable row with left/right actions and full-swipe trigger.
@@ -507,7 +505,7 @@ All components are imported directly from `@masumdev/rn-ui`:
 - `InputOTP`, `InputOTPGroup`, `InputOTPSlot`, `InputOTPSeparator`: Segmented PIN / 2FA code boxes.
 - `Textarea`: Multi-line text input box with character counter.
 - `Checkbox`: Accessible checkbox toggle with indeterminate state.
-- `Switch`: Smooth animated toggle switch with `variant="filled" | "outline"` and `shape="pill" | "oval" | "rounded"`.
+- `Switch`: Smooth animated fluid oval toggle switch with inward press-stretch motion and `variant="filled" | "outline"`.
 - `RadioGroup`, `RadioGroupItem`: Single-choice option group with `card` and `plain` variants.
 - `Select`: Portal-layered virtualized dropdown select picker.
 - `Combobox`, `ComboboxInput`, `ComboboxContent`, `ComboboxList`, `ComboboxItem`, `ComboboxEmpty`: Searchable filterable select dropdown.

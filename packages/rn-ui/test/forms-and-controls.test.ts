@@ -21,6 +21,7 @@ import {
   Stepper,
   Switch,
   ThemeProvider,
+  lightTheme,
 } from "../src";
 import { act, collectText, findAllNodes, mockUiState, renderUI } from "./setup";
 
@@ -75,9 +76,9 @@ describe("forms, controls & input components", () => {
             onCheckedChange: onCheckbox,
           }),
           React.createElement(Switch, {
-            checked: false,
+            value: false,
             disabled: true,
-            onCheckedChange: onSwitch,
+            onValueChange: onSwitch,
           }),
           React.createElement(
             RadioGroup,
@@ -161,6 +162,51 @@ describe("forms, controls & input components", () => {
 
     expect(collectText(container)).toContain("1");
     expect(collectText(container)).toContain("2");
+    expect(mockUiState.withSpringCallCount).toBe(0);
+  });
+
+  it("renders Switch with unified fluid oval proportions, centered wrapper, and toggle callback", () => {
+    const onValueChange = mock((_next: boolean) => {});
+    const { container } = renderUI(
+      wrap(
+        React.createElement(Switch, {
+          value: false,
+          onValueChange,
+          accessibilityLabel: "Notifications",
+        }),
+      ),
+    );
+
+    const pressable = findAllNodes(
+      container,
+      (n) => n.props?.accessibilityRole === "switch",
+    )[0];
+    expect(pressable).toBeDefined();
+    const wrapperStyle =
+      (pressable?.props?.style as Record<string, unknown> | undefined) ?? {};
+    expect(wrapperStyle.alignSelf).toBeUndefined();
+
+    const animViews = pressable
+      ? findAllNodes(pressable, (n) => n.type === "anim-view")
+      : [];
+    const trackStyle =
+      (animViews[0]?.props?.style as Record<string, unknown> | undefined) ?? {};
+    const thumbStyle =
+      (animViews[1]?.props?.style as Record<string, unknown> | undefined) ?? {};
+
+    expect(Number(trackStyle.width)).toBeGreaterThan(
+      Number(trackStyle.height) * 1.7,
+    );
+    expect(trackStyle.borderRadius).toBe(lightTheme.radii.full);
+    expect(Number(thumbStyle.width)).toBeGreaterThan(Number(thumbStyle.height));
+    expect(thumbStyle.borderRadius).toBe(lightTheme.radii.full);
+
+    act(() => {
+      (pressable?.props?.onPress as (() => void) | undefined)?.();
+    });
+
+    expect(onValueChange).toHaveBeenCalledTimes(1);
+    expect(onValueChange).toHaveBeenCalledWith(true);
     expect(mockUiState.withSpringCallCount).toBe(0);
   });
 });
