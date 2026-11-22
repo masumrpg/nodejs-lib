@@ -37,7 +37,7 @@ export function ChatBubblesSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
                 />
                 <AvatarFallback>{SAMPLE_ASSETS.avatarInitials}</AvatarFallback>
               </Avatar>
-              <Bubble align="start" variant="secondary">
+              <Bubble align="start" tone="secondary" variant="soft">
                 <BubbleContent>
                   Hai! Apakah kamu bisa bantu saya memahami cara kustomisasi
                   tema warna di pustaka ini?
@@ -46,27 +46,27 @@ export function ChatBubblesSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
             </Box>
 
             {/* Outgoing message */}
-            <Bubble align="end" variant="default">
+            <Bubble align="end" tone="primary" variant="filled">
               <BubbleContent>
                 Tentu! Kamu cukup buat objek tema baru dan oper ke
                 ThemeProvider. Contoh lengkapnya ada di dokumentasi README.
               </BubbleContent>
               <BubbleReactions side="bottom" align="end">
-                <Text style={{ fontSize: 11 }}>👍 2</Text>
+                <Text style={{ fontSize: 11 }}>+2</Text>
               </BubbleReactions>
             </Bubble>
 
             {/* Outgoing follow-up */}
-            <Bubble align="end" variant="tinted">
+            <Bubble align="end" tone="primary" variant="soft">
               <BubbleContent>
-                Apakah penjelasan ini cukup membantu? 😊
+                Apakah penjelasan ini cukup membantu?
               </BubbleContent>
               <BubbleReactions side="bottom" align="end">
-                <Text style={{ fontSize: 11 }}>❤️ 1</Text>
+                <Text style={{ fontSize: 11 }}>+1</Text>
               </BubbleReactions>
             </Bubble>
 
-            {/* Incoming message with warning/destructive alert */}
+            {/* Incoming message with danger/warning alert */}
             <Box
               row
               gap="sm"
@@ -84,19 +84,19 @@ export function ChatBubblesSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
                 />
                 <AvatarFallback>JD</AvatarFallback>
               </Avatar>
-              <Bubble align="start" variant="destructive">
+              <Bubble align="start" tone="danger" variant="soft">
                 <BubbleContent>
                   Wah, kelihatannya ada yang salah di setup saya. Warnanya tidak
                   mau ganti.
                 </BubbleContent>
                 <BubbleReactions side="bottom" align="start">
-                  <Text style={{ fontSize: 11 }}>😢 1</Text>
+                  <Text style={{ fontSize: 11 }}>1 reply</Text>
                 </BubbleReactions>
               </Bubble>
             </Box>
 
             {/* Outgoing message with outline variant */}
-            <Bubble align="end" variant="outline">
+            <Bubble align="end" tone="primary" variant="outline">
               <BubbleContent>
                 Coba pastikan berkas konfigurasi tsconfig sudah benar dan build
                 ulang projectnya.

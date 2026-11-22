@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  StyleSheet,
   View,
   type StyleProp,
   type ViewProps,
@@ -16,60 +17,85 @@ export interface PaginationProps extends ViewProps {
   onPageChange?: (page: number) => void;
   previousLabel?: string;
   nextLabel?: string;
+  previousAccessibilityLabel?: string;
+  nextAccessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 }
 
-export function Pagination({
+export const Pagination = React.memo(function Pagination({
   page,
   pageCount,
   onPageChange,
   previousLabel = "Prev",
   nextLabel = "Next",
+  previousAccessibilityLabel = "Previous page",
+  nextAccessibilityLabel = "Next page",
   style,
   ...props
 }: PaginationProps) {
   const { spacing } = useTheme();
-  const safePage = Math.min(pageCount, Math.max(1, page));
+  const isCountValid = Number.isFinite(pageCount) && pageCount > 0;
+  const safeCount = isCountValid ? Math.max(1, Math.trunc(pageCount)) : 1;
+  const rawPage = Number.isFinite(page) ? Math.trunc(page) : 1;
+  const safePage = Math.min(safeCount, Math.max(1, rawPage));
+
+  const prevDisabled = !isCountValid || safePage <= 1;
+  const nextDisabled = !isCountValid || safePage >= safeCount;
 
   return (
     <View
-      style={[
-        {
-          width: "100%",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: spacing.sm,
-        },
-        style,
-      ]}
+      accessibilityRole="none"
+      accessibilityLabel={`Pagination, page ${safePage} of ${safeCount}`}
+      style={[styles.container, { gap: spacing.sm }, style]}
       {...props}
     >
       <Button
         size="sm"
         variant="outline"
         tone="secondary"
-        disabled={safePage <= 1}
-        onPress={() => onPageChange?.(safePage - 1)}
+        accessibilityLabel={previousAccessibilityLabel}
+        disabled={prevDisabled}
+        onPress={() => {
+          if (!prevDisabled) {
+            onPageChange?.(safePage - 1);
+          }
+        }}
       >
         {previousLabel}
       </Button>
       <Text
         variant="labelSmall"
         color="textMuted"
-        style={{ fontVariant: ["tabular-nums"] }}
+        style={styles.pageLabel}
       >
-        {safePage} / {pageCount}
+        {safePage} / {safeCount}
       </Text>
       <Button
         size="sm"
         variant="outline"
         tone="secondary"
-        disabled={safePage >= pageCount}
-        onPress={() => onPageChange?.(safePage + 1)}
+        accessibilityLabel={nextAccessibilityLabel}
+        disabled={nextDisabled}
+        onPress={() => {
+          if (!nextDisabled) {
+            onPageChange?.(safePage + 1);
+          }
+        }}
       >
         {nextLabel}
       </Button>
     </View>
   );
-}
+});
+
+const styles = StyleSheet.create({
+  container: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  pageLabel: {
+    fontVariant: ["tabular-nums"],
+  },
+});

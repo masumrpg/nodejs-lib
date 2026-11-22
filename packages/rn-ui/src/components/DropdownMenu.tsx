@@ -1,13 +1,11 @@
-import React from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Dimensions,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
+  useWindowDimensions,
   type GestureResponderEvent,
-  type ModalProps,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
@@ -15,30 +13,42 @@ import {
 import Animated, {
   Easing,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import Svg, { Path } from "react-native-svg";
 
-import { useTheme, type ThemeColors } from "../theme";
+import { Portal, useTheme, type ThemeColors } from "../theme";
+import {
+  computeAnchoredPosition,
+  measureAnchorNode,
+  useDelayedUnmount,
+  withAlpha,
+  type AnchorMeasurement,
+} from "../utils";
 import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
-import { renderIcon, type RenderIcon } from "./types";
+import {
+  ANIMATION_TIMING,
+  minTouchHitSlop,
+  renderIcon,
+  type BaseGlassProps,
+  type BaseHapticProps,
+  type RenderIcon,
+} from "./types";
 
 export type DropdownMenuAlign = "start" | "end";
 export type DropdownMenuItemVariant = "default" | "destructive";
 
-interface DropdownMenuTriggerLayout {
-  pageX: number;
-  pageY: number;
-  width: number;
-  height: number;
-}
-
 export interface DropdownMenuContextProps {
   open: boolean;
   setOpen: (open: boolean) => void;
-  triggerLayout: DropdownMenuTriggerLayout;
-  setTriggerLayout: (layout: DropdownMenuTriggerLayout) => void;
+  anchor: AnchorMeasurement | null;
+  setAnchor: (layout: AnchorMeasurement | null) => void;
+  triggerRef: React.RefObject<React.ComponentRef<typeof View> | null>;
+  glass: boolean;
+  haptic: boolean;
   colors: ThemeColors;
 }
 
@@ -53,33 +63,30 @@ export function useDropdownMenu() {
   return context;
 }
 
-export interface DropdownMenuProps {
+export interface DropdownMenuProps extends BaseGlassProps, BaseHapticProps {
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   children?: React.ReactNode;
 }
 
-export function DropdownMenu({
+export const DropdownMenu = React.memo(function DropdownMenu({
   open: controlledOpen,
   defaultOpen = false,
   onOpenChange,
+  glass = false,
+  haptic = true,
   children,
 }: DropdownMenuProps) {
   const { colors } = useTheme();
-  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen);
-  const [triggerLayout, setTriggerLayout] =
-    React.useState<DropdownMenuTriggerLayout>({
-      pageX: 0,
-      pageY: 0,
-      width: 0,
-      height: 0,
-    });
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
+  const [anchor, setAnchor] = useState<AnchorMeasurement | null>(null);
+  const triggerRef = useRef<React.ComponentRef<typeof View>>(null);
 
   const isControlled = controlledOpen !== undefined;
-  const open = isControlled ? controlledOpen : uncontrolledOpen;
+  const open = isControlled ? Boolean(controlledOpen) : uncontrolledOpen;
 
-  const setOpen = React.useCallback(
+  const setOpen = useCallback(
     (nextOpen: boolean) => {
       if (!isControlled) {
         setUncontrolledOpen(nextOpen);
@@ -89,20 +96,36 @@ export function DropdownMenu({
     [isControlled, onOpenChange],
   );
 
+  useEffect(() => {
+    if (open) {
+      measureAnchorNode(triggerRef, (rect) => {
+        setAnchor(rect);
+      });
+    }
+  }, [open]);
+
+  const value = useMemo<DropdownMenuContextProps>(
+    () => ({
+      open,
+      setOpen,
+      anchor,
+      setAnchor,
+      triggerRef,
+      glass,
+      haptic,
+      colors,
+    }),
+    [anchor, colors, glass, haptic, open, setOpen],
+  );
+
   return (
-    <DropdownMenuContext.Provider
-      value={{
-        open,
-        setOpen,
-        triggerLayout,
-        setTriggerLayout,
-        colors,
-      }}
-    >
-      <View style={{ alignSelf: "flex-start" }}>{children}</View>
+    <DropdownMenuContext.Provider value={value}>
+      <View collapsable={false} style={styles.triggerRoot}>
+        {children}
+      </View>
     </DropdownMenuContext.Provider>
   );
-}
+});
 
 export interface DropdownMenuTriggerProps {
   children?: React.ReactNode;
@@ -110,61 +133,68 @@ export interface DropdownMenuTriggerProps {
   disabled?: boolean;
 }
 
-export function DropdownMenuTrigger({
+export const DropdownMenuTrigger = React.memo(function DropdownMenuTrigger({
   children,
   style,
   disabled = false,
 }: DropdownMenuTriggerProps) {
-  const { open, setOpen, setTriggerLayout } = useDropdownMenu();
-  const triggerRef = React.useRef<React.ComponentRef<typeof View>>(null);
+  const { open, setOpen, setAnchor, triggerRef, haptic } = useDropdownMenu();
+  const childDisabled = React.isValidElement<{ disabled?: boolean }>(children)
+    ? Boolean(children.props.disabled)
+    : false;
+  const mergedDisabled = disabled || childDisabled;
 
-  const handlePress = () => {
-    if (disabled) return;
-    triggerHaptic("selection");
+  const handlePress = useCallback(() => {
+    if (mergedDisabled) return;
+    if (haptic) triggerHaptic("selection");
 
-    triggerRef.current?.measureInWindow(
-      (x: number, y: number, width: number, height: number) => {
-        if (width > 0 && height > 0) {
-          setTriggerLayout({ pageX: x, pageY: y, width, height });
-          setOpen(!open);
-        }
-      },
-    );
-  };
-
-  if (React.isValidElement(children)) {
-    return React.cloneElement(
-      children as React.ReactElement<Record<string, unknown>>,
-      {
-        ref: triggerRef as never,
-        disabled,
-        onPress: (e: GestureResponderEvent) => {
-          handlePress();
-          (
-            children.props as {
-              onPress?: (e: GestureResponderEvent) => void;
-            }
-          )?.onPress?.(e);
-        },
-      },
-    );
-  }
+    const nextOpen = !open;
+    if (nextOpen) {
+      measureAnchorNode(triggerRef, (rect) => {
+        setAnchor(rect);
+      });
+      setOpen(true);
+    } else {
+      setOpen(false);
+    }
+  }, [haptic, mergedDisabled, open, setAnchor, setOpen, triggerRef]);
 
   return (
-    <Pressable
-      ref={triggerRef as never}
-      accessibilityRole="button"
-      accessibilityState={{ expanded: open, disabled }}
-      disabled={disabled}
-      onPress={handlePress}
-      style={style}
-    >
-      {children}
-    </Pressable>
+    <View ref={triggerRef} collapsable={false} style={style}>
+      {React.isValidElement(children) ? (
+        React.cloneElement(
+          children as React.ReactElement<{
+            disabled?: boolean;
+            onPress?: (e: GestureResponderEvent) => void;
+          }>,
+          {
+            disabled: mergedDisabled,
+            onPress: (e: GestureResponderEvent) => {
+              handlePress();
+              (
+                children.props as {
+                  onPress?: (ev: GestureResponderEvent) => void;
+                }
+              )?.onPress?.(e);
+            },
+          },
+        )
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: open, disabled: mergedDisabled }}
+          disabled={mergedDisabled}
+          hitSlop={minTouchHitSlop(36)}
+          onPress={handlePress}
+        >
+          {children}
+        </Pressable>
+      )}
+    </View>
   );
-}
+});
 
-export interface DropdownMenuContentProps {
+export interface DropdownMenuContentProps extends BaseGlassProps {
   children?: React.ReactNode;
   align?: DropdownMenuAlign;
   width?: number;
@@ -172,125 +202,135 @@ export interface DropdownMenuContentProps {
   sideOffset?: number;
   style?: StyleProp<ViewStyle>;
   overlayStyle?: StyleProp<ViewStyle>;
-  modalProps?: Omit<
-    ModalProps,
-    "visible" | "transparent" | "animationType" | "onRequestClose"
-  >;
 }
 
-export function DropdownMenuContent({
+export const DropdownMenuContent = React.memo(function DropdownMenuContent({
   children,
   align = "start",
   width = 220,
   maxHeight = 320,
   sideOffset = 6,
+  glass: contentGlass,
   style,
   overlayStyle,
-  modalProps,
 }: DropdownMenuContentProps) {
-  const { open, setOpen, triggerLayout, colors } = useDropdownMenu();
-  const { components, radii, spacing, isDark } = useTheme();
-  const progress = useSharedValue(0);
+  const dropdownContext = useDropdownMenu();
+  const { open, setOpen, anchor, glass: contextGlass, haptic, colors } =
+    dropdownContext;
+  const { components, radii, shadows, spacing, isDark } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
-  React.useEffect(() => {
-    if (open) {
-      triggerHaptic("medium");
-      progress.value = withTiming(1, {
-        duration: 160,
-        easing: Easing.bezier(0.23, 1, 0.32, 1),
-      });
-    } else {
-      progress.value = withTiming(0, {
-        duration: 120,
-        easing: Easing.bezier(0.23, 1, 0.32, 1),
-      });
-    }
-  }, [open, progress]);
-
-  const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
-  const spaceBelow =
-    screenHeight - (triggerLayout.pageY + triggerLayout.height);
-  const renderAbove = spaceBelow < maxHeight + 40;
-  const rawLeft =
-    align === "end"
-      ? triggerLayout.pageX + triggerLayout.width - width
-      : triggerLayout.pageX;
-  const left = Math.min(
-    Math.max(spacing.sm, rawLeft),
-    screenWidth - width - spacing.sm,
+  const glass = contentGlass ?? contextGlass;
+  const shouldMount = useDelayedUnmount(
+    open,
+    reducedMotion ? 0 : ANIMATION_TIMING.transition,
   );
-  const positionStyle = renderAbove
-    ? { bottom: screenHeight - triggerLayout.pageY + sideOffset }
-    : { top: triggerLayout.pageY + triggerLayout.height + sideOffset };
+  const progress = useSharedValue(open ? 1 : 0);
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: progress.value,
-      transform: [
-        {
-          translateY: renderAbove
-            ? (1 - progress.value) * 6
-            : (1 - progress.value) * -6,
-        },
-        {
-          scale: 0.95 + progress.value * 0.05,
-        },
-      ],
-    };
+  useEffect(() => {
+    if (open) {
+      if (haptic) triggerHaptic("medium");
+      progress.value = reducedMotion
+        ? 1
+        : withTiming(1, {
+            duration: ANIMATION_TIMING.transition,
+            easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+          });
+    } else {
+      progress.value = reducedMotion
+        ? 0
+        : withTiming(0, {
+            duration: 120,
+            easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+          });
+    }
+  }, [haptic, open, progress, reducedMotion]);
+
+  const resolvedAnchor: AnchorMeasurement = anchor ?? {
+    x: spacing.sm,
+    y: windowHeight * 0.25,
+    width,
+    height: 40,
+  };
+  const coords = computeAnchoredPosition({
+    anchor: resolvedAnchor,
+    contentWidth: width,
+    contentHeight: Math.min(maxHeight, 240),
+    windowWidth,
+    windowHeight,
+    preferredPlacement: "bottom",
+    align: align === "end" ? "end" : "start",
+    offset: sideOffset,
+    viewportPadding: spacing.sm,
   });
 
-  if (!open) return null;
+  const renderAbove = coords.resolvedPlacement === "top";
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [
+      {
+        translateY: renderAbove
+          ? (1 - progress.value) * 6
+          : (1 - progress.value) * -6,
+      },
+      { scale: 0.95 + progress.value * 0.05 },
+    ],
+  }));
+
+  if (!shouldMount && !open) return null;
 
   return (
-    <Modal
-      transparent
-      visible={open}
-      animationType="none"
-      statusBarTranslucent
-      navigationBarTranslucent
-      hardwareAccelerated
-      onRequestClose={() => setOpen(false)}
-      {...modalProps}
-    >
-      <Pressable
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: isDark ? "rgba(0,0,0,0.4)" : "rgba(15,23,42,0.25)" },
-          overlayStyle,
-        ]}
-        onPress={() => {
-          triggerHaptic("selection");
-          setOpen(false);
-        }}
-      />
+    <Portal layer="popover">
+      <DropdownMenuContext.Provider value={dropdownContext}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss menu"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: isDark
+                ? withAlpha("#000000", 0.35)
+                : withAlpha("#0F172A", 0.18),
+            },
+            overlayStyle,
+          ]}
+          onPress={() => {
+            if (haptic) triggerHaptic("selection");
+            setOpen(false);
+          }}
+        />
 
-      <Animated.View
-        style={[
-          {
-            position: "absolute",
-            left,
-            width,
-            backgroundColor: isDark
-              ? colors.surfaceRaised ?? colors.surface
-              : colors.surface,
-            borderWidth: components.borderWidth.strong,
-            borderColor: colors.border,
-            borderRadius: radii.xl,
-            padding: spacing.xs,
-            maxHeight,
-            elevation: 0,
-            overflow: "hidden",
-          },
-          positionStyle,
-          animatedStyle,
-          style,
-        ]}
-      >
-        <ScrollView keyboardShouldPersistTaps="handled">{children}</ScrollView>
-      </Animated.View>
-    </Modal>
+        <Animated.View
+          accessibilityRole="menu"
+          style={[
+            styles.content,
+            {
+              top: coords.top,
+              left: coords.left,
+              width,
+              maxHeight,
+              backgroundColor: glass
+                ? colors.glassSurfaceStrong
+                : colors.surface,
+              borderWidth: components.borderWidth.default,
+              borderColor: glass ? colors.glassBorder : colors.border,
+              borderRadius: radii.xl,
+              padding: spacing.xs,
+            },
+            shadows.lg,
+            animatedStyle,
+            style,
+          ]}
+        >
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {children}
+          </ScrollView>
+        </Animated.View>
+      </DropdownMenuContext.Provider>
+    </Portal>
   );
-}
+});
 
 export interface DropdownMenuItemProps {
   onPress?: () => void;
@@ -301,7 +341,7 @@ export interface DropdownMenuItemProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function DropdownMenuItem({
+export const DropdownMenuItem = React.memo(function DropdownMenuItem({
   onPress,
   children,
   leftIcon,
@@ -309,7 +349,7 @@ export function DropdownMenuItem({
   disabled = false,
   style,
 }: DropdownMenuItemProps) {
-  const { setOpen, colors } = useDropdownMenu();
+  const { setOpen, haptic, colors } = useDropdownMenu();
   const { radii, spacing, typography } = useTheme();
   const isDestructive = variant === "destructive";
   const textColor = disabled
@@ -318,22 +358,22 @@ export function DropdownMenuItem({
       ? colors.danger
       : colors.text;
 
-  const handlePress = () => {
+  const handlePress = useCallback(() => {
     if (disabled) return;
-    triggerHaptic("selection");
+    if (haptic) triggerHaptic("selection");
     onPress?.();
     setOpen(false);
-  };
+  }, [disabled, haptic, onPress, setOpen]);
 
   return (
     <Pressable
+      accessibilityRole="menuitem"
+      accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={handlePress}
       style={({ pressed }) => [
+        styles.item,
         {
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
           paddingVertical: spacing.sm,
           paddingHorizontal: spacing.md,
           borderRadius: radii.md,
@@ -341,17 +381,19 @@ export function DropdownMenuItem({
             ? isDestructive
               ? colors.dangerSoft
               : colors.surfaceMuted
-            : colors.transparent,
+            : "transparent",
           opacity: disabled ? 0.5 : 1,
           gap: spacing.sm,
         },
         style,
       ]}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, flex: 1 }}>
+      <View style={[styles.itemLead, { gap: spacing.sm }]}>
         {leftIcon ? renderIcon(leftIcon, textColor, 16) : null}
-        {typeof children === "string" ? (
-          <Text style={{ ...typography.bodySmall, color: textColor, fontWeight: "500" }}>
+        {typeof children === "string" || typeof children === "number" ? (
+          <Text
+            style={[typography.bodySmall, { color: textColor, fontWeight: "500" }]}
+          >
             {children}
           </Text>
         ) : (
@@ -360,7 +402,7 @@ export function DropdownMenuItem({
       </View>
     </Pressable>
   );
-}
+});
 
 export interface DropdownMenuCheckboxItemProps {
   checked?: boolean;
@@ -372,110 +414,119 @@ export interface DropdownMenuCheckboxItemProps {
   checkIcon?: RenderIcon;
 }
 
-function CheckIcon({ color }: { color: string }) {
-  return (
-    <View
-      style={{
-        width: 8,
-        height: 5,
-        borderLeftWidth: 1.75,
-        borderBottomWidth: 1.75,
-        borderColor: color,
-        transform: [{ rotate: "-45deg" }],
-        marginRight: 2,
-      }}
-    />
-  );
-}
+export const DropdownMenuCheckboxItem = React.memo(
+  function DropdownMenuCheckboxItem({
+    checked = false,
+    onCheckedChange,
+    children,
+    leftIcon,
+    disabled = false,
+    style,
+    checkIcon,
+  }: DropdownMenuCheckboxItemProps) {
+    const { setOpen, haptic, colors } = useDropdownMenu();
+    const { radii, spacing, typography } = useTheme();
 
-export function DropdownMenuCheckboxItem({
-  checked = false,
-  onCheckedChange,
-  children,
-  leftIcon,
-  disabled = false,
-  style,
-  checkIcon,
-}: DropdownMenuCheckboxItemProps) {
-  const { setOpen, colors } = useDropdownMenu();
-  const { radii, spacing, typography } = useTheme();
+    const handlePress = useCallback(() => {
+      if (disabled) return;
+      if (haptic) triggerHaptic("selection");
+      onCheckedChange?.(!checked);
+      setOpen(false);
+    }, [checked, disabled, haptic, onCheckedChange, setOpen]);
 
-  const handlePress = () => {
-    if (disabled) return;
-    triggerHaptic("selection");
-    onCheckedChange?.(!checked);
-    setOpen(false);
-  };
-
-  return (
-    <Pressable
-      disabled={disabled}
-      onPress={handlePress}
-      style={({ pressed }) => [
-        {
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingVertical: spacing.sm,
-          paddingHorizontal: spacing.md,
-          borderRadius: radii.md,
-          backgroundColor: pressed ? colors.surfaceMuted : colors.transparent,
-          opacity: disabled ? 0.5 : 1,
-          gap: spacing.sm,
-        },
-        style,
-      ]}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, flex: 1 }}>
-        {leftIcon ? renderIcon(leftIcon, colors.textMuted, 16) : null}
-        <Text
-          style={{
-            ...typography.bodySmall,
-            color: disabled ? colors.textMuted : colors.text,
-            fontWeight: "500",
-          }}
-        >
-          {children}
-        </Text>
-      </View>
-      {checked &&
-        (checkIcon ? (
-          renderIcon(checkIcon, colors.primary, 14)
-        ) : (
-          <CheckIcon color={colors.primary} />
-        ))}
-    </Pressable>
-  );
-}
+    return (
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked, disabled }}
+        disabled={disabled}
+        onPress={handlePress}
+        style={({ pressed }) => [
+          styles.item,
+          {
+            paddingVertical: spacing.sm,
+            paddingHorizontal: spacing.md,
+            borderRadius: radii.md,
+            backgroundColor: pressed ? colors.surfaceMuted : "transparent",
+            opacity: disabled ? 0.5 : 1,
+            gap: spacing.sm,
+          },
+          style,
+        ]}
+      >
+        <View style={[styles.itemLead, { gap: spacing.sm }]}>
+          {leftIcon ? renderIcon(leftIcon, colors.textMuted, 16) : null}
+          {typeof children === "string" || typeof children === "number" ? (
+            <Text
+              style={[
+                typography.bodySmall,
+                {
+                  color: disabled ? colors.textMuted : colors.text,
+                  fontWeight: "500",
+                },
+              ]}
+            >
+              {children}
+            </Text>
+          ) : (
+            children
+          )}
+        </View>
+        {checked
+          ? checkIcon
+            ? renderIcon(checkIcon, colors.primary, 14)
+            : (
+                <Svg
+                  width={15}
+                  height={15}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={colors.primary}
+                  strokeWidth={2.2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <Path d="M20 6L9 17l-5-5" />
+                </Svg>
+              )
+          : null}
+      </Pressable>
+    );
+  },
+);
 
 export interface DropdownMenuSeparatorProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function DropdownMenuSeparator({ style }: DropdownMenuSeparatorProps) {
+export const DropdownMenuSeparator = React.memo(function DropdownMenuSeparator({
+  style,
+}: DropdownMenuSeparatorProps) {
   const { colors } = useDropdownMenu();
-  const { spacing } = useTheme();
+  const { components, spacing } = useTheme();
 
   return (
     <View
       style={[
         {
-          height: 1,
-          backgroundColor: colors.border,
+          height: components.borderWidth.hairline,
+          backgroundColor: colors.borderMuted,
           marginVertical: spacing.xs,
         },
         style,
       ]}
     />
   );
-}
+});
 
 export interface DropdownMenuLabelProps {
   children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }
 
-export function DropdownMenuLabel({ children, style }: DropdownMenuLabelProps) {
+export const DropdownMenuLabel = React.memo(function DropdownMenuLabel({
+  children,
+  style,
+}: DropdownMenuLabelProps) {
   const { colors } = useDropdownMenu();
   const { spacing, typography } = useTheme();
 
@@ -486,8 +537,13 @@ export function DropdownMenuLabel({ children, style }: DropdownMenuLabelProps) {
         style,
       ]}
     >
-      {typeof children === "string" ? (
-        <Text style={{ ...typography.labelSmall, color: colors.textMuted, fontWeight: "600" }}>
+      {typeof children === "string" || typeof children === "number" ? (
+        <Text
+          style={[
+            typography.labelSmall,
+            { color: colors.textMuted, fontWeight: "600" },
+          ]}
+        >
           {children}
         </Text>
       ) : (
@@ -495,14 +551,14 @@ export function DropdownMenuLabel({ children, style }: DropdownMenuLabelProps) {
       )}
     </View>
   );
-}
+});
 
 export interface DropdownMenuShortcutProps {
   children?: React.ReactNode;
   style?: StyleProp<TextStyle>;
 }
 
-export function DropdownMenuShortcut({
+export const DropdownMenuShortcut = React.memo(function DropdownMenuShortcut({
   children,
   style,
 }: DropdownMenuShortcutProps) {
@@ -512,8 +568,8 @@ export function DropdownMenuShortcut({
   return (
     <Text
       style={[
+        typography.caption,
         {
-          ...typography.caption,
           color: colors.textMuted,
           marginLeft: spacing.sm,
           fontWeight: "600",
@@ -524,4 +580,24 @@ export function DropdownMenuShortcut({
       {children}
     </Text>
   );
-}
+});
+
+const styles = StyleSheet.create({
+  triggerRoot: {
+    alignSelf: "flex-start",
+  },
+  content: {
+    position: "absolute",
+  },
+  item: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  itemLead: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+});

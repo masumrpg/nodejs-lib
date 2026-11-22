@@ -272,7 +272,7 @@ export default function QRCodeScreen() {
                     </Text>
                   </Box>
                 </Box>
-                <Badge tone="success" variant="subtle" size="sm">
+                <Badge tone="success" variant="soft" size="sm">
                   Verified
                 </Badge>
               </Box>
@@ -317,7 +317,7 @@ export default function QRCodeScreen() {
                   Pure vector SVG with zero background padding
                 </Text>
               </Box>
-              <Badge tone="info" variant="subtle" size="sm">
+              <Badge tone="info" variant="soft" size="sm">
                 No Background
               </Badge>
             </Box>

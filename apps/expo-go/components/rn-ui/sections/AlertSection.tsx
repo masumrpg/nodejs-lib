@@ -70,17 +70,18 @@ export function AlertSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* 3. Warning Glassmorphism Alert */}
         <Alert
           tone="warning"
-          variant="glass"
+          variant="soft"
+          glass
           title="Storage Limit Warning"
           icon={icon(TriangleAlert)}
         >
           You are using 88% of your allocated cloud storage. Consider upgrading.
         </Alert>
 
-        {/* 4. Solid Rich Dark Mode Danger Alert */}
+        {/* 4. Filled Rich Dark Mode Danger Alert */}
         <Alert
           tone="danger"
-          variant="solid"
+          variant="filled"
           title="Critical Error Occurred"
           icon={icon(OctagonAlert)}
           dismissible

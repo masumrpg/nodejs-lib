@@ -30,7 +30,7 @@ export function SwitchExample() {
   );
 }`;
 
-`Switch` toggles the state of a single setting on or off with smooth UI thread worklet translation, custom tone color tracks, round and oval variants, and haptic taps.
+`Switch` toggles the state of a single setting on or off with zero-bounce UI thread worklet timing, custom tone color tracks, `filled` / `outline` variants, `pill` / `oval` / `rounded` shapes, and haptic taps.
 
 ## Usage
 
@@ -44,7 +44,8 @@ export function SwitchExample() {
     defaultValue: { type: 'boolean', default: 'false', description: 'Initial uncontrolled toggle state.' },
     onValueChange: { type: '(value: boolean) => void', description: 'Callback on toggle state change.' },
     size: { type: "'sm' | 'md' | 'lg'", default: "'md'", description: 'Preset track and thumb scale.' },
-    variant: { type: "'round' | 'oval'", default: "'round'", description: 'Track corner radius variant.' },
+    variant: { type: "'filled' | 'outline'", default: "'filled'", description: 'Visual track treatment.' },
+    shape: { type: "'pill' | 'oval' | 'rounded'", default: "'pill'", description: 'Track corner radius shape.' },
     tone: { type: 'ComponentTone', default: "'primary'", description: 'Active track color tone.' },
     disabled: { type: 'boolean', default: 'false', description: 'Disables user interaction and dims opacity.' },
     invalid: { type: 'boolean', default: 'false', description: 'Highlights error state with danger outline.' },

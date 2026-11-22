@@ -250,7 +250,7 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
                     <Box row gap="xs" style={{ flexWrap: "wrap" }}>
                       <Badge
                         tone="success"
-                        variant="subtle"
+                        variant="soft"
                         size="sm"
                         icon={icon(Users)}
                       >
@@ -258,7 +258,7 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
                       </Badge>
                       <Badge
                         tone="primary"
-                        variant="subtle"
+                        variant="soft"
                         size="sm"
                         icon={icon(Sparkles)}
                       >
@@ -266,7 +266,7 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
                       </Badge>
                       <Badge
                         tone="warning"
-                        variant="subtle"
+                        variant="soft"
                         size="sm"
                         icon={icon(Star)}
                       >

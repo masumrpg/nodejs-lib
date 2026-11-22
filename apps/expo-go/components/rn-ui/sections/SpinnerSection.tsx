@@ -17,7 +17,7 @@ export function SpinnerSection({ ctx }: { ctx: RnUiSectionContext }) {
   const { colors, icon } = ctx;
 
   const [variant, setVariant] = React.useState<SpinnerVariant>("circular");
-  const [size, setSize] = React.useState<SpinnerSize>("default");
+  const [size, setSize] = React.useState<SpinnerSize>("md");
   const [speed, setSpeed] = React.useState<SpinnerSpeed>("normal");
   const [animated, setAnimated] = React.useState(true);
 
@@ -99,7 +99,7 @@ export function SpinnerSection({ ctx }: { ctx: RnUiSectionContext }) {
                 Size
               </Text>
               <Box row gap="xs" style={{ flexWrap: "wrap" }}>
-                {(["xs", "sm", "default", "lg", "xl"] as const).map((s) => (
+                {(["xs", "sm", "md", "lg", "xl"] as const).map((s) => (
                   <Button
                     key={s}
                     size="xs"
@@ -139,7 +139,7 @@ export function SpinnerSection({ ctx }: { ctx: RnUiSectionContext }) {
         <Card outlined>
           <Box gap="md">
             <Text weight="700" color="text">
-              Loader Variants
+              Spinner Variants
             </Text>
             <Text color="textMuted" variant="bodySmall">
               Four distinct animation styles for different UX context and hierarchies.
@@ -191,7 +191,7 @@ export function SpinnerSection({ ctx }: { ctx: RnUiSectionContext }) {
               {(["primary", "secondary", "accent", "success", "warning", "danger", "info"] as const).map((t) => (
                 <Box key={t} center gap="xs" style={{ minWidth: 60 }}>
                   <Spinner tone={t} size="sm" />
-                  <Badge tone={t} variant="subtle" size="sm">
+                  <Badge tone={t} variant="soft" size="sm">
                     {t}
                   </Badge>
                 </Box>
@@ -261,7 +261,7 @@ export function SpinnerSection({ ctx }: { ctx: RnUiSectionContext }) {
                 >
                   <Spinner
                     variant="ring"
-                    size="default"
+                    size="md"
                     tone="primary"
                     label="Syncing cloud assets..."
                     labelPlacement="bottom"

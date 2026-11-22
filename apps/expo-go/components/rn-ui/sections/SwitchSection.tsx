@@ -12,41 +12,43 @@ export function SwitchSection({ ctx }: { ctx: RnUiSectionContext }) {
     <Section title="Switch">
       <Card outlined>
         <Box gap="lg">
-          {/* iOS 26 Oval Variant Showcase */}
+          {/* iOS 26 Oval Shape Showcase */}
           <Box row style={{ alignItems: "center", justifyContent: "space-between" }}>
             <Box flex={1}>
               <Box row center gap="xs">
                 <Text variant="label">iOS 26 Oval Switch</Text>
-                <Badge tone="accent">variant="oval"</Badge>
+                <Badge tone="accent">shape="oval"</Badge>
               </Box>
               <Text variant="bodySmall" color="textMuted">
-                Elongated fluid oval proportions with interactive stretch physics.
+                Elongated fluid oval proportions with interactive timing physics.
               </Text>
             </Box>
             <Switch
-              variant="oval"
+              shape="oval"
               value={ovalValue}
               onValueChange={setOvalValue}
               tone="primary"
             />
           </Box>
 
-          {/* Round vs Oval Size Comparison */}
+          {/* Pill vs Oval Shape & Variant Comparison */}
           <Box row style={{ alignItems: "center", justifyContent: "space-between" }}>
             <Box flex={1}>
-              <Text variant="label">Round (Standard) vs Oval</Text>
+              <Text variant="label">Pill Outline vs Oval Filled</Text>
               <Text variant="bodySmall" color="textMuted">
-                Side-by-side shape comparison.
+                Orthogonal variant and shape comparison.
               </Text>
             </Box>
             <Box row gap="md" center>
               <Switch
-                variant="round"
+                shape="pill"
+                variant="outline"
                 value={switchValue}
                 onValueChange={setSwitchValue}
               />
               <Switch
-                variant="oval"
+                shape="oval"
+                variant="filled"
                 value={switchValue}
                 onValueChange={setSwitchValue}
                 tone="accent"
@@ -63,7 +65,7 @@ export function SwitchSection({ ctx }: { ctx: RnUiSectionContext }) {
               </Text>
             </Box>
             <Switch
-              variant="oval"
+              shape="oval"
               size="lg"
               tone="success"
               value={airplaneMode}
@@ -83,9 +85,9 @@ export function SwitchSection({ ctx }: { ctx: RnUiSectionContext }) {
               </Text>
             </Box>
             <Box row gap="xs" center>
-              <Switch variant="oval" size="sm" value={true} />
-              <Switch variant="oval" size="md" value={true} />
-              <Switch variant="oval" size="lg" value={true} />
+              <Switch shape="oval" size="sm" value={true} />
+              <Switch shape="oval" size="md" value={true} />
+              <Switch shape="oval" size="lg" value={true} />
             </Box>
           </Box>
 
@@ -98,8 +100,8 @@ export function SwitchSection({ ctx }: { ctx: RnUiSectionContext }) {
               </Text>
             </Box>
             <Box row gap="sm">
-              <Switch variant="oval" value={false} disabled />
-              <Switch variant="oval" value={true} disabled />
+              <Switch shape="oval" value={false} disabled />
+              <Switch shape="oval" value={true} disabled />
             </Box>
           </Box>
         </Box>

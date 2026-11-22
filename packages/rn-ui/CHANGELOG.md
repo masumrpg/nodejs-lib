@@ -5,6 +5,43 @@ All notable changes to **@masumdev/rn-ui** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-11-22
+
+### Breaking Changes
+- **Canonical Size Token (`"default"` -> `"md"`)**: Standardized `ComponentSize`, `Avatar`, `Badge`, `Button`, `Chip`, `EmptyMedia`, `Progress`, and `Spinner` to `"md"` instead of `"default"`.
+- **Canonical Variant & Shape Alignment**:
+  - `Badge`: replaced `"solid"` with `"filled"` and removed redundant `"subtle"` (`"filled" | "outline" | "soft" | "ghost"`).
+  - `Alert`: replaced `"solid"` and `"glass"` variants with `"filled" | "soft" | "outline" | "accent"` plus orthogonal `glass?: boolean`.
+  - `Accordion`: replaced `"outlined"` and `"glass"` variants with `"outline" | "flat" | "ghost"` plus orthogonal `glass?: boolean`.
+  - `Button`: removed `"danger"` variant (use `tone="danger" variant="filled"`).
+  - `Toast`: renamed `"outlined"` variant to `"outline"`.
+  - `Switch`: moved `"round" | "oval"` out of `variant` into `shape?: "pill" | "oval" | "rounded"` with `variant?: "filled" | "outline"`.
+  - `Bubble`: split `"destructive" | "tinted" | "muted" | "secondary"` variants into orthogonal `tone` + `variant="filled" | "soft" | "outline" | "ghost"`.
+  - `Avatar`: removed `"premium"` / `"vip"` / `"gold"` / `"bg"` legacy props.
+- **Removed Legacy Component Aliases**: Removed `Loader` (use `Spinner`), `Tag` / `TagProps` (use `Chip` / `ChipProps`), `FormMessage` / `FormMessageProps` (use `FormError`), and `TimePickerDialog` (use `TimePickerModal`).
+
+### Added
+- **Multi-Theme Preset Engine & Style Presets**: Added live runtime `presets` switching (`themeName`, `defaultThemeName`, `setThemeName()`, `availableThemes`, `themeNameStorageKey`), `setElevation()` / `toggleElevation()`, auto-derived WCAG `*Soft` / `on*` color tokens in `createTheme()`, `createHardShadows()` (cross-platform RN `boxShadow` hard-offset shadows), `components.borderWidth.control`/`filled`, `components.surface` tokens, and built-in `defaultThemePreset`, `minimalThemePreset` (HeroUI-inspired borderless), and `neoBrutalismThemePreset` (Neo-Brutalism Light & Dark).
+- **Flexible Thin Shadows (`elevation`)**: Added `elevation?: boolean` (default `true` = `subtleShadows`, `false` = `flatShadows`) on `Theme`, `ThemeInput`, `ThemeProvider`, and `createTheme()`, plus semantic `glassSurface`, `glassSurfaceStrong`, and `glassBorder` tokens.
+- **Built-in Portal Architecture & Shared Anchoring**: Added `Portal`, `PortalProvider`, and `PortalHost` inside `ThemeProvider`, plus shared `useAnchorPosition`, `computeAnchoredPosition`, and `measureAnchorNode` utilities.
+- **Locale Registration & Local Date Parser**: Added `registerLocale()`, BCP-47 regional tag resolution, and `parseLocalDateString()`.
+- **Unit Test Suite**: Added `bun:test` coverage across 5 test files (`theme-and-utils`, `typography-and-primitives`, `forms-and-controls`, `overlays-and-portals`, `calendars-and-gestures`).
+
+### Fixed & Changed
+- **WCAG AA Contrast & Typography**: Recalibrated Light/Dark theme palettes for >= 4.5:1 contrast, fixed `withAlpha()`, preserved custom `fontWeight` + `fonts` in `Text`, and replaced raw warning/close emoji glyphs with SVG icons.
+- **Strict Zero-Bounce Timing Worklets**: Migrated remaining `withSpring` usage to `withTiming` cubic curves (`Easing.bezier`) respecting `useReducedMotion()`.
+- **Compound Portal Context Bridging & Overlay Fixes**: Preserved parent React Context inside `<Portal>` for `Combobox`, `DropdownMenu`, `ContextMenu`, `Popover`, `HoverCard`, and `Toast`, and resolved viewport clamping, disabled trigger handling, toast timer eviction, calendar contrast, and gesture stability issues.
+
+---
+
+## [0.6.0] - 2026-11-15
+
+### Added
+- **New Components**: Introduced `Tabs`, `SearchBar`, `Tooltip`, and `SpeedDial`.
+- **Tabs & Tooltip Motion**: Added directional transitions with `useReducedMotion()` support and viewport edge collision flipping (`autoFlip`).
+
+---
+
 ## [0.5.0] - 2026-11-15
 
 ### Added

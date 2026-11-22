@@ -135,7 +135,7 @@ export function CarouselSection({ ctx }: { ctx: RnUiSectionContext }) {
               <Text weight="700" color="text">
                 Auto-Play Banner Carousel
               </Text>
-              <Badge tone="success" variant="solid">
+              <Badge tone="success" variant="filled">
                 AUTO PLAY (3s)
               </Badge>
             </Box>
@@ -159,7 +159,7 @@ export function CarouselSection({ ctx }: { ctx: RnUiSectionContext }) {
                       }}
                     >
                       <Text weight="700" color="primary">
-                        🎉 Version 2.4 Released
+                        Version 0.7.0 Released
                       </Text>
                       <Text color="textMuted" variant="bodySmall">
                         Over 25+ new mobile UI components added to library.

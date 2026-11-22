@@ -6,6 +6,7 @@ import { ChevronRight } from "lucide-react-native";
 import {
   Badge,
   Box,
+  Button,
   Card,
   Input,
   Text,
@@ -34,6 +35,22 @@ export interface ComponentCategory {
 }
 
 export const CATALOG_CATEGORIES: ComponentCategory[] = [
+  {
+    title: "Theme & Foundations",
+    description:
+      "Multi-theme presets (Default, Minimal Borderless, Neo-Brutalism) and mode controls.",
+    iconName: "Palette",
+    items: [
+      {
+        id: "theme-provider",
+        name: "ThemeProvider",
+        description:
+          "Live multi-theme preset switcher, global elevation shadows toggle, and light/dark studio.",
+        tone: "primary",
+        isNew: true,
+      },
+    ],
+  },
   {
     title: "Layout Primitives",
     description:
@@ -248,7 +265,7 @@ export const CATALOG_CATEGORIES: ComponentCategory[] = [
       },
       {
         id: "chip",
-        name: "Chip & Tag",
+        name: "Chip",
         description: "Filter chips and removable keyword tags.",
         tone: "success",
       },
@@ -462,7 +479,8 @@ export const CATALOG_CATEGORIES: ComponentCategory[] = [
 
 export default function RnUiCatalogScreen() {
   const router = useRouter();
-  const { colors, spacing } = useTheme();
+  const { colors, spacing, themeName, availableThemes, setThemeName } =
+    useTheme();
   const insets = useSafeAreaInsets();
   const styles = useStyles();
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -521,6 +539,28 @@ export default function RnUiCatalogScreen() {
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
+
+        {/* Quick Multi-Theme Switcher */}
+        <Box row gap="sm" style={{ flexWrap: "wrap" }}>
+          {availableThemes.map((presetKey) => {
+            const label =
+              presetKey === "minimal"
+                ? "Minimal (HeroUI)"
+                : presetKey === "brutal"
+                  ? "Neo-Brutalism"
+                  : "Default";
+            return (
+              <Button
+                key={presetKey}
+                size="sm"
+                variant={themeName === presetKey ? "filled" : "outline"}
+                onPress={() => setThemeName(presetKey)}
+              >
+                {label}
+              </Button>
+            );
+          })}
+        </Box>
 
         {/* Categories Grid */}
         <Box gap="xxl">
@@ -582,7 +622,7 @@ export default function RnUiCatalogScreen() {
                                 {item.id}
                               </Badge>
                               {item.isNew && (
-                                <Badge tone="success" variant="solid" size="sm" style={{ alignSelf: "center" }}>
+                                <Badge tone="success" variant="filled" size="sm" style={{ alignSelf: "center" }}>
                                   NEW
                                 </Badge>
                               )}
@@ -626,10 +666,11 @@ function useStyles() {
     },
     cardWrapper: {
       padding: 0,
-      overflow: "hidden",
     },
     cardPressable: {
       padding: theme.spacing.md,
+      borderRadius: theme.radii.xl,
+      overflow: "hidden",
     },
   }));
 }

@@ -175,7 +175,7 @@ export function ToastSection({ ctx }: { ctx: RnUiSectionContext }) {
         title: "Settings Saved!",
         description: "Cloud synchronization finished successfully.",
         tone: "success",
-        variant: "outlined",
+        variant: "outline",
         icon: icon(CheckCircle2),
         duration: 3500,
         action: {
@@ -200,7 +200,7 @@ export function ToastSection({ ctx }: { ctx: RnUiSectionContext }) {
       title: "File Moved to Trash",
       description: "item_v2_backup.zip was relocated.",
       tone: "warning",
-      variant: "outlined",
+      variant: "outline",
       icon: icon(AlertTriangle),
       action: {
         label: "Undo",
@@ -223,7 +223,7 @@ export function ToastSection({ ctx }: { ctx: RnUiSectionContext }) {
       title: "Network Error",
       description: "Request to api.masumdev.com timed out.",
       tone: "danger",
-      variant: "outlined",
+      variant: "outline",
       icon: icon(AlertCircle),
       action: {
         label: "Retry",
@@ -237,10 +237,10 @@ export function ToastSection({ ctx }: { ctx: RnUiSectionContext }) {
   // 7. Standard Variant Triggers
   const showOutlinedToast = () => {
     toast.show({
-      title: "Outlined Toast",
+      title: "Outline Toast",
       description: "Prominent colored border with surface card background.",
       tone: "success",
-      variant: "outlined",
+      variant: "outline",
       icon: icon(CheckCircle2),
     });
   };

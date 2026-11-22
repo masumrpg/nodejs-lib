@@ -1,6 +1,10 @@
 import React from "react";
 import {
+  AppState,
+  StyleSheet,
   View,
+  type AppStateStatus,
+  type LayoutChangeEvent,
   type StyleProp,
   type ViewProps,
   type ViewStyle,
@@ -9,6 +13,7 @@ import Animated, {
   cancelAnimation,
   Easing,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -17,61 +22,87 @@ import Svg, { Circle } from "react-native-svg";
 
 import { useTheme } from "../theme";
 import { Text } from "./Text";
-import type { ComponentTone, ToneProps } from "./types";
+import {
+  ANIMATION_TIMING,
+  resolveToneColors,
+  type BaseAnimatedProps,
+  type ComponentSize,
+  type ComponentTone,
+  type SizeProps,
+  type ToneProps,
+} from "./types";
 
-export type ProgressSize = "xs" | "sm" | "default" | "lg" | "xl";
+export type ProgressSize = ComponentSize;
 
-export interface ProgressProps extends ViewProps, ToneProps<ComponentTone> {
+export interface ProgressProps
+  extends ViewProps,
+    ToneProps<ComponentTone>,
+    SizeProps<ProgressSize>,
+    BaseAnimatedProps {
   value?: number;
   max?: number;
-  size?: ProgressSize;
-  animated?: boolean;
   indeterminate?: boolean;
   style?: StyleProp<ViewStyle>;
   indicatorStyle?: StyleProp<ViewStyle>;
 }
 
-export function Progress({
+const PROGRESS_HEIGHTS: Record<ProgressSize, number> = {
+  xs: 4,
+  sm: 6,
+  md: 10,
+  lg: 14,
+  xl: 18,
+};
+
+function ProgressComponent({
   value = 0,
   max = 100,
   tone = "primary",
-  size = "default",
+  size = "md",
   animated = true,
   indeterminate = false,
   style,
   indicatorStyle,
+  onLayout,
   ...props
 }: ProgressProps) {
   const { colors, radii } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const shouldAnimate = animated && !reducedMotion;
+  const [appActive, setAppActive] = React.useState(
+    AppState.currentState === "active",
+  );
 
-  const toneColor =
-    tone === "success"
-      ? colors.success
-      : tone === "warning"
-      ? colors.warning
-      : tone === "danger"
-      ? colors.danger
-      : tone === "accent"
-      ? colors.accent
-      : colors.primary;
+  React.useEffect(() => {
+    const subscription = AppState.addEventListener(
+      "change",
+      (next: AppStateStatus) => {
+        setAppActive(next === "active");
+      },
+    );
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
-  const height =
-    size === "xs"
-      ? 4
-      : size === "sm"
-      ? 6
-      : size === "lg"
-      ? 14
-      : size === "xl"
-      ? 18
-      : 10;
+  const toneColor = resolveToneColors(tone, colors).solid;
+  const height = PROGRESS_HEIGHTS[size] ?? PROGRESS_HEIGHTS.md;
 
-  const progress = Math.max(0, Math.min(1, max <= 0 ? 0 : value / max));
-  const width = useSharedValue(progress);
+  const safeMax = Number.isFinite(max) && max > 0 ? max : 100;
+  const safeValue = Number.isFinite(value) ? value : 0;
+  const progress = Math.max(0, Math.min(1, safeValue / safeMax));
+
+  const trackWidth = useSharedValue(0);
+  const ratio = useSharedValue(progress);
   const indeterminateOffset = useSharedValue(-0.4);
 
   React.useEffect(() => {
     if (indeterminate) {
+      if (!appActive || reducedMotion) {
+        cancelAnimation(indeterminateOffset);
+        indeterminateOffset.value = 0.3;
+        return;
+      }
       indeterminateOffset.value = -0.4;
       indeterminateOffset.value = withRepeat(
         withTiming(1, { duration: 1200, easing: Easing.bezier(0.4, 0, 0.6, 1) }),
@@ -83,47 +114,86 @@ export function Progress({
       };
     }
 
-    if (!animated) {
-      cancelAnimation(width);
-      width.value = progress;
+    if (!shouldAnimate) {
+      cancelAnimation(ratio);
+      ratio.value = progress;
       return;
     }
-    width.value = withTiming(progress, {
-      duration: 220,
-      easing: Easing.bezier(0.23, 1, 0.32, 1),
+
+    ratio.value = withTiming(progress, {
+      duration: 200,
+      easing: Easing.bezier(...ANIMATION_TIMING.bezier),
     });
 
     return () => {
-      cancelAnimation(width);
+      cancelAnimation(ratio);
     };
-  }, [animated, indeterminate, progress, width, indeterminateOffset]);
+  }, [
+    appActive,
+    indeterminate,
+    indeterminateOffset,
+    progress,
+    ratio,
+    reducedMotion,
+    shouldAnimate,
+  ]);
+
+  const handleLayout = React.useCallback(
+    (event: LayoutChangeEvent) => {
+      const nextWidth = event.nativeEvent.layout.width;
+      if (nextWidth > 0) {
+        trackWidth.value = nextWidth;
+      }
+      onLayout?.(event);
+    },
+    [onLayout, trackWidth],
+  );
 
   const indicatorAnimatedStyle = useAnimatedStyle(() => {
+    const w = trackWidth.value;
     if (indeterminate) {
+      if (w <= 0) {
+        return {
+          width: "40%",
+          transform: [{ translateX: 0 }],
+        };
+      }
+      const barWidth = Math.max(36, w * 0.4);
       return {
-        width: "40%",
-        transform: [
-          {
-            translateX: indeterminateOffset.value * 280,
-          },
-        ],
+        width: barWidth,
+        transform: [{ translateX: indeterminateOffset.value * w }],
+      };
+    }
+    const p = ratio.value;
+    if (w > 0) {
+      return {
+        width: w,
+        transform: [{ translateX: -(w * (1 - p)) / 2 }, { scaleX: p }],
       };
     }
     return {
-      width: `${width.value * 100}%`,
+      width: `${p * 100}%`,
     };
   });
+
+  const accessibilityValue = indeterminate
+    ? undefined
+    : {
+        min: 0,
+        max: safeMax,
+        now: Math.max(0, Math.min(safeMax, safeValue)),
+      };
 
   return (
     <View
       accessibilityRole="progressbar"
-      accessibilityValue={{ min: 0, max, now: value }}
+      accessibilityValue={accessibilityValue}
+      onLayout={handleLayout}
       style={[
+        styles.track,
         {
-          width: "100%",
           height,
           borderRadius: radii.full,
-          overflow: "hidden",
           backgroundColor: colors.backgroundSubtle,
         },
         style,
@@ -132,8 +202,8 @@ export function Progress({
     >
       <Animated.View
         style={[
+          styles.indicator,
           {
-            height: "100%",
             borderRadius: radii.full,
             backgroundColor: toneColor,
           },
@@ -145,16 +215,20 @@ export function Progress({
   );
 }
 
-export interface CircularProgressProps extends ToneProps<ComponentTone> {
-  value?: number; // 0 to 100
-  size?: number; // Outer diameter (default 64)
-  strokeWidth?: number; // Ring thickness (default 6)
+export const Progress = React.memo(ProgressComponent);
+
+export interface CircularProgressProps
+  extends Omit<ViewProps, "style">,
+    ToneProps<ComponentTone> {
+  value?: number;
+  size?: number;
+  strokeWidth?: number;
   showValue?: boolean;
   strokeLinecap?: "round" | "square" | "butt";
   style?: StyleProp<ViewStyle>;
 }
 
-export function CircularProgress({
+function CircularProgressComponent({
   value = 0,
   size = 64,
   strokeWidth = 6,
@@ -162,61 +236,60 @@ export function CircularProgress({
   showValue = true,
   strokeLinecap = "round",
   style,
+  ...props
 }: CircularProgressProps) {
   const { colors } = useTheme();
 
-  const toneColor =
-    tone === "success"
-      ? colors.success
-      : tone === "warning"
-      ? colors.warning
-      : tone === "danger"
-      ? colors.danger
-      : tone === "accent"
-      ? colors.accent
-      : colors.primary;
+  const safeSize = Number.isFinite(size) && size > 4 ? size : 64;
+  const safeStroke = Number.isFinite(strokeWidth)
+    ? Math.max(1, Math.min(strokeWidth, safeSize / 2 - 1))
+    : 6;
+  const safeValue = Number.isFinite(value) ? value : 0;
+  const clamped = Math.max(0, Math.min(100, safeValue));
 
-  const clamped = Math.max(0, Math.min(100, value));
-  const radius = (size - strokeWidth) / 2;
+  const toneColor = resolveToneColors(tone, colors).solid;
+  const radius = Math.max(1, (safeSize - safeStroke) / 2);
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (circumference * clamped) / 100;
+  const fontSize = Math.max(10, Math.round(safeSize * 0.22));
 
   return (
     <View
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(clamped) }}
       style={[
         {
-          width: size,
-          height: size,
+          width: safeSize,
+          height: safeSize,
           justifyContent: "center",
           alignItems: "center",
           position: "relative",
         },
         style,
       ]}
+      {...props}
     >
       <Svg
-        width={size}
-        height={size}
-        style={{ transform: [{ rotate: "-90deg" }] }}
+        width={safeSize}
+        height={safeSize}
+        style={styles.svgRotate}
       >
-        {/* Background track circle */}
         <Circle
-          cx={size / 2}
-          cy={size / 2}
+          cx={safeSize / 2}
+          cy={safeSize / 2}
           r={radius}
           stroke={colors.backgroundSubtle}
-          strokeWidth={strokeWidth}
+          strokeWidth={safeStroke}
           fill="none"
         />
 
-        {/* Foreground progress arc with ROUNDED LINE CAPS */}
         {clamped > 0 && (
           <Circle
-            cx={size / 2}
-            cy={size / 2}
+            cx={safeSize / 2}
+            cy={safeSize / 2}
             r={radius}
             stroke={toneColor}
-            strokeWidth={strokeWidth}
+            strokeWidth={safeStroke}
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
             strokeLinecap={strokeLinecap}
@@ -226,19 +299,12 @@ export function CircularProgress({
       </Svg>
 
       {showValue && (
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text weight="700" color="text" style={{ fontSize: size * 0.22 }}>
+        <View pointerEvents="none" style={styles.centerOverlay}>
+          <Text
+            weight="700"
+            color="text"
+            style={{ fontSize, lineHeight: Math.round(fontSize * 1.15) }}
+          >
             {Math.round(clamped)}%
           </Text>
         </View>
@@ -246,3 +312,23 @@ export function CircularProgress({
     </View>
   );
 }
+
+export const CircularProgress = React.memo(CircularProgressComponent);
+
+const styles = StyleSheet.create({
+  track: {
+    width: "100%",
+    overflow: "hidden",
+  },
+  indicator: {
+    height: "100%",
+  },
+  svgRotate: {
+    transform: [{ rotate: "-90deg" }],
+  },
+  centerOverlay: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+});

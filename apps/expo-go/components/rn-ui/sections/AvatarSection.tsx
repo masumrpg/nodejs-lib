@@ -187,15 +187,15 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
                 </Text>
               </Box>
 
-              {/* Default with Away Status */}
+              {/* Medium (md) with Away Status */}
               <Box center gap="xs">
-                <Avatar size="default">
+                <Avatar size="md">
                   <AvatarImage source={{ uri: sampleUsers[2].uri }} />
                   <AvatarFallback>{sampleUsers[2].initials}</AvatarFallback>
                   <AvatarBadge status="away" />
                 </Avatar>
                 <Text variant="caption" color="textMuted">
-                  default (36px)
+                  md (36px)
                 </Text>
               </Box>
 
@@ -369,18 +369,18 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
           <Box gap="lg">
             <Box row center style={{ justifyContent: "space-between" }}>
               <Text weight="700" color="text">
-                VIP, Gold, Premium & Bordered Variants
+                Ring, Bordered & Default Variants
               </Text>
-              <Badge tone="accent">basic, vip, gold, premium</Badge>
+              <Badge tone="accent">default, bordered, ring</Badge>
             </Box>
             <Text color="textMuted" variant="bodySmall">
-              Elevate user profiles with basic default frames, vibrant borders, social story rings, luxurious VIP Gold, and royal Premium frames across all shapes.
+              Elevate user profiles with clean default frames, bordered accents, and social story rings across all shapes.
             </Text>
 
             {/* Circular Frames */}
             <Box gap="xs">
               <Text variant="caption" color="textMuted">
-                Circular Frames & Luxury Badges
+                Circular Frames & Tone Badges
               </Text>
               <Box row gap="xl" center style={styles.wrap}>
                 {/* Basic / Default */}
@@ -390,24 +390,24 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
                     <AvatarFallback>{SAMPLE_ASSETS.avatarInitials}</AvatarFallback>
                   </Avatar>
                   <Text variant="caption" color="textMuted">
-                    Basic
+                    Default
                   </Text>
                 </Box>
 
-                {/* Gold Border */}
+                {/* Accent Border */}
                 <Box center gap="xs">
-                  <Avatar size="xl" variant="bordered" tone="gold">
+                  <Avatar size="xl" variant="bordered" tone="warning">
                     <AvatarImage source={{ uri: SAMPLE_ASSETS.avatarUrl }} />
                     <AvatarFallback>{SAMPLE_ASSETS.avatarInitials}</AvatarFallback>
                   </Avatar>
                   <Text variant="caption" color="textMuted">
-                    Gold Border
+                    Amber Border
                   </Text>
                 </Box>
 
-                {/* VIP Gold Edition */}
+                {/* Featured Ring */}
                 <Box center gap="xs">
-                  <Avatar size="xl" variant="vip">
+                  <Avatar size="xl" variant="ring" tone="warning">
                     <AvatarImage source={{ uri: SAMPLE_ASSETS.avatarUrl }} />
                     <AvatarFallback>{SAMPLE_ASSETS.avatarInitials}</AvatarFallback>
                     <AvatarBadge tone="warning" position="top-right">
@@ -415,13 +415,13 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
                     </AvatarBadge>
                   </Avatar>
                   <Text variant="caption" color="textMuted">
-                    VIP Gold
+                    Featured Ring
                   </Text>
                 </Box>
 
-                {/* Premium Royal Edition */}
+                {/* Secondary Highlight Border */}
                 <Box center gap="xs">
-                  <Avatar size="xl" variant="premium">
+                  <Avatar size="xl" variant="bordered" tone="secondary">
                     <AvatarImage source={{ uri: SAMPLE_ASSETS.avatarUrl }} />
                     <AvatarFallback>{SAMPLE_ASSETS.avatarInitials}</AvatarFallback>
                     <AvatarBadge tone="secondary" position="top-right">
@@ -429,7 +429,7 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
                     </AvatarBadge>
                   </Avatar>
                   <Text variant="caption" color="textMuted">
-                    Premium
+                    Highlight
                   </Text>
                 </Box>
 
@@ -452,7 +452,7 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
                     <AvatarBadge status="online" />
                   </Avatar>
                   <Text variant="caption" color="textMuted">
-                    Online VIP
+                    Online Status
                   </Text>
                 </Box>
               </Box>
@@ -460,15 +460,15 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
 
             <Divider style={{ marginVertical: 4 }} />
 
-            {/* Shape-Aware Luxury Frames (Rounded & Square) */}
+            {/* Shape-Aware Frames (Rounded & Square) */}
             <Box gap="xs">
               <Text variant="caption" color="textMuted">
-                Rounded & Square Luxury Frames
+                Rounded & Square Frames
               </Text>
               <Box row gap="xl" center style={styles.wrap}>
-                {/* Rounded VIP */}
+                {/* Rounded Warning Ring */}
                 <Box center gap="xs">
-                  <Avatar size="xl" shape="rounded" variant="vip">
+                  <Avatar size="xl" shape="rounded" variant="ring" tone="warning">
                     <AvatarImage source={{ uri: SAMPLE_ASSETS.avatarUrl }} />
                     <AvatarFallback>{SAMPLE_ASSETS.avatarInitials}</AvatarFallback>
                     <AvatarBadge tone="warning" position="top-right">
@@ -476,13 +476,13 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
                     </AvatarBadge>
                   </Avatar>
                   <Text variant="caption" color="textMuted">
-                    VIP Rounded
+                    Ring Rounded
                   </Text>
                 </Box>
 
-                {/* Square Premium */}
+                {/* Square Secondary */}
                 <Box center gap="xs">
-                  <Avatar size="xl" shape="square" variant="premium">
+                  <Avatar size="xl" shape="square" variant="bordered" tone="secondary">
                     <AvatarImage source={{ uri: SAMPLE_ASSETS.avatarUrl }} />
                     <AvatarFallback>{SAMPLE_ASSETS.avatarInitials}</AvatarFallback>
                     <AvatarBadge tone="secondary" position="top-right">
@@ -490,18 +490,18 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
                     </AvatarBadge>
                   </Avatar>
                   <Text variant="caption" color="textMuted">
-                    Square Premium
+                    Square Border
                   </Text>
                 </Box>
 
-                {/* Gold Ring Rounded */}
+                {/* Accent Ring Rounded */}
                 <Box center gap="xs">
-                  <Avatar size="xl" shape="rounded" variant="ring" tone="gold">
+                  <Avatar size="xl" shape="rounded" variant="ring" tone="warning">
                     <AvatarImage source={{ uri: SAMPLE_ASSETS.avatarUrl }} />
                     <AvatarFallback>{SAMPLE_ASSETS.avatarInitials}</AvatarFallback>
                   </Avatar>
                   <Text variant="caption" color="textMuted">
-                    Gold Ring
+                    Amber Ring
                   </Text>
                 </Box>
               </Box>

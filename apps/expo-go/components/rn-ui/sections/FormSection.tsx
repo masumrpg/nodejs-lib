@@ -13,9 +13,9 @@ import {
   DatePickerInput,
   FormControl,
   FormDescription,
+  FormError,
   FormField,
   FormLabel,
-  FormMessage,
   Input,
   InputGroup,
   InputGroupAddon,
@@ -176,7 +176,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                 }}
               />
             </FormControl>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {/* 2. InputGroup (Prefix Addon) */}
@@ -199,7 +199,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
               </InputGroup>
             </FormControl>
             <FormDescription>Composite input with prefix protocol addon.</FormDescription>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {/* 3. Input (Email) */}
@@ -216,7 +216,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                 }}
               />
             </FormControl>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {/* 4. RadioGroup (Plain Variant) */}
@@ -237,7 +237,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                 <RadioGroupItem value="female" label="Female" />
               </RadioGroup>
             </FormControl>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {/* 5. DatePickerInput (Wheel DatePicker) */}
@@ -245,7 +245,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
             <FormLabel>5. Date of Birth (DatePickerInput)</FormLabel>
             <FormControl>
               <DatePickerInput
-                title="SET BIRTHDAY"
+                title="Select Date of Birth"
                 placeholder="Select date of birth"
                 value={formData.dob}
                 onChange={(selected) => {
@@ -254,7 +254,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                 }}
               />
             </FormControl>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {/* 6. TimePickerInput (TimePicker) */}
@@ -271,7 +271,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                 }}
               />
             </FormControl>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {/* 7. Chip Tags (Interactive Chips) */}
@@ -302,7 +302,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                 })}
               </Box>
             </FormControl>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {/* 8. Slider (Single Thumb Experience) */}
@@ -326,7 +326,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                 tone="primary"
               />
             </FormControl>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {/* 9. RangeSlider (Dual Thumbs Budget) */}
@@ -350,7 +350,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                 tone="primary"
               />
             </FormControl>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {/* 10. Select Dropdown */}
@@ -369,7 +369,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                 chevronIcon={icon(ChevronsUpDown)}
               />
             </FormControl>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {/* 11. Combobox Autocomplete */}
@@ -401,7 +401,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                 </ComboboxContent>
               </Combobox>
             </FormControl>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {/* 12. InputOTP (PIN code) */}
@@ -427,7 +427,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                 </InputOTP>
               </Box>
             </FormControl>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {/* 13. Textarea (Multiline Bio) */}
@@ -444,7 +444,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                 numberOfLines={3}
               />
             </FormControl>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {/* 14. Rating (Star control) */}
@@ -459,7 +459,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                 }}
               />
             </FormControl>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {/* 15. Switch (Toggle) */}
@@ -471,7 +471,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                   <FormDescription>Enable express turnaround delivery.</FormDescription>
                 </Box>
                 <Switch
-                  variant="oval"
+                  shape="oval"
                   value={formData.fastTrack}
                   onValueChange={(val) => setFormData((prev) => ({ ...prev, fastTrack: val }))}
                 />
@@ -519,7 +519,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
               />
             </FormControl>
             <FormDescription>Sign your authorization on canvas above.</FormDescription>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {/* 17. Checkbox (Terms agreement) */}
@@ -538,7 +538,7 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                 </Text>
               </Box>
             </FormControl>
-            <FormMessage />
+            <FormError />
           </FormField>
 
           {successMessage ? (

@@ -2,6 +2,7 @@ import React from "react";
 import {
   StyleSheet,
   View,
+  type AccessibilityActionEvent,
   type LayoutChangeEvent,
   type StyleProp,
   type ViewProps,
@@ -9,27 +10,35 @@ import {
 } from "react-native";
 import {
   GestureDetector,
-  useCompetingGestures,
+  useExclusiveGestures,
   usePanGesture,
   useTapGesture,
 } from "react-native-gesture-handler";
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withTiming,
   type SharedValue,
 } from "react-native-reanimated";
-import { scheduleOnRN } from "react-native-worklets";
 import Svg, { Path } from "react-native-svg";
+import { scheduleOnRN } from "react-native-worklets";
 
 import { useTheme } from "../theme";
+import { withAlpha } from "../utils/color";
 import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
+  ANIMATION_TIMING,
+  minTouchHitSlop,
   renderIcon,
-  type BaseGlassProps,
+  resolveToneColors,
+  type BaseAnimatedProps,
   type BaseHapticProps,
+  type ComponentSize,
+  type ComponentTone,
   type RenderIcon,
   type SizeProps,
   type ToneProps,
@@ -44,17 +53,8 @@ export type RatingShape =
   | "shield";
 
 export type RatingPrecision = "full" | "half" | "exact" | number;
-
-export type RatingSize = "sm" | "md" | "lg" | "xl" | number;
-
-export type RatingTone =
-  | "warning"
-  | "danger"
-  | "primary"
-  | "success"
-  | "secondary"
-  | "accent"
-  | "info";
+export type RatingSize = ComponentSize | number;
+export type RatingTone = ComponentTone;
 
 export interface RatingItemInfo {
   index: number;
@@ -69,9 +69,9 @@ export interface RatingItemInfo {
 export interface RatingProps
   extends Omit<ViewProps, "style">,
     ToneProps<RatingTone>,
-    SizeProps<Exclude<RatingSize, number>>,
-    BaseGlassProps,
-    BaseHapticProps {
+    SizeProps<RatingSize>,
+    BaseHapticProps,
+    BaseAnimatedProps {
   value?: number;
   defaultValue?: number;
   max?: number;
@@ -112,7 +112,9 @@ function getDefaultTone(shape: RatingShape): RatingTone {
 }
 
 function parsePrecisionStep(precision: RatingPrecision): number {
-  if (typeof precision === "number") return Math.max(0.01, precision);
+  if (typeof precision === "number" && Number.isFinite(precision)) {
+    return Math.max(0.01, precision);
+  }
   switch (precision) {
     case "full":
       return 1;
@@ -123,6 +125,12 @@ function parsePrecisionStep(precision: RatingPrecision): number {
     default:
       return 1;
   }
+}
+
+function getDecimalPlaces(step: number): number {
+  const stepStr = String(step);
+  const dotIdx = stepStr.indexOf(".");
+  return dotIdx >= 0 ? stepStr.length - dotIdx - 1 : 0;
 }
 
 function clamp(val: number, min: number, max: number): number {
@@ -141,13 +149,15 @@ function roundToStep(
   if (rawVal >= max) return max;
 
   let snapped = Math.round(rawVal / step) * step;
-  const decimals = (step.toString().split(".")[1] || "").length;
-  snapped = Number(snapped.toFixed(Math.max(1, decimals)));
+  const str = String(step);
+  const idx = str.indexOf(".");
+  const decimals = idx >= 0 ? str.length - idx - 1 : 0;
+  snapped = decimals > 0 ? Number(snapped.toFixed(decimals)) : snapped;
 
   return clamp(snapped, allowZero ? 0 : step, max);
 }
 
-function ShapeSvg({
+const ShapeSvg = React.memo(function ShapeSvg({
   shape,
   color,
   size,
@@ -215,12 +225,13 @@ function ShapeSvg({
         </Svg>
       );
   }
-}
+});
 
-function RatingItemWrapper({
+const RatingItemWrapper = React.memo(function RatingItemWrapper({
   index,
   itemSize,
   ratingShared,
+  displayVal,
   activeColor,
   activeEmptyColor,
   shape,
@@ -230,6 +241,7 @@ function RatingItemWrapper({
   index: number;
   itemSize: number;
   ratingShared: SharedValue<number>;
+  displayVal: number;
   activeColor: string;
   activeEmptyColor: string;
   shape: RatingShape;
@@ -254,10 +266,9 @@ function RatingItemWrapper({
   });
 
   if (renderItem) {
-    const currentVal = ratingShared.value;
     let fillFraction = 0;
-    if (currentVal >= itemValue) fillFraction = 1;
-    else if (currentVal > index) fillFraction = currentVal - index;
+    if (displayVal >= itemValue) fillFraction = 1;
+    else if (displayVal > index) fillFraction = displayVal - index;
 
     return (
       <View style={{ width: itemSize, height: itemSize }}>
@@ -287,7 +298,7 @@ function RatingItemWrapper({
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
-          { overflow: "hidden" },
+          styles.overflowHidden,
           fillOverlayStyle,
         ]}
       >
@@ -301,9 +312,9 @@ function RatingItemWrapper({
       </Animated.View>
     </View>
   );
-}
+});
 
-export function Rating({
+function RatingComponent({
   value,
   defaultValue = 0,
   max = 5,
@@ -319,6 +330,7 @@ export function Rating({
   allowClear = true,
   showValue = false,
   haptic = true,
+  animated = true,
   valueFormat,
   renderItem,
   icon,
@@ -330,14 +342,19 @@ export function Rating({
   onLayout,
   ...props
 }: RatingProps) {
-  const { colors, components } = useTheme();
+  const { colors, components, spacing } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const shouldAnimate = animated && !reducedMotion;
 
   const activeTone = tone ?? getDefaultTone(shape);
-  const activeColor = color ?? colors[activeTone];
-  const activeEmptyColor = emptyColor ?? colors.textMuted + "40";
+  const activeColor = color ?? resolveToneColors(activeTone, colors).solid;
+  const activeEmptyColor = emptyColor ?? withAlpha(colors.textMuted, 0.25);
   const itemSize =
-    typeof size === "number" ? size : components.rating?.size[size] ?? 24;
+    typeof size === "number"
+      ? size
+      : components.rating.size[size] ?? components.rating.size.md;
   const step = parsePrecisionStep(precision);
+  const stepDecimals = getDecimalPlaces(step);
 
   const [internalValue, setInternalValue] = React.useState(defaultValue);
   const isControlled = value !== undefined;
@@ -347,12 +364,14 @@ export function Rating({
   );
 
   const ratingShared = useSharedValue(currentValue);
+  const valueAtStart = useSharedValue(currentValue);
   const lastEmittedRating = useSharedValue(currentValue);
   const isInteracting = useSharedValue(false);
   const containerWidth = useSharedValue(max * itemSize + (max - 1) * gap);
   const scaleAnim = useSharedValue(1);
 
   const [displayVal, setDisplayVal] = React.useState(currentValue);
+  const needsJsDisplay = Boolean(showValue || renderItem);
 
   React.useEffect(() => {
     if (!isInteracting.value) {
@@ -362,8 +381,21 @@ export function Rating({
     }
   }, [currentValue, isInteracting, lastEmittedRating, ratingShared]);
 
+  React.useEffect(() => {
+    return () => {
+      cancelAnimation(scaleAnim);
+    };
+  }, [scaleAnim]);
+
+  const emitDisplay = React.useCallback(
+    (nextVal: number) => {
+      setDisplayVal(nextVal);
+    },
+    [],
+  );
+
   const updateRatingFromX = React.useCallback(
-    (xPos: number, isFinal: boolean = false) => {
+    (xPos: number, isFinal: boolean, isTap = false) => {
       "worklet";
       const totalW = containerWidth.value;
       if (totalW <= 0) return;
@@ -371,14 +403,22 @@ export function Rating({
       const rawVal = (xPos / totalW) * max;
       let nextVal = roundToStep(rawVal, step, max, allowClear);
 
-      if (isFinal && allowClear && nextVal === ratingShared.value && xPos < itemSize) {
+      if (
+        isTap &&
+        isFinal &&
+        allowClear &&
+        nextVal === valueAtStart.value &&
+        xPos < itemSize + gap / 2
+      ) {
         nextVal = 0;
       }
 
       ratingShared.value = nextVal;
       if (nextVal !== lastEmittedRating.value || isFinal) {
         lastEmittedRating.value = nextVal;
-        scheduleOnRN(setDisplayVal, nextVal);
+        if (needsJsDisplay || isFinal) {
+          scheduleOnRN(emitDisplay, nextVal);
+        }
         if (onValueChange) {
           scheduleOnRN(onValueChange, nextVal);
         }
@@ -390,13 +430,17 @@ export function Rating({
     [
       allowClear,
       containerWidth,
+      emitDisplay,
+      gap,
       isControlled,
       itemSize,
       lastEmittedRating,
       max,
+      needsJsDisplay,
       onValueChange,
       ratingShared,
       step,
+      valueAtStart,
     ],
   );
 
@@ -404,63 +448,68 @@ export function Rating({
     if (haptic) triggerHaptic("selection");
   }, [haptic]);
 
-  const tapGesture = useTapGesture({
-    enabled: !disabled && !readOnly,
-    onDeactivate: (e) => {
-      "worklet";
-      if (!e.canceled) {
-        updateRatingFromX(e.x, true);
-        scheduleOnRN(triggerHapticFeedback);
-      }
-    },
-  });
+  const isInteractionDisabled = disabled || readOnly;
 
   const panGesture = usePanGesture({
-    enabled: !disabled && !readOnly,
-    minDistance: 2,
-    onBegin: (e) => {
+    enabled: !isInteractionDisabled,
+    minDistance: 6,
+    onActivate: (e) => {
       "worklet";
       isInteracting.value = true;
-      scaleAnim.value = withTiming(1.04, {
-        duration: 120,
-        easing: Easing.bezier(0.23, 1, 0.32, 1),
-      });
+      valueAtStart.value = ratingShared.value;
+      if (shouldAnimate) {
+        scaleAnim.value = withTiming(1.04, {
+          duration: ANIMATION_TIMING.pressIn,
+          easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+        });
+      }
       if (onSlidingStart) {
         scheduleOnRN(onSlidingStart, ratingShared.value);
       }
-      updateRatingFromX(e.x, false);
+      updateRatingFromX(e.x, false, false);
     },
     onUpdate: (e) => {
       "worklet";
-      updateRatingFromX(e.x, false);
+      updateRatingFromX(e.x, false, false);
     },
     onDeactivate: (e) => {
       "worklet";
       if (!e.canceled) {
-        updateRatingFromX(e.x, true);
-        const finalVal = ratingShared.value;
-        scaleAnim.value = withTiming(1, {
-          duration: 140,
-          easing: Easing.bezier(0.23, 1, 0.32, 1),
-        });
+        updateRatingFromX(e.x, true, false);
         if (onSlidingComplete) {
-          scheduleOnRN(onSlidingComplete, finalVal);
+          scheduleOnRN(onSlidingComplete, ratingShared.value);
         }
         scheduleOnRN(triggerHapticFeedback);
       }
-      isInteracting.value = false;
     },
     onFinalize: () => {
       "worklet";
       isInteracting.value = false;
-      scaleAnim.value = withTiming(1, {
-        duration: 140,
-        easing: Easing.bezier(0.23, 1, 0.32, 1),
-      });
+      if (shouldAnimate) {
+        scaleAnim.value = withTiming(1, {
+          duration: ANIMATION_TIMING.pressOut,
+          easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+        });
+      }
     },
   });
 
-  const composedGesture = useCompetingGestures(tapGesture, panGesture);
+  const tapGesture = useTapGesture({
+    enabled: !isInteractionDisabled,
+    onBegin: () => {
+      "worklet";
+      valueAtStart.value = ratingShared.value;
+    },
+    onDeactivate: (e) => {
+      "worklet";
+      if (!e.canceled) {
+        updateRatingFromX(e.x, true, true);
+        scheduleOnRN(triggerHapticFeedback);
+      }
+    },
+  });
+
+  const composedGesture = useExclusiveGestures(panGesture, tapGesture);
 
   const containerAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scaleAnim.value }],
@@ -469,20 +518,48 @@ export function Rating({
 
   const handleLayout = (e: LayoutChangeEvent) => {
     containerWidth.value = e.nativeEvent.layout.width;
-    if (onLayout) onLayout(e);
+    onLayout?.(e);
+  };
+
+  const handleAccessibilityAction = (e: AccessibilityActionEvent) => {
+    if (isInteractionDisabled) return;
+    let nextVal = currentValue;
+    if (e.nativeEvent.actionName === "increment") {
+      nextVal = Math.min(max, Number((currentValue + step).toFixed(stepDecimals)));
+    } else if (e.nativeEvent.actionName === "decrement") {
+      nextVal = Math.max(0, Number((currentValue - step).toFixed(stepDecimals)));
+    }
+    ratingShared.value = nextVal;
+    lastEmittedRating.value = nextVal;
+    setDisplayVal(nextVal);
+    if (!isControlled) setInternalValue(nextVal);
+    onValueChange?.(nextVal);
   };
 
   const defaultFormattedValue = valueFormat
     ? valueFormat(displayVal, max)
-    : `${displayVal.toFixed(step < 0.5 ? 1 : step === 0.5 ? 1 : 0)} / ${max}`;
+    : `${displayVal.toFixed(stepDecimals)} / ${max}`;
+
+  const hitSlop = minTouchHitSlop(itemSize);
 
   return (
     <View style={[styles.root, style]} {...props}>
       <GestureDetector gesture={composedGesture}>
         <Animated.View
           accessibilityRole={readOnly ? undefined : "adjustable"}
-          accessibilityLabel="Rating"
+          accessibilityLabel={props.accessibilityLabel ?? "Rating"}
+          accessibilityState={{ disabled: isInteractionDisabled }}
           accessibilityValue={{ min: 0, max, now: displayVal }}
+          accessibilityActions={
+            readOnly
+              ? undefined
+              : [
+                  { name: "increment", label: "Increase rating" },
+                  { name: "decrement", label: "Decrease rating" },
+                ]
+          }
+          onAccessibilityAction={handleAccessibilityAction}
+          hitSlop={hitSlop}
           onLayout={handleLayout}
           style={[styles.container, { gap }, containerAnimatedStyle]}
         >
@@ -499,6 +576,7 @@ export function Rating({
                 index={index}
                 itemSize={itemSize}
                 ratingShared={ratingShared}
+                displayVal={displayVal}
                 activeColor={activeColor}
                 activeEmptyColor={activeEmptyColor}
                 shape={shape}
@@ -511,13 +589,19 @@ export function Rating({
       </GestureDetector>
 
       {showValue && (
-        <Text variant="labelSmall" color="textMuted" style={styles.valueText}>
+        <Text
+          variant="labelSmall"
+          color="textMuted"
+          style={{ marginLeft: spacing.sm }}
+        >
           {defaultFormattedValue}
         </Text>
       )}
     </View>
   );
 }
+
+export const Rating = React.memo(RatingComponent);
 
 const styles = StyleSheet.create({
   root: {
@@ -538,7 +622,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  valueText: {
-    marginLeft: 8,
+  overflowHidden: {
+    overflow: "hidden",
   },
 });

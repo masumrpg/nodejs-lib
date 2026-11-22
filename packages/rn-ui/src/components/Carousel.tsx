@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Dimensions,
   Pressable,
-  ScrollView,
+  StyleSheet,
   View,
+  useWindowDimensions,
+  type FlatList,
   type LayoutChangeEvent,
+  type ListRenderItemInfo,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -13,19 +15,25 @@ import Animated, {
   interpolate,
   useAnimatedScrollHandler,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   type SharedValue,
 } from "react-native-reanimated";
+import Svg, { Path } from "react-native-svg";
 import { scheduleOnRN } from "react-native-worklets";
 
 import { useTheme } from "../theme";
 import { triggerHaptic } from "../utils/haptics";
-import { renderIcon, type RenderIcon } from "./types";
+import {
+  minTouchHitSlop,
+  renderIcon,
+  type BaseHapticProps,
+  type RenderIcon,
+} from "./types";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-
-export interface CarouselProps {
+export interface CarouselProps extends BaseHapticProps {
   itemWidth?: number;
+  gap?: number;
   onIndexChange?: (index: number) => void;
   showPagination?: boolean;
   autoPlay?: boolean;
@@ -38,14 +46,19 @@ export interface CarouselProps {
 export interface CarouselContextProps {
   scrollX: SharedValue<number>;
   itemWidth: number;
+  snapStep: number;
+  containerWidth: number;
   activeIndex: number;
   totalItems: number;
+  showPagination: boolean;
+  haptic: boolean;
   setTotalItems: React.Dispatch<React.SetStateAction<number>>;
   scrollPrev: () => void;
   scrollNext: () => void;
+  scrollToIndex: (index: number) => void;
   canScrollPrev: boolean;
   canScrollNext: boolean;
-  scrollViewRef: React.RefObject<React.ComponentRef<typeof ScrollView> | null>;
+  listRef: React.RefObject<FlatList<React.ReactElement> | null>;
   setActiveIndex: React.Dispatch<React.SetStateAction<number>>;
 }
 
@@ -59,15 +72,20 @@ export function useCarousel() {
   return context;
 }
 
-function CarouselDot({ index }: { index: number }) {
+const CarouselDot = React.memo(function CarouselDot({
+  index,
+}: {
+  index: number;
+}) {
   const { colors } = useTheme();
-  const { scrollX, itemWidth, scrollViewRef, setActiveIndex } = useCarousel();
+  const { scrollX, snapStep, scrollToIndex } = useCarousel();
 
   const animatedStyle = useAnimatedStyle(() => {
+    const step = Math.max(1, snapStep);
     const inputRange = [
-      (index - 1) * itemWidth,
-      index * itemWidth,
-      (index + 1) * itemWidth,
+      (index - 1) * step,
+      index * step,
+      (index + 1) * step,
     ];
 
     const width = interpolate(
@@ -92,172 +110,216 @@ function CarouselDot({ index }: { index: number }) {
 
   return (
     <Pressable
-      onPress={() => {
-        triggerHaptic("selection");
-        scrollViewRef.current?.scrollTo({
-          x: index * itemWidth,
-          animated: true,
-        });
-        setActiveIndex(index);
-      }}
-      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={`Go to slide ${index + 1}`}
+      onPress={() => scrollToIndex(index)}
+      hitSlop={minTouchHitSlop(16)}
     >
       <Animated.View
         style={[
-          {
-            height: 6,
-            borderRadius: 999,
-            backgroundColor: colors.primary,
-          },
+          styles.dot,
+          { backgroundColor: colors.primary },
           animatedStyle,
         ]}
       />
     </Pressable>
   );
-}
+});
 
-export function Carousel({
+export const Carousel = React.memo(function Carousel({
   itemWidth,
+  gap = 0,
   onIndexChange,
   showPagination = true,
   autoPlay = false,
   autoPlayInterval = 3000,
   loop = true,
+  haptic = true,
   style,
   children,
   ...props
 }: CarouselProps) {
   const { spacing } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
 
-  const [containerWidth, setContainerWidth] = React.useState(SCREEN_WIDTH);
-  const [activeIndex, setActiveIndex] = React.useState(0);
-  const [totalItems, setTotalItems] = React.useState(0);
+  const [containerWidth, setContainerWidth] = useState(windowWidth);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
 
+  const activeIndexRef = useRef(0);
+  const didMountRef = useRef(false);
   const scrollX = useSharedValue(0);
-  const scrollViewRef = React.useRef<React.ComponentRef<typeof ScrollView> | null>(null);
+  const listRef = useRef<FlatList<React.ReactElement>>(null);
 
-  const resolvedItemWidth = itemWidth || containerWidth * 0.78;
+  const resolvedItemWidth = Math.max(1, itemWidth || containerWidth * 0.78);
+  const snapStep = resolvedItemWidth + gap;
 
-  const scrollPrev = React.useCallback(() => {
-    triggerHaptic("selection");
-    const nextIndex = activeIndex > 0 ? activeIndex - 1 : loop ? totalItems - 1 : 0;
-    scrollViewRef.current?.scrollTo({
-      x: nextIndex * resolvedItemWidth,
-      animated: true,
-    });
-    setActiveIndex(nextIndex);
-  }, [activeIndex, loop, resolvedItemWidth, totalItems]);
+  const scrollToIndex = useCallback(
+    (index: number) => {
+      if (totalItems <= 0) return;
+      const clamped = Math.max(0, Math.min(totalItems - 1, index));
+      if (haptic) triggerHaptic("selection");
+      listRef.current?.scrollToOffset({
+        offset: clamped * snapStep,
+        animated: !reducedMotion,
+      });
+      activeIndexRef.current = clamped;
+      setActiveIndex(clamped);
+    },
+    [haptic, reducedMotion, snapStep, totalItems],
+  );
 
-  const scrollNext = React.useCallback(() => {
-    triggerHaptic("selection");
-    const nextIndex = activeIndex < totalItems - 1 ? activeIndex + 1 : loop ? 0 : totalItems - 1;
-    scrollViewRef.current?.scrollTo({
-      x: nextIndex * resolvedItemWidth,
-      animated: true,
-    });
-    setActiveIndex(nextIndex);
-  }, [activeIndex, loop, resolvedItemWidth, totalItems]);
+  const scrollPrev = useCallback(() => {
+    if (totalItems <= 0) return;
+    const curr = activeIndexRef.current;
+    const nextIndex = curr > 0 ? curr - 1 : loop ? totalItems - 1 : 0;
+    scrollToIndex(nextIndex);
+  }, [loop, scrollToIndex, totalItems]);
+
+  const scrollNext = useCallback(() => {
+    if (totalItems <= 0) return;
+    const curr = activeIndexRef.current;
+    const nextIndex = curr < totalItems - 1 ? curr + 1 : loop ? 0 : totalItems - 1;
+    scrollToIndex(nextIndex);
+  }, [loop, scrollToIndex, totalItems]);
 
   const canScrollPrev = loop || activeIndex > 0;
   const canScrollNext = loop || activeIndex < totalItems - 1;
 
-  // AutoPlay timer
-  React.useEffect(() => {
+  useEffect(() => {
     if (!autoPlay || totalItems <= 1) return;
 
     const timer = setInterval(() => {
-      scrollNext();
+      const curr = activeIndexRef.current;
+      const nextIndex =
+        curr < totalItems - 1 ? curr + 1 : loop ? 0 : totalItems - 1;
+      if (!loop && nextIndex === curr) return;
+      listRef.current?.scrollToOffset({
+        offset: nextIndex * snapStep,
+        animated: !reducedMotion,
+      });
+      activeIndexRef.current = nextIndex;
+      setActiveIndex(nextIndex);
     }, autoPlayInterval);
 
     return () => clearInterval(timer);
-  }, [autoPlay, autoPlayInterval, totalItems, scrollNext]);
+  }, [autoPlay, autoPlayInterval, loop, reducedMotion, snapStep, totalItems]);
 
-  const handleLayout = (e: LayoutChangeEvent) => {
+  const handleLayout = useCallback((e: LayoutChangeEvent) => {
     const { width } = e.nativeEvent.layout;
     if (width > 0) {
-      setContainerWidth(width);
+      setContainerWidth((prev) => (prev === width ? prev : width));
     }
-  };
+  }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
+    activeIndexRef.current = activeIndex;
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
     onIndexChange?.(activeIndex);
   }, [activeIndex, onIndexChange]);
 
+  const contextValue = useMemo<CarouselContextProps>(
+    () => ({
+      scrollX,
+      itemWidth: resolvedItemWidth,
+      snapStep,
+      containerWidth,
+      activeIndex,
+      totalItems,
+      showPagination,
+      haptic,
+      setTotalItems,
+      scrollPrev,
+      scrollNext,
+      scrollToIndex,
+      canScrollPrev,
+      canScrollNext,
+      listRef,
+      setActiveIndex,
+    }),
+    [
+      activeIndex,
+      canScrollNext,
+      canScrollPrev,
+      containerWidth,
+      haptic,
+      resolvedItemWidth,
+      scrollNext,
+      scrollPrev,
+      scrollToIndex,
+      scrollX,
+      showPagination,
+      snapStep,
+      totalItems,
+    ],
+  );
+
   return (
-    <CarouselContext.Provider
-      value={{
-        scrollX,
-        itemWidth: resolvedItemWidth,
-        activeIndex,
-        totalItems,
-        setTotalItems,
-        scrollPrev,
-        scrollNext,
-        canScrollPrev,
-        canScrollNext,
-        scrollViewRef,
-        setActiveIndex,
-      }}
-    >
+    <CarouselContext.Provider value={contextValue}>
       <View
         onLayout={handleLayout}
-        style={[
-          {
-            width: "100%",
-            position: "relative",
-          },
-          style,
-        ]}
+        style={[styles.carouselRoot, style]}
         {...props}
       >
         {children}
 
-        {showPagination && totalItems > 1 && (
+        {showPagination && totalItems > 1 ? (
           <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "center",
-              alignItems: "center",
-              marginTop: spacing.md,
-              gap: spacing.xs,
-            }}
+            style={[
+              styles.pagination,
+              { marginTop: spacing.md, gap: spacing.xs },
+            ]}
           >
             {Array.from({ length: totalItems }).map((_, i) => (
               <CarouselDot key={i} index={i} />
             ))}
           </View>
-        )}
+        ) : null}
       </View>
     </CarouselContext.Provider>
   );
-}
+});
 
 export interface CarouselContentProps {
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
 }
 
-export function CarouselContent({ style, children }: CarouselContentProps) {
-  const { scrollX, itemWidth, scrollViewRef, setTotalItems, setActiveIndex } =
-    useCarousel();
+export const CarouselContent = React.memo(function CarouselContent({
+  style,
+  children,
+}: CarouselContentProps) {
+  const {
+    scrollX,
+    itemWidth,
+    snapStep,
+    containerWidth,
+    listRef,
+    setTotalItems,
+    setActiveIndex,
+  } = useCarousel();
 
-  const [containerWidth, setContainerWidth] = React.useState(SCREEN_WIDTH);
+  const items = useMemo(
+    () =>
+      React.Children.toArray(children).filter((child): child is React.ReactElement =>
+        React.isValidElement(child),
+      ),
+    [children],
+  );
+  const total = items.length;
+  const gap = Math.max(0, snapStep - itemWidth);
 
-  const childrenArray = React.Children.toArray(children);
-  const total = childrenArray.length;
-
-  React.useEffect(() => {
+  useEffect(() => {
     setTotalItems(total);
-  }, [total, setTotalItems]);
+  }, [setTotalItems, total]);
 
-  const updateActiveIndex = React.useCallback(
+  const updateActiveIndex = useCallback(
     (index: number) => {
-      setActiveIndex((prev) => {
-        if (prev !== index) {
-          return index;
-        }
-        return prev;
-      });
+      setActiveIndex((prev) => (prev !== index ? index : prev));
     },
     [setActiveIndex],
   );
@@ -267,7 +329,8 @@ export function CarouselContent({ style, children }: CarouselContentProps) {
   const handleScroll = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollX.value = event.contentOffset.x;
-      const index = Math.round(event.contentOffset.x / itemWidth);
+      const step = Math.max(1, snapStep);
+      const index = Math.round(event.contentOffset.x / step);
       if (index >= 0 && index < total && index !== lastActiveIndex.value) {
         lastActiveIndex.value = index;
         scheduleOnRN(updateActiveIndex, index);
@@ -275,49 +338,52 @@ export function CarouselContent({ style, children }: CarouselContentProps) {
     },
   });
 
-  const handleLayout = (e: LayoutChangeEvent) => {
-    const { width } = e.nativeEvent.layout;
-    if (width > 0) {
-      setContainerWidth(width);
-    }
-  };
-
   const sidePadding = Math.max(0, (containerWidth - itemWidth) / 2);
 
-  // Automatically inject index prop into CarouselItem children
-  const renderedChildren = childrenArray.map((child, index) => {
-    if (React.isValidElement(child)) {
-      return React.cloneElement(child as React.ReactElement<{ index?: number }>, {
-        index,
-      });
-    }
-    return child;
-  });
+  const renderItem = useCallback(
+    ({ item, index }: ListRenderItemInfo<React.ReactElement>) => (
+      <View style={index < total - 1 && gap > 0 ? { marginRight: gap } : undefined}>
+        {React.cloneElement(item as React.ReactElement<{ index?: number }>, {
+          index,
+        })}
+      </View>
+    ),
+    [gap, total],
+  );
+
+  const getItemLayout = useCallback(
+    (_: ArrayLike<React.ReactElement> | null | undefined, index: number) => ({
+      length: snapStep,
+      offset: snapStep * index,
+      index,
+    }),
+    [snapStep],
+  );
 
   return (
-    <View onLayout={handleLayout} style={{ width: "100%", overflow: "hidden" }}>
-      <Animated.ScrollView
-        ref={scrollViewRef as never}
+    <View style={styles.contentWrapper}>
+      <Animated.FlatList<React.ReactElement>
+        ref={listRef}
+        data={items}
+        keyExtractor={(_, idx) => `carousel-item-${idx}`}
+        renderItem={renderItem}
+        getItemLayout={getItemLayout}
         horizontal
         pagingEnabled={false}
-        snapToInterval={itemWidth}
+        snapToInterval={snapStep > 0 ? snapStep : undefined}
         snapToAlignment="center"
         decelerationRate="fast"
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={handleScroll}
         contentContainerStyle={[
-          {
-            paddingHorizontal: sidePadding,
-          },
+          { paddingHorizontal: sidePadding },
           style,
         ]}
-      >
-        {renderedChildren}
-      </Animated.ScrollView>
+      />
     </View>
   );
-}
+});
 
 export interface CarouselItemProps {
   index?: number;
@@ -325,26 +391,27 @@ export interface CarouselItemProps {
   children?: React.ReactNode;
 }
 
-export function CarouselItem({
+export const CarouselItem = React.memo(function CarouselItem({
   index = 0,
   style,
   children,
   ...props
 }: CarouselItemProps) {
-  const { scrollX, itemWidth } = useCarousel();
+  const { scrollX, itemWidth, snapStep } = useCarousel();
 
   const animatedStyle = useAnimatedStyle(() => {
+    const step = Math.max(1, snapStep);
     const inputRange = [
-      (index - 1) * itemWidth,
-      index * itemWidth,
-      (index + 1) * itemWidth,
+      (index - 1) * step,
+      index * step,
+      (index + 1) * step,
     ];
 
     return {
       opacity: interpolate(
         scrollX.value,
         inputRange,
-        [0.6, 1, 0.6],
+        [0.65, 1, 0.65],
         Extrapolation.CLAMP,
       ),
       transform: [
@@ -363,11 +430,8 @@ export function CarouselItem({
   return (
     <Animated.View
       style={[
-        {
-          width: itemWidth,
-          justifyContent: "center",
-          alignItems: "center",
-        },
+        styles.itemContainer,
+        { width: itemWidth },
         animatedStyle,
         style,
       ]}
@@ -376,118 +440,150 @@ export function CarouselItem({
       {children}
     </Animated.View>
   );
-}
-
-// Chevron pure arrow icons
-function ChevronLeftIcon({ color }: { color: string }) {
-  return (
-    <View
-      style={{
-        width: 10,
-        height: 10,
-        borderLeftWidth: 2,
-        borderBottomWidth: 2,
-        borderColor: color,
-        transform: [{ rotate: "45deg" }],
-        marginLeft: 2,
-      }}
-    />
-  );
-}
-
-function ChevronRightIcon({ color }: { color: string }) {
-  return (
-    <View
-      style={{
-        width: 10,
-        height: 10,
-        borderRightWidth: 2,
-        borderTopWidth: 2,
-        borderColor: color,
-        transform: [{ rotate: "45deg" }],
-        marginRight: 2,
-      }}
-    />
-  );
-}
+});
 
 export interface CarouselButtonProps {
   style?: StyleProp<ViewStyle>;
   icon?: RenderIcon;
 }
 
-export function CarouselPrevious({ style, icon }: CarouselButtonProps) {
-  const { colors, components, radii, spacing } = useTheme();
-  const { scrollPrev, canScrollPrev } = useCarousel();
+const ARROW_SIZE = 36;
+
+export const CarouselPrevious = React.memo(function CarouselPrevious({
+  style,
+  icon,
+}: CarouselButtonProps) {
+  const { colors, components, radii, shadows, spacing } = useTheme();
+  const { scrollPrev, canScrollPrev, showPagination, totalItems } =
+    useCarousel();
 
   if (!canScrollPrev) return null;
 
+  const verticalOffset = showPagination && totalItems > 1 ? -30 : -18;
+
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Previous slide"
+      hitSlop={minTouchHitSlop(ARROW_SIZE)}
       onPress={scrollPrev}
       style={({ pressed }) => [
+        styles.navButton,
         {
-          position: "absolute",
           left: spacing.sm,
-          top: "50%",
-          marginTop: -32,
-          width: 36,
-          height: 36,
+          marginTop: verticalOffset,
           borderRadius: radii.full,
           backgroundColor: colors.surface,
-          borderWidth: components.borderWidth.strong,
+          borderWidth: components.borderWidth.default,
           borderColor: colors.border,
-          justifyContent: "center",
-          alignItems: "center",
-          zIndex: 10,
           opacity: pressed ? 0.78 : 1,
         },
+        shadows.sm,
         style,
       ]}
     >
       {icon ? (
         renderIcon(icon, colors.text, 18)
       ) : (
-        <ChevronLeftIcon color={colors.text} />
+        <Svg
+          width={18}
+          height={18}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={colors.text}
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <Path d="m15 18-6-6 6-6" />
+        </Svg>
       )}
     </Pressable>
   );
-}
+});
 
-export function CarouselNext({ style, icon }: CarouselButtonProps) {
-  const { colors, components, radii, spacing } = useTheme();
-  const { scrollNext, canScrollNext } = useCarousel();
+export const CarouselNext = React.memo(function CarouselNext({
+  style,
+  icon,
+}: CarouselButtonProps) {
+  const { colors, components, radii, shadows, spacing } = useTheme();
+  const { scrollNext, canScrollNext, showPagination, totalItems } =
+    useCarousel();
 
   if (!canScrollNext) return null;
 
+  const verticalOffset = showPagination && totalItems > 1 ? -30 : -18;
+
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Next slide"
+      hitSlop={minTouchHitSlop(ARROW_SIZE)}
       onPress={scrollNext}
       style={({ pressed }) => [
+        styles.navButton,
         {
-          position: "absolute",
           right: spacing.sm,
-          top: "50%",
-          marginTop: -32,
-          width: 36,
-          height: 36,
+          marginTop: verticalOffset,
           borderRadius: radii.full,
           backgroundColor: colors.surface,
-          borderWidth: components.borderWidth.strong,
+          borderWidth: components.borderWidth.default,
           borderColor: colors.border,
-          justifyContent: "center",
-          alignItems: "center",
-          zIndex: 10,
           opacity: pressed ? 0.78 : 1,
         },
+        shadows.sm,
         style,
       ]}
     >
       {icon ? (
         renderIcon(icon, colors.text, 18)
       ) : (
-        <ChevronRightIcon color={colors.text} />
+        <Svg
+          width={18}
+          height={18}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={colors.text}
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <Path d="m9 18 6-6-6-6" />
+        </Svg>
       )}
     </Pressable>
   );
-}
+});
+
+const styles = StyleSheet.create({
+  carouselRoot: {
+    width: "100%",
+    position: "relative",
+  },
+  contentWrapper: {
+    width: "100%",
+    overflow: "hidden",
+  },
+  pagination: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dot: {
+    height: 6,
+    borderRadius: 999,
+  },
+  itemContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  navButton: {
+    position: "absolute",
+    top: "50%",
+    width: ARROW_SIZE,
+    height: ARROW_SIZE,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+});

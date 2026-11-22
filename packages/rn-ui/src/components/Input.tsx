@@ -10,9 +10,17 @@ import {
 
 import { useTheme } from "../theme";
 import { withAlpha } from "../utils";
-import type { BaseGlassProps } from "./types";
+import { useFormField } from "./FormField";
+import {
+  minTouchHitSlop,
+  type BaseGlassProps,
+  type ComponentShape,
+  type ComponentSize,
+  type ShapeProps,
+  type SizeProps,
+} from "./types";
 
-export type InputSize = "sm" | "md" | "lg";
+export type InputSize = ComponentSize;
 export type InputType =
   | "text"
   | "email"
@@ -21,26 +29,17 @@ export type InputType =
   | "tel"
   | "url";
 
-export interface InputProps extends Omit<TextInputProps, "style">, BaseGlassProps {
+export interface InputProps
+  extends Omit<TextInputProps, "style">,
+    SizeProps<InputSize>,
+    ShapeProps<ComponentShape>,
+    BaseGlassProps {
   type?: InputType;
-  size?: InputSize;
   invalid?: boolean;
   disabled?: boolean;
   fullWidth?: boolean;
   style?: StyleProp<TextStyle>;
 }
-
-const inputHeights: Record<InputSize, number> = {
-  sm: 36,
-  md: 44,
-  lg: 52,
-};
-
-const inputPaddingX: Record<InputSize, number> = {
-  sm: 10,
-  md: 12,
-  lg: 14,
-};
 
 function getKeyboardType(type: InputType): KeyboardTypeOptions {
   if (type === "email") return "email-address";
@@ -50,93 +49,112 @@ function getKeyboardType(type: InputType): KeyboardTypeOptions {
   return "default";
 }
 
-import { useFormField } from "./FormField";
+export const Input: React.NamedExoticComponent<
+  InputProps & React.RefAttributes<TextInputInstance>
+> = React.memo(
+  React.forwardRef<TextInputInstance, InputProps>(function Input(
+    {
+      type = "text",
+      size = "md",
+      shape = "rounded",
+      invalid = false,
+      disabled = false,
+      fullWidth = true,
+      glass = false,
+      editable,
+      multiline,
+      hitSlop,
+      onFocus,
+      onBlur,
+      keyboardType,
+      secureTextEntry,
+      placeholderTextColor,
+      accessibilityState,
+      style,
+      ...props
+    },
+    ref,
+  ) {
+    const { colors, components, typography, radii, shadows } = useTheme();
+    const field = useFormField();
+    const [focused, setFocused] = React.useState(false);
 
-export const Input: (
-  props: InputProps & { ref?: React.Ref<TextInputInstance> },
-) => React.ReactNode = React.forwardRef<TextInputInstance, InputProps>(
-  function Input(
-  {
-    type = "text",
-    size = "md",
-    invalid = false,
-    disabled = false,
-    fullWidth = true,
-    glass = false,
-    editable,
-    multiline,
-    onFocus,
-    onBlur,
-    keyboardType,
-    secureTextEntry,
-    placeholderTextColor,
-    style,
-    ...props
-  },
-  ref,
-) {
-  const { colors, components, typography, radii, isDark } = useTheme();
-  const field = useFormField();
-  const [focused, setFocused] = React.useState(false);
+    const isInvalid = invalid || Boolean(field?.invalid);
+    const isDisabled = disabled || Boolean(field?.disabled);
+    const isReadOnly = !isDisabled && editable === false;
+    const isEditable = isDisabled ? false : (editable ?? true);
 
-  const isInvalid = invalid || Boolean(field?.invalid);
-  const isDisabled = disabled || Boolean(field?.disabled);
-  const isEditable = editable ?? !isDisabled;
+    const inputTokens = components.input;
+    const height = inputTokens.height[size];
+    const paddingX = inputTokens.paddingX[size];
 
-  const glassBg = isDark
-    ? "rgba(15, 27, 45, 0.60)"
-    : "rgba(255, 255, 255, 0.70)";
+    const borderRadius =
+      shape === "pill" ? radii.full : shape === "square" ? radii.sm : radii.lg;
 
-  const borderColor = isInvalid
-    ? colors.danger
-    : focused
-      ? colors.primary
-      : glass
-        ? isDark
-          ? "rgba(248, 250, 252, 0.20)"
-          : "rgba(15, 23, 42, 0.14)"
-        : colors.border;
+    const borderColor = isDisabled
+      ? colors.disabled
+      : isInvalid
+        ? colors.danger
+        : focused
+          ? colors.primary
+          : glass
+            ? colors.glassBorder
+            : colors.border;
 
-  return (
-    <TextInput
-      ref={ref as never}
-      editable={isEditable}
-      keyboardType={keyboardType ?? getKeyboardType(type)}
-      secureTextEntry={secureTextEntry ?? type === "password"}
-      placeholderTextColor={placeholderTextColor ?? colors.placeholder}
-      onFocus={(event) => {
-        setFocused(true);
-        onFocus?.(event);
-      }}
-      onBlur={(event) => {
-        setFocused(false);
-        onBlur?.(event);
-      }}
-      style={[
-        typography.body,
-        {
-          width: fullWidth ? "100%" : undefined,
-          minHeight: multiline ? inputHeights[size] * 2 : inputHeights[size],
-          paddingHorizontal: inputPaddingX[size],
-          paddingVertical: multiline ? 10 : 0,
-          borderRadius: radii.lg,
-          borderWidth:
-            focused || invalid
-              ? components.borderWidth.focus
-              : components.borderWidth.strong,
-          borderColor,
-          backgroundColor: isEditable
-            ? glass
-              ? glassBg
-              : colors.input
-            : withAlpha(colors.input, 0.55),
-          color: isEditable ? colors.text : colors.disabledText,
-          opacity: isEditable ? 1 : 0.72,
-          textAlignVertical: multiline ? "top" : "center",
-        },
-        style,
-      ]}
-      {...props}
-    />
-  );
-});
+    const backgroundColor = isDisabled
+      ? withAlpha(colors.disabled, 0.72)
+      : isReadOnly
+        ? colors.backgroundMuted
+        : glass
+          ? colors.glassSurface
+          : colors.input;
+
+    const textStyle =
+      size === "xs" || size === "sm" ? typography.bodySmall : typography.body;
+    const inputShadow = !isDisabled
+      ? shadows[components.surface.inputShadow]
+      : shadows.none;
+
+    return (
+      <TextInput
+        ref={ref}
+        editable={isEditable}
+        keyboardType={keyboardType ?? getKeyboardType(type)}
+        secureTextEntry={secureTextEntry ?? type === "password"}
+        placeholderTextColor={placeholderTextColor ?? colors.placeholder}
+        accessibilityState={{ disabled: isDisabled, ...accessibilityState }}
+        hitSlop={hitSlop ?? minTouchHitSlop(height)}
+        onFocus={(event) => {
+          setFocused(true);
+          onFocus?.(event);
+        }}
+        onBlur={(event) => {
+          setFocused(false);
+          onBlur?.(event);
+        }}
+        style={[
+          textStyle,
+          {
+            width: fullWidth ? "100%" : undefined,
+            minHeight: multiline ? height * 2 : height,
+            paddingHorizontal: paddingX,
+            paddingVertical: multiline ? 10 : 0,
+            borderRadius,
+            borderWidth:
+              focused || isInvalid
+                ? components.borderWidth.focus
+                : components.borderWidth.strong,
+            borderColor,
+            backgroundColor,
+            color: isDisabled ? colors.disabledText : colors.text,
+            opacity: isDisabled ? 0.65 : isReadOnly ? 0.9 : 1,
+            textAlignVertical: multiline ? "top" : "center",
+          },
+          inputShadow,
+          style,
+        ]}
+        {...props}
+      />
+    );
+  }),
+);

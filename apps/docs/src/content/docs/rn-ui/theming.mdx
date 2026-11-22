@@ -97,7 +97,7 @@ export default function App() {
   );
 }`;
 
-`@masumdev/rn-ui` features a typed theme engine with built-in dark mode support, reactive hooks, dynamic style resolution, and storage hydration.
+`@masumdev/rn-ui` features a typed theme engine with built-in dark mode support, reactive hooks, flexible thin-shadow toggles (`elevation`), integrated `PortalProvider` / `PortalHost` overlay layering, semantic glass tokens (`glassSurface`, `glassBorder`), and storage hydration.
 
 ## ThemeProvider API
 
@@ -116,25 +116,109 @@ export default function App() {
       default: "'system'",
       description: 'Uncontrolled initial color scheme preference.',
     },
+    elevation: {
+      type: 'boolean',
+      default: 'true',
+      description: 'Controlled elevation shadow toggle. True resolves subtle/preset shadows; false collapses all depth shadows to flatShadows.',
+    },
+    defaultElevation: {
+      type: 'boolean',
+      description: 'Initial uncontrolled elevation override when elevation prop is not controlled.',
+    },
+    presets: {
+      type: 'ThemePresets',
+      default: 'builtInThemePresets',
+      description: 'Named dictionary of Light/Dark ThemePair presets (includes default, minimal, and brutal out of the box).',
+    },
+    themeName: {
+      type: 'string',
+      description: 'Controlled active theme preset key.',
+    },
+    defaultThemeName: {
+      type: 'string',
+      default: "'default'",
+      description: 'Initial uncontrolled active preset key (e.g., default, minimal, brutal).',
+    },
     themes: {
       type: '{ light?: ThemeInput; dark?: ThemeInput }',
-      description: 'Custom light and dark theme object overrides.',
+      description: 'Custom light and dark theme object overrides layered cleanly on top of the active preset.',
     },
     storage: {
       type: '{ getItem: (key: string) => Promise<string | null>; setItem: (key: string, val: string) => Promise<void> }',
-      description: 'Storage instance for persisting color scheme (e.g., SecureStore or AsyncStorage).',
+      description: 'Storage instance for persisting color scheme and themeName (e.g., SecureStore or AsyncStorage).',
     },
     storageKey: {
       type: 'string',
       default: "'rn-ui-color-scheme'",
-      description: 'Key name used in persistent storage.',
+      description: 'Key name used to persist colorScheme preference.',
+    },
+    themeNameStorageKey: {
+      type: 'string',
+      default: "'rn-ui-theme-name'",
+      description: 'Key name used to persist active themeName preset.',
     },
     onColorSchemeChange: {
       type: '(colorScheme: ColorSchemePreference) => void',
       description: 'Callback triggered whenever the user updates the color scheme.',
     },
+    onThemeNameChange: {
+      type: '(name: string) => void',
+      description: 'Callback triggered whenever the user switches the active preset.',
+    },
+    onElevationChange: {
+      type: '(elevation: boolean) => void',
+      description: 'Callback triggered when global elevation is toggled via setElevation() / toggleElevation().',
+    },
   }}
 />
+
+## Built-in Design Presets & Neo-Brutalism / Minimal Support
+
+`@masumdev/rn-ui` ships three reactive Light + Dark presets out of the box via `builtInThemePresets` (`default`, `minimal`, `brutal`):
+
+```tsx
+import {
+  ThemeProvider,
+  builtInThemePresets,
+  useTheme,
+  Button,
+  Box,
+} from '@masumdev/rn-ui';
+
+export function AppRoot() {
+  return (
+    <ThemeProvider presets={builtInThemePresets} defaultThemeName="minimal">
+      <PresetSwitcher />
+    </ThemeProvider>
+  );
+}
+
+function PresetSwitcher() {
+  const { themeName, availableThemes, setThemeName, toggleElevation } = useTheme();
+
+  return (
+    <Box row gap="sm">
+      {availableThemes.map((name) => (
+        <Button
+          key={name}
+          size="sm"
+          variant={themeName === name ? 'filled' : 'outline'}
+          onPress={() => setThemeName(name)}
+        >
+          {name}
+        </Button>
+      ))}
+      <Button size="sm" variant="soft" onPress={toggleElevation}>
+        Toggle Shadows
+      </Button>
+    </Box>
+  );
+}
+```
+
+- **`defaultThemePreset` (`"default"`)**: Crisp `1px`–`1.5px` unified `colors.border` outlines across Light and Dark modes (via `components.surface.outlineBorderColor = "border"`, with `"tone"` opt-in for tone-tinted outlines) paired with soft diffused shadows (`subtleShadows`).
+- **`minimalThemePreset` (`"minimal"`)**: HeroUI Native-inspired `0px` borderless surfaces separated by background stepping (`#F4F4F5`/`#FFFFFF` in Light, OLED `#000000`/`#18181B` in Dark) and pill radii. Sets `components.surface.outlineStyle = "tonal"`, automatically turning `variant="outline"` buttons, icon buttons, badges, chips, bubbles, alerts, and steppers into `0px` borderless tonal surface fills while keeping `1.5px` strokes on form selection indicators (`Checkbox`, `RadioGroup`, `Switch`) and focus/invalid rings.
+- **`neoBrutalismThemePreset` (`"brutal"`)**: Chunky `2px`–`2.5px` solid ink borders, razor-sharp zero-blur hard-offset shadows via `createHardShadows()` + React Native `boxShadow` across Android/iOS/Web, and mechanical offset press-down motion (`components.surface.pressEffect = "offset"`).
 
 ## Using the `useTheme` Hook
 

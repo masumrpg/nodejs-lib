@@ -1,29 +1,37 @@
-import React from "react";
+import React, { createContext, useContext, useMemo } from "react";
 import {
   Pressable,
-  Text,
   View,
   type PressableProps,
   type StyleProp,
-  type TextProps,
   type TextStyle,
   type ViewProps,
   type ViewStyle,
 } from "react-native";
 
 import { useTheme } from "../theme";
+import { Text, type TextProps } from "./Text";
 
 export type ItemVariant = "default" | "outline" | "muted";
-export type ItemSize = "default" | "sm" | "xs";
+export type ItemSize = "xs" | "sm" | "md";
 export type ItemMediaVariant = "default" | "icon" | "image";
+
+interface ItemContextValue {
+  size: ItemSize;
+  variant: ItemVariant;
+}
+
+const ItemContext = createContext<ItemContextValue | null>(null);
 
 export interface ItemGroupProps extends ViewProps {
   size?: ItemSize;
+  variant?: ItemVariant;
   style?: StyleProp<ViewStyle>;
 }
 
-export function ItemGroup({
-  size = "default",
+export const ItemGroup = React.memo(function ItemGroup({
+  size = "md",
+  variant = "default",
   style,
   ...props
 }: ItemGroupProps) {
@@ -31,33 +39,42 @@ export function ItemGroup({
   const gap =
     size === "xs" ? spacing.sm : size === "sm" ? spacing.md : spacing.lg;
 
+  const contextValue = useMemo(() => ({ size, variant }), [size, variant]);
+
   return (
-    <View
-      accessibilityRole="list"
-      style={[
-        {
-          width: "100%",
-          gap,
-        },
-        style,
-      ]}
-      {...props}
-    />
+    <ItemContext.Provider value={contextValue}>
+      <View
+        accessibilityRole="list"
+        style={[
+          {
+            width: "100%",
+            gap,
+          },
+          style,
+        ]}
+        {...props}
+      />
+    </ItemContext.Provider>
   );
-}
+});
 
 export interface ItemSeparatorProps extends ViewProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function ItemSeparator({ style, ...props }: ItemSeparatorProps) {
-  const { colors, spacing } = useTheme();
+export const ItemSeparator = React.memo(function ItemSeparator({
+  style,
+  ...props
+}: ItemSeparatorProps) {
+  const { colors, components, spacing } = useTheme();
 
   return (
     <View
+      importantForAccessibility="no"
+      accessibilityElementsHidden
       style={[
         {
-          height: 1,
+          height: components.borderWidth.default,
           width: "100%",
           marginVertical: spacing.sm,
           backgroundColor: colors.divider,
@@ -67,7 +84,7 @@ export function ItemSeparator({ style, ...props }: ItemSeparatorProps) {
       {...props}
     />
   );
-}
+});
 
 export interface ItemProps extends Omit<PressableProps, "style"> {
   variant?: ItemVariant;
@@ -77,49 +94,90 @@ export interface ItemProps extends Omit<PressableProps, "style"> {
     | ((state: { pressed: boolean }) => StyleProp<ViewStyle>);
 }
 
-export function Item({
-  variant = "default",
-  size = "default",
+export const Item = React.memo(function Item({
+  variant,
+  size,
   disabled,
+  onPress,
+  onLongPress,
   style,
   ...props
 }: ItemProps) {
-  const { colors, radii, spacing } = useTheme();
+  const { colors, components, radii, spacing, isDark } = useTheme();
+  const group = useContext(ItemContext);
+  const resolvedVariant = variant ?? group?.variant ?? "default";
+  const resolvedSize = size ?? group?.size ?? "md";
+  const isTonalOutline = components.surface.outlineStyle === "tonal";
+  const isTonalItemOutline = resolvedVariant === "outline" && isTonalOutline;
 
-  const paddingX = size === "xs" ? spacing.md : spacing.lg;
-  const paddingY = size === "xs" ? spacing.sm : spacing.md;
-  const gap = size === "xs" ? spacing.sm : spacing.md;
+  const paddingX =
+    resolvedSize === "xs"
+      ? spacing.sm
+      : resolvedSize === "sm"
+        ? spacing.md
+        : spacing.lg;
+  const paddingY =
+    resolvedSize === "xs"
+      ? spacing.xs
+      : resolvedSize === "sm"
+        ? spacing.sm
+        : spacing.md;
+  const minHeight =
+    resolvedSize === "xs" ? 40 : resolvedSize === "sm" ? 44 : 52;
+  const gap = resolvedSize === "xs" ? spacing.sm : spacing.md;
   const isDisabled = Boolean(disabled);
+  const isInteractive = Boolean(onPress || onLongPress);
+
+  const baseStyle: ViewStyle = {
+    width: "100%",
+    minHeight,
+    paddingHorizontal: paddingX,
+    paddingVertical: paddingY,
+    borderRadius: radii.lg,
+    borderWidth:
+      resolvedVariant === "outline" && !isTonalOutline
+        ? components.borderWidth.default
+        : 0,
+    borderColor:
+      resolvedVariant === "outline" && !isTonalOutline
+        ? colors.border
+        : colors.transparent,
+    backgroundColor: isTonalItemOutline
+      ? isDark
+        ? colors.surfaceRaised
+        : colors.backgroundMuted
+      : resolvedVariant === "muted"
+        ? colors.surfaceMuted
+        : colors.transparent,
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap,
+    opacity: isDisabled ? 0.5 : 1,
+  };
+
+  if (!isInteractive) {
+    const staticStyle =
+      typeof style === "function" ? style({ pressed: false }) : style;
+    return <View style={[baseStyle, staticStyle]} {...(props as ViewProps)} />;
+  }
 
   return (
     <Pressable
-      accessibilityRole={props.onPress ? "button" : undefined}
+      accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled }}
       disabled={isDisabled}
+      onPress={onPress}
+      onLongPress={onLongPress}
       style={({ pressed }) => [
-        {
-          width: "100%",
-          minHeight: size === "xs" ? 40 : 48,
-          paddingHorizontal: paddingX,
-          paddingVertical: paddingY,
-          borderRadius: radii.lg,
-          borderWidth: variant === "outline" ? 1.25 : 1.25,
-          borderColor:
-            variant === "outline" ? colors.border : colors.transparent,
-          backgroundColor:
-            variant === "muted" ? colors.surfaceMuted : colors.transparent,
-          flexDirection: "row",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap,
-          opacity: isDisabled ? 0.5 : pressed ? 0.78 : 1,
-        },
+        baseStyle,
+        { opacity: isDisabled ? 0.5 : pressed ? 0.78 : 1 },
         typeof style === "function" ? style({ pressed }) : style,
       ]}
       {...props}
     />
   );
-}
+});
 
 export interface ItemMediaProps extends ViewProps {
   variant?: ItemMediaVariant;
@@ -127,41 +185,54 @@ export interface ItemMediaProps extends ViewProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function ItemMedia({
+export const ItemMedia = React.memo(function ItemMedia({
   variant = "default",
-  size = "default",
+  size,
   style,
   ...props
 }: ItemMediaProps) {
   const { colors, radii } = useTheme();
-  const imageSize = size === "xs" ? 24 : size === "sm" ? 32 : 40;
+  const group = useContext(ItemContext);
+  const resolvedSize = size ?? group?.size ?? "md";
+  const boxDimension =
+    resolvedSize === "xs" ? 28 : resolvedSize === "sm" ? 34 : 40;
+  const hasBox = variant === "image" || variant === "icon";
 
   return (
     <View
       style={[
         {
-          width: variant === "image" ? imageSize : undefined,
-          height: variant === "image" ? imageSize : undefined,
+          width: hasBox ? boxDimension : undefined,
+          height: hasBox ? boxDimension : undefined,
           flexShrink: 0,
           alignItems: "center",
           justifyContent: "center",
           overflow: variant === "image" ? "hidden" : undefined,
-          borderRadius: variant === "image" ? radii.sm : undefined,
-          backgroundColor:
-            variant === "image" ? colors.backgroundMuted : colors.transparent,
+          borderRadius:
+            variant === "image"
+              ? radii.sm
+              : variant === "icon"
+                ? radii.md
+                : undefined,
+          backgroundColor: hasBox
+            ? colors.backgroundMuted
+            : colors.transparent,
         },
         style,
       ]}
       {...props}
     />
   );
-}
+});
 
 export interface ItemContentProps extends ViewProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function ItemContent({ style, ...props }: ItemContentProps) {
+export const ItemContent = React.memo(function ItemContent({
+  style,
+  ...props
+}: ItemContentProps) {
   const { spacing } = useTheme();
 
   return (
@@ -177,57 +248,56 @@ export function ItemContent({ style, ...props }: ItemContentProps) {
       {...props}
     />
   );
-}
+});
 
-export interface ItemTitleProps extends TextProps {
+export interface ItemTitleProps extends Omit<TextProps, "style"> {
   style?: StyleProp<TextStyle>;
 }
 
-export function ItemTitle({ style, ...props }: ItemTitleProps) {
-  const { colors, typography } = useTheme();
-
+export const ItemTitle = React.memo(function ItemTitle({
+  numberOfLines = 1,
+  style,
+  ...props
+}: ItemTitleProps) {
   return (
     <Text
-      numberOfLines={1}
-      style={[
-        typography.label,
-        {
-          color: colors.text,
-        },
-        style,
-      ]}
+      variant="label"
+      color="text"
+      numberOfLines={numberOfLines}
+      style={style}
       {...props}
     />
   );
-}
+});
 
-export interface ItemDescriptionProps extends TextProps {
+export interface ItemDescriptionProps extends Omit<TextProps, "style"> {
   style?: StyleProp<TextStyle>;
 }
 
-export function ItemDescription({ style, ...props }: ItemDescriptionProps) {
-  const { colors, typography } = useTheme();
-
+export const ItemDescription = React.memo(function ItemDescription({
+  numberOfLines = 2,
+  style,
+  ...props
+}: ItemDescriptionProps) {
   return (
     <Text
-      numberOfLines={2}
-      style={[
-        typography.bodySmall,
-        {
-          color: colors.textMuted,
-        },
-        style,
-      ]}
+      variant="bodySmall"
+      color="textMuted"
+      numberOfLines={numberOfLines}
+      style={style}
       {...props}
     />
   );
-}
+});
 
 export interface ItemActionsProps extends ViewProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function ItemActions({ style, ...props }: ItemActionsProps) {
+export const ItemActions = React.memo(function ItemActions({
+  style,
+  ...props
+}: ItemActionsProps) {
   const { spacing } = useTheme();
 
   return (
@@ -243,13 +313,16 @@ export function ItemActions({ style, ...props }: ItemActionsProps) {
       {...props}
     />
   );
-}
+});
 
 export interface ItemHeaderProps extends ViewProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function ItemHeader({ style, ...props }: ItemHeaderProps) {
+export const ItemHeader = React.memo(function ItemHeader({
+  style,
+  ...props
+}: ItemHeaderProps) {
   const { spacing } = useTheme();
 
   return (
@@ -267,13 +340,16 @@ export function ItemHeader({ style, ...props }: ItemHeaderProps) {
       {...props}
     />
   );
-}
+});
 
 export interface ItemFooterProps extends ViewProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function ItemFooter({ style, ...props }: ItemFooterProps) {
+export const ItemFooter = React.memo(function ItemFooter({
+  style,
+  ...props
+}: ItemFooterProps) {
   const { spacing } = useTheme();
 
   return (
@@ -291,4 +367,4 @@ export function ItemFooter({ style, ...props }: ItemFooterProps) {
       {...props}
     />
   );
-}
+});

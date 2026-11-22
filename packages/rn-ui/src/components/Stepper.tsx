@@ -1,27 +1,32 @@
 import React from "react";
 import {
   Pressable,
+  StyleSheet,
   View,
+  type AccessibilityActionEvent,
   type StyleProp,
   type ViewProps,
   type ViewStyle,
 } from "react-native";
+import Svg, { Line } from "react-native-svg";
 
 import { useTheme } from "../theme";
 import { withAlpha } from "../utils";
 import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
+  minTouchHitSlop,
   renderIcon,
-  type RenderIcon,
   type BaseGlassProps,
   type BaseHapticProps,
+  type ComponentSize,
+  type RenderIcon,
   type SizeProps,
   type VariantProps,
 } from "./types";
 
 export type StepperVariant = "input" | "soft" | "outline";
-export type StepperSize = "sm" | "md" | "lg";
+export type StepperSize = ComponentSize;
 
 export interface StepperProps
   extends ViewProps,
@@ -41,62 +46,61 @@ export interface StepperProps
   style?: StyleProp<ViewStyle>;
 }
 
-const stepperHeights: Record<StepperSize, number> = {
-  sm: 36,
-  md: 44,
-  lg: 52,
-};
+function roundToStepDecimals(value: number, step: number): number {
+  const stepStr = String(step);
+  const dotIdx = stepStr.indexOf(".");
+  if (dotIdx < 0) return value;
+  const decimals = stepStr.length - dotIdx - 1;
+  return Number(value.toFixed(decimals));
+}
 
-function clampStepper(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
+function clampStepper(value: number, min: number, max: number, step: number) {
+  const rounded = roundToStepDecimals(value, step);
+  return Math.min(max, Math.max(min, rounded));
 }
 
 function MinusIcon({ color, size }: { color: string; size: number }) {
   return (
-    <View
-      style={{
-        width: size,
-        height: 2,
-        backgroundColor: color,
-        borderRadius: 1,
-      }}
-    />
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Line
+        x1={5}
+        y1={12}
+        x2={19}
+        y2={12}
+        stroke={color}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+      />
+    </Svg>
   );
 }
 
 function PlusIcon({ color, size }: { color: string; size: number }) {
   return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <View
-        style={{
-          position: "absolute",
-          width: size,
-          height: 2,
-          backgroundColor: color,
-          borderRadius: 1,
-        }}
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Line
+        x1={5}
+        y1={12}
+        x2={19}
+        y2={12}
+        stroke={color}
+        strokeWidth={2.5}
+        strokeLinecap="round"
       />
-      <View
-        style={{
-          position: "absolute",
-          width: 2,
-          height: size,
-          backgroundColor: color,
-          borderRadius: 1,
-        }}
+      <Line
+        x1={12}
+        y1={5}
+        x2={12}
+        y2={19}
+        stroke={color}
+        strokeWidth={2.5}
+        strokeLinecap="round"
       />
-    </View>
+    </Svg>
   );
 }
 
-export function Stepper({
+function StepperComponent({
   value,
   defaultValue = 0,
   min = 0,
@@ -113,93 +117,157 @@ export function Stepper({
   style,
   ...props
 }: StepperProps) {
-  const { colors, components, radii, spacing, isDark } = useTheme();
+  const { colors, components, radii, shadows, spacing } = useTheme();
+  const safeMin = Math.min(min, max);
+  const safeMax = Math.max(min, max);
   const [internalValue, setInternalValue] = React.useState(defaultValue);
 
-  const currentValue = clampStepper(value ?? internalValue, min, max);
+  const currentValue = clampStepper(
+    value ?? internalValue,
+    safeMin,
+    safeMax,
+    step,
+  );
 
-  const setNextValue = (nextValue: number) => {
-    if (disabled) return;
-    const next = clampStepper(nextValue, min, max);
-    if (haptic) triggerHaptic("selection");
-    if (value === undefined) setInternalValue(next);
-    onValueChange?.(next);
-  };
+  const setNextValue = React.useCallback(
+    (nextValue: number) => {
+      if (disabled) return;
+      const next = clampStepper(nextValue, safeMin, safeMax, step);
+      if (next === currentValue) return;
+      if (haptic) triggerHaptic("selection");
+      if (value === undefined) setInternalValue(next);
+      onValueChange?.(next);
+    },
+    [
+      currentValue,
+      disabled,
+      haptic,
+      onValueChange,
+      safeMax,
+      safeMin,
+      step,
+      value,
+    ],
+  );
 
-  const containerHeight = stepperHeights[size];
-  const padding = 4;
-  const buttonSize = containerHeight - padding * 2;
-  const iconSize = size === "sm" ? 12 : size === "md" ? 14 : 16;
+  const stepperTokens = components.stepper;
+  const containerHeight = stepperTokens.height[size];
+  const buttonSize = stepperTokens.buttonSize[size];
+  const iconSize = stepperTokens.iconSize[size];
+  const padding = Math.max(2, Math.round((containerHeight - buttonSize) / 2));
 
-  const glassBg = isDark
-    ? "rgba(15, 27, 45, 0.70)"
-    : "rgba(255, 255, 255, 0.85)";
+  const isTonalOutline = components.surface.outlineStyle === "tonal";
 
   const containerBg = disabled
-    ? withAlpha(colors.input, 0.55)
+    ? colors.disabled
     : glass
-      ? glassBg
+      ? colors.glassSurface
       : variant === "soft"
-        ? withAlpha(colors.primary, 0.08)
-        : colors.input;
+        ? colors.primarySoft
+        : variant === "outline"
+          ? isTonalOutline
+            ? colors.input
+            : colors.transparent
+          : colors.input;
 
   const borderColor = glass
-    ? isDark
-      ? "rgba(248, 250, 252, 0.20)"
-      : "rgba(15, 23, 42, 0.14)"
-    : colors.border;
+    ? colors.glassBorder
+    : variant === "soft"
+      ? components.surface.outlineBorderColor === "border"
+        ? colors.border
+        : withAlpha(colors.primary, 0.28)
+      : variant === "outline" && isTonalOutline
+        ? colors.transparent
+        : colors.border;
 
-  // Concentric inner radius (Outer 16px - 4px padding = 12px inner)
+  const borderWidth =
+    variant === "outline"
+      ? isTonalOutline
+        ? 0
+        : components.borderWidth.control
+      : variant === "soft" && !glass
+        ? components.borderWidth.default
+        : components.borderWidth.strong;
+  const containerShadow = !disabled
+    ? shadows[components.surface.inputShadow]
+    : shadows.none;
+
+  const buttonRestBg =
+    variant === "soft"
+      ? withAlpha(colors.primary, 0.14)
+      : withAlpha(colors.secondary, 0.12);
+
   const innerRadius = radii.md;
 
-  const canDecrement = !disabled && currentValue > min;
-  const canIncrement = !disabled && currentValue < max;
+  const canDecrement = !disabled && currentValue > safeMin;
+  const canIncrement = !disabled && currentValue < safeMax;
+  const buttonHitSlop = minTouchHitSlop(buttonSize);
+
+  const handleAccessibilityAction = (e: AccessibilityActionEvent) => {
+    if (disabled) return;
+    if (e.nativeEvent.actionName === "increment") {
+      setNextValue(currentValue + step);
+    } else if (e.nativeEvent.actionName === "decrement") {
+      setNextValue(currentValue - step);
+    }
+  };
 
   return (
     <View
       accessibilityRole="adjustable"
-      accessibilityValue={{ min, max, now: currentValue }}
+      accessibilityState={{ disabled }}
+      accessibilityValue={{ min: safeMin, max: safeMax, now: currentValue }}
+      accessibilityActions={[
+        { name: "increment", label: "Increment" },
+        { name: "decrement", label: "Decrement" },
+      ]}
+      onAccessibilityAction={handleAccessibilityAction}
       style={[
+        styles.container,
         {
           height: containerHeight,
           minHeight: containerHeight,
-          flexDirection: "row",
-          alignItems: "center",
-          borderWidth: components.borderWidth.strong,
+          borderWidth,
           borderColor,
           borderRadius: radii.lg,
           backgroundColor: containerBg,
           padding,
-          opacity: disabled ? 0.56 : 1,
+          opacity: disabled ? 0.6 : 1,
         },
+        containerShadow,
         style,
       ]}
       {...props}
     >
-      {/* Decrement Button (-) */}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Decrement stepper"
+        accessibilityState={{ disabled: !canDecrement }}
+        hitSlop={buttonHitSlop}
         disabled={!canDecrement}
         onPress={() => setNextValue(currentValue - step)}
         style={({ pressed }) => [
+          styles.stepBtn,
           {
             width: buttonSize,
             height: buttonSize,
             borderRadius: innerRadius,
-            backgroundColor: pressed && canDecrement
-              ? colors.backgroundMuted
-              : canDecrement
-                ? withAlpha(colors.secondary, 0.12)
-                : colors.transparent,
-            alignItems: "center",
-            justifyContent: "center",
+            backgroundColor:
+              pressed && canDecrement
+                ? colors.backgroundMuted
+                : canDecrement
+                  ? buttonRestBg
+                  : colors.transparent,
             opacity: canDecrement ? (pressed ? 0.8 : 1) : 0.4,
           },
         ]}
       >
         {decrementIcon ? (
-          renderIcon(decrementIcon, canDecrement ? colors.text : colors.disabledText, iconSize)
+          renderIcon(
+            decrementIcon,
+            canDecrement ? colors.text : colors.disabledText,
+            iconSize,
+          )
         ) : (
           <MinusIcon
             color={canDecrement ? colors.text : colors.disabledText}
@@ -208,48 +276,46 @@ export function Stepper({
         )}
       </Pressable>
 
-      {/* Value Counter Text */}
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          paddingHorizontal: spacing.xs,
-        }}
-      >
+      <View style={[styles.valueWrap, { paddingHorizontal: spacing.xs }]}>
         <Text
-          variant={size === "sm" ? "bodySmall" : "label"}
+          variant={size === "xs" || size === "sm" ? "bodySmall" : "label"}
+          color={disabled ? "disabledText" : "text"}
           weight="600"
-          style={{ fontVariant: ["tabular-nums"] }}
+          style={styles.tabularText}
         >
           {currentValue}
         </Text>
       </View>
 
-      {/* Increment Button (+) */}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Increment stepper"
+        accessibilityState={{ disabled: !canIncrement }}
+        hitSlop={buttonHitSlop}
         disabled={!canIncrement}
         onPress={() => setNextValue(currentValue + step)}
         style={({ pressed }) => [
+          styles.stepBtn,
           {
             width: buttonSize,
             height: buttonSize,
             borderRadius: innerRadius,
-            backgroundColor: pressed && canIncrement
-              ? colors.backgroundMuted
-              : canIncrement
-                ? withAlpha(colors.secondary, 0.12)
-                : colors.transparent,
-            alignItems: "center",
-            justifyContent: "center",
+            backgroundColor:
+              pressed && canIncrement
+                ? colors.backgroundMuted
+                : canIncrement
+                  ? buttonRestBg
+                  : colors.transparent,
             opacity: canIncrement ? (pressed ? 0.8 : 1) : 0.4,
           },
         ]}
       >
         {incrementIcon ? (
-          renderIcon(incrementIcon, canIncrement ? colors.text : colors.disabledText, iconSize)
+          renderIcon(
+            incrementIcon,
+            canIncrement ? colors.text : colors.disabledText,
+            iconSize,
+          )
         ) : (
           <PlusIcon
             color={canIncrement ? colors.text : colors.disabledText}
@@ -260,3 +326,24 @@ export function Stepper({
     </View>
   );
 }
+
+export const Stepper = React.memo(StepperComponent);
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  stepBtn: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  valueWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabularText: {
+    fontVariant: ["tabular-nums"],
+  },
+});

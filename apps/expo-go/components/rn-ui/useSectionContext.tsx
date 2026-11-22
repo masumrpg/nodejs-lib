@@ -8,7 +8,23 @@ const icon =
 
 export function useSectionContext() {
   const theme = useTheme();
-  const { colors, colorScheme, isDark, setColorScheme, radii, spacing, typography, shadows, components } = theme;
+  const {
+    colors,
+    colorScheme,
+    isDark,
+    setColorScheme,
+    radii,
+    spacing,
+    typography,
+    shadows,
+    components,
+    elevation,
+    setElevation,
+    toggleElevation,
+    themeName,
+    availableThemes,
+    setThemeName,
+  } = theme;
   const toast = useToast();
 
   const [sampleInput, setSampleInput] = React.useState("Hello @masumdev/rn-ui");
@@ -75,6 +91,12 @@ export function useSectionContext() {
     typography,
     shadows,
     components,
+    elevation,
+    setElevation,
+    toggleElevation,
+    themeName,
+    availableThemes,
+    setThemeName,
     toast,
     icon,
     styles,

@@ -1,6 +1,8 @@
 import React from "react";
 import {
-  Text,
+  StyleSheet,
+  Text as RNText,
+  View,
   type StyleProp,
   type TextProps,
   type TextStyle,
@@ -17,41 +19,71 @@ export interface LabelProps extends TextProps {
   style?: StyleProp<TextStyle>;
 }
 
-export function Label({
+function LabelComponent({
   required = false,
   requiredIndicator,
   requiredIndicatorStyle,
   disabled = false,
   invalid = false,
+  accessibilityState,
   style,
   children,
   ...props
 }: LabelProps) {
-  const { colors, typography } = useTheme();
+  const { colors, spacing, typography } = useTheme();
+  const isCustomNodeIndicator =
+    required &&
+    requiredIndicator !== undefined &&
+    requiredIndicator !== null &&
+    typeof requiredIndicator !== "string" &&
+    typeof requiredIndicator !== "number";
+
+  const textColor = disabled
+    ? colors.disabledText
+    : invalid
+      ? colors.danger
+      : colors.text;
+
+  if (isCustomNodeIndicator) {
+    return (
+      <View
+        accessible
+        accessibilityRole="text"
+        accessibilityState={{ disabled, ...accessibilityState }}
+        style={[styles.row, { gap: spacing.xxs }]}
+      >
+        <RNText
+          style={[typography.label, { color: textColor }, style]}
+          {...props}
+        >
+          {children}
+        </RNText>
+        <View pointerEvents="none">{requiredIndicator}</View>
+      </View>
+    );
+  }
 
   return (
-    <Text
-      style={[
-        typography.label,
-        {
-          color: disabled
-            ? colors.disabledText
-            : invalid
-              ? colors.danger
-              : colors.text,
-        },
-        style,
-      ]}
+    <RNText
+      accessibilityState={{ disabled, ...accessibilityState }}
+      style={[typography.label, { color: textColor }, style]}
       {...props}
     >
       {children}
-      {required
-        ? (requiredIndicator ?? (
-            <Text style={[{ color: colors.danger }, requiredIndicatorStyle]}>
-              {" *"}
-            </Text>
-          ))
-        : null}
-    </Text>
+      {required ? (
+        <RNText style={[{ color: colors.danger }, requiredIndicatorStyle]}>
+          {requiredIndicator ?? " *"}
+        </RNText>
+      ) : null}
+    </RNText>
   );
 }
+
+export const Label = React.memo(LabelComponent);
+
+const styles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+});

@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  StyleSheet,
   View,
   type StyleProp,
   type ViewProps,
@@ -8,7 +9,7 @@ import {
 
 import { useTheme } from "../theme";
 import { Text } from "./Text";
-import { renderIcon, type RenderIcon, type BaseGlassProps } from "./types";
+import { renderIcon, type BaseGlassProps, type RenderIcon } from "./types";
 
 export interface TimelineProps extends ViewProps {
   style?: StyleProp<ViewStyle>;
@@ -32,12 +33,16 @@ export interface TimelineDescriptionProps {
   children?: React.ReactNode;
 }
 
-export function Timeline({ style, children, ...props }: TimelineProps) {
+export const Timeline = React.memo(function Timeline({
+  style,
+  children,
+  ...props
+}: TimelineProps) {
   const childrenArray = React.Children.toArray(children).filter(Boolean);
   const count = childrenArray.length;
 
   return (
-    <View style={[{ gap: 0 }, style]} {...props}>
+    <View style={[styles.root, style]} {...props}>
       {childrenArray.map((child, index) => {
         if (React.isValidElement<TimelineItemProps>(child)) {
           return React.cloneElement(child, {
@@ -49,12 +54,13 @@ export function Timeline({ style, children, ...props }: TimelineProps) {
       })}
     </View>
   );
-}
+});
 
-export function TimelineItem({
+export const TimelineItem = React.memo(function TimelineItem({
   active = false,
   isLast = false,
   isFirst = false,
+  glass = false,
   lineColor,
   dotColor,
   icon,
@@ -62,68 +68,126 @@ export function TimelineItem({
   children,
   ...props
 }: TimelineItemProps) {
-  const { colors, components, spacing } = useTheme();
+  const { colors, components, radii, spacing } = useTheme();
   const indicatorSize = components.timeline.indicatorSize;
-  const resolvedDotColor =
-    dotColor ?? (active ? colors.primary : colors.border);
+  const resolvedDotBg =
+    dotColor ?? (active ? colors.primary : colors.surfaceMuted);
+  const resolvedDotBorder = active || dotColor ? "transparent" : colors.border;
+  const resolvedIconColor =
+    active || dotColor ? colors.onPrimary : colors.textMuted;
   const resolvedLineColor =
     lineColor ?? (active ? colors.primary : colors.borderMuted);
 
   return (
-    <View style={[{ flexDirection: "row", gap: spacing.md }, style]} {...props}>
-      <View style={{ alignItems: "center", width: indicatorSize + 8 }}>
+    <View
+      style={[
+        styles.row,
+        {
+          gap: spacing.md,
+          minHeight: !isLast ? components.timeline.connectorMinHeight : undefined,
+        },
+        style,
+      ]}
+      {...props}
+    >
+      <View
+        style={[
+          styles.trackColumn,
+          { width: indicatorSize + 8 },
+        ]}
+      >
         <View
-          style={{
-            width: indicatorSize,
-            height: indicatorSize,
-            borderRadius: indicatorSize / 2,
-            backgroundColor: resolvedDotColor,
-            marginTop: 4,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+          style={[
+            styles.dot,
+            {
+              width: indicatorSize,
+              height: indicatorSize,
+              borderRadius: indicatorSize / 2,
+              backgroundColor: resolvedDotBg,
+              borderWidth: components.borderWidth.default,
+              borderColor: resolvedDotBorder,
+              marginTop: isFirst ? 2 : 4,
+            },
+          ]}
         >
-          {icon ? renderIcon(icon, colors.onPrimary, 8) : null}
+          {icon ? renderIcon(icon, resolvedIconColor, 8) : null}
         </View>
-        {!isLast && (
+        {!isLast ? (
           <View
-            style={{
-              width: components.timeline.connectorWidth ?? 1.5,
-              flex: 1,
-              backgroundColor: resolvedLineColor,
-              marginTop: 4,
-            }}
+            style={[
+              styles.connector,
+              {
+                width: components.timeline.connectorWidth ?? 1.5,
+                backgroundColor: resolvedLineColor,
+              },
+            ]}
           />
-        )}
+        ) : null}
       </View>
 
       <View
-        style={{
-          flex: 1,
-          paddingBottom: isLast ? 0 : spacing.lg,
-          gap: spacing.xs,
-        }}
+        style={[
+          styles.contentColumn,
+          {
+            marginBottom: isLast ? 0 : spacing.lg,
+            gap: spacing.xs,
+          },
+          glass && {
+            backgroundColor: colors.glassSurface,
+            borderWidth: components.borderWidth.default,
+            borderColor: colors.glassBorder,
+            borderRadius: radii.lg,
+            padding: spacing.md,
+          },
+        ]}
       >
         {children}
       </View>
     </View>
   );
-}
+});
 
-export function TimelineTitle({ children }: TimelineTitleProps) {
-  return typeof children === "string" ? (
+export const TimelineTitle = React.memo(function TimelineTitle({
+  children,
+}: TimelineTitleProps) {
+  return typeof children === "string" || typeof children === "number" ? (
     <Text variant="label">{children}</Text>
   ) : (
     <>{children}</>
   );
-}
+});
 
-export function TimelineDescription({ children }: TimelineDescriptionProps) {
-  return typeof children === "string" ? (
+export const TimelineDescription = React.memo(function TimelineDescription({
+  children,
+}: TimelineDescriptionProps) {
+  return typeof children === "string" || typeof children === "number" ? (
     <Text variant="bodySmall" color="textMuted">
       {children}
     </Text>
   ) : (
     <>{children}</>
   );
-}
+});
+
+const styles = StyleSheet.create({
+  root: {
+    gap: 0,
+  },
+  row: {
+    flexDirection: "row",
+  },
+  trackColumn: {
+    alignItems: "center",
+  },
+  dot: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  connector: {
+    flex: 1,
+    marginTop: 4,
+  },
+  contentColumn: {
+    flex: 1,
+  },
+});

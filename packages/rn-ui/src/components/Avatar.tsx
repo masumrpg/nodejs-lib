@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
   Image,
   View,
@@ -12,21 +12,68 @@ import {
 
 import { useTheme } from "../theme";
 import { Text } from "./Text";
+import {
+  resolveToneColors,
+  type ComponentSize,
+  type ComponentTone,
+  type SizeProps,
+  type ToneProps,
+  type VariantProps,
+} from "./types";
 
-export type AvatarSize = "sm" | "default" | "lg" | "xl" | number;
+export type AvatarSize = ComponentSize | number;
 export type AvatarShape = "circle" | "square" | "rounded";
 export type AvatarStatus = "online" | "offline" | "busy" | "away";
+export type AvatarVariant = "default" | "bordered" | "ring";
+export type AvatarTone = ComponentTone;
+export type AvatarBadgeTone = ComponentTone;
+export type AvatarBadgePosition =
+  | "top-right"
+  | "top-left"
+  | "bottom-right"
+  | "bottom-left";
+
+const AVATAR_DIMENSIONS: Record<ComponentSize, number> = {
+  xs: 24,
+  sm: 28,
+  md: 36,
+  lg: 44,
+  xl: 56,
+};
+
+function resolveAvatarDimension(size: AvatarSize): number {
+  if (typeof size === "number") {
+    return Number.isFinite(size) && size > 0 ? size : AVATAR_DIMENSIONS.md;
+  }
+  return AVATAR_DIMENSIONS[size] ?? AVATAR_DIMENSIONS.md;
+}
+
+function resolveAvatarShapeRadius(
+  shape: AvatarShape,
+  radii: ReturnType<typeof useTheme>["radii"],
+): number {
+  if (shape === "circle") return radii.full;
+  if (shape === "square") return radii.xs;
+  return radii.md;
+}
+
+function getSourceIdentity(source: ImageSourcePropType | undefined): unknown {
+  if (source && typeof source === "object" && !Array.isArray(source) && "uri" in source) {
+    return source.uri;
+  }
+  return source;
+}
 
 interface AvatarContextType {
   size: AvatarSize;
   shape: AvatarShape;
-  variant?: AvatarVariant;
-  ringPadding: number;
+  variant: AvatarVariant;
+  innerInset: number;
   hasLoaded: boolean;
   setHasLoaded: (value: boolean) => void;
   hasError: boolean;
   setHasError: (value: boolean) => void;
-  inGroup?: boolean;
+  inGroup: boolean;
 }
 
 const AvatarContext = createContext<AvatarContextType | null>(null);
@@ -47,38 +94,12 @@ const GroupContext = createContext<{
   shape: AvatarShape;
 } | null>(null);
 
-export type AvatarVariant = "default" | "bordered" | "ring" | "premium" | "vip";
-export type AvatarTone =
-  | "default"
-  | "primary"
-  | "secondary"
-  | "accent"
-  | "success"
-  | "warning"
-  | "danger"
-  | "gold";
-
-export type AvatarBadgeTone =
-  | "primary"
-  | "danger"
-  | "warning"
-  | "success"
-  | "secondary"
-  | "accent";
-
-export type AvatarBadgePosition =
-  | "top-right"
-  | "top-left"
-  | "bottom-right"
-  | "bottom-left";
-
-export interface AvatarProps extends React.ComponentPropsWithoutRef<
-  typeof View
-> {
-  size?: AvatarSize;
+export interface AvatarProps
+  extends React.ComponentPropsWithoutRef<typeof View>,
+    VariantProps<AvatarVariant>,
+    ToneProps<AvatarTone>,
+    SizeProps<AvatarSize> {
   shape?: AvatarShape;
-  variant?: AvatarVariant;
-  tone?: AvatarTone;
   style?: StyleProp<ViewStyle>;
   badge?: React.ReactNode | number | string;
   badgeTone?: AvatarBadgeTone;
@@ -90,8 +111,8 @@ export interface AvatarProps extends React.ComponentPropsWithoutRef<
   children?: React.ReactNode;
 }
 
-export function Avatar({
-  size = "default",
+function AvatarComponent({
+  size = "md",
   shape = "circle",
   variant = "default",
   tone = "default",
@@ -110,90 +131,62 @@ export function Avatar({
   const [hasLoaded, setHasLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  // Check if rendered inside an AvatarGroup
   const group = useContext(GroupContext);
   const finalSize = group ? group.size : size;
   const finalShape = group ? group.shape : shape;
   const inGroup = !!group;
 
-  // Determine width and height based on size
-  const dimension =
-    typeof finalSize === "number"
-      ? finalSize
-      : finalSize === "xl"
-      ? 56
-      : finalSize === "lg"
-      ? 44
-      : finalSize === "sm"
-      ? 28
-      : 36;
-
-  const borderRadius =
-    finalShape === "circle"
-      ? radii.full
-      : finalShape === "square"
-      ? radii.xs
-      : radii.md;
-
-  const toneColor =
-    tone === "primary"
-      ? colors.primary
-      : tone === "secondary"
-      ? colors.secondary
-      : tone === "accent"
-      ? colors.accent
-      : tone === "success"
-      ? colors.success
-      : tone === "warning"
-      ? colors.warning
-      : tone === "danger"
-      ? colors.danger
-      : tone === "gold"
-      ? "#F59E0B"
-      : colors.border;
+  const dimension = resolveAvatarDimension(finalSize);
+  const borderRadius = resolveAvatarShapeRadius(finalShape, radii);
+  const toneColors = resolveToneColors(tone, colors);
 
   let borderWidth = 0;
   let borderColor: string | undefined;
   let ringPadding = 0;
 
   if (variant === "bordered") {
-    borderWidth = 2;
-    borderColor = tone === "default" ? colors.border : toneColor;
+    borderWidth = components.borderWidth.ring;
+    borderColor = tone === "default" ? colors.border : toneColors.solid;
   } else if (variant === "ring") {
-    borderWidth = 2;
-    borderColor = tone === "default" ? colors.primary : toneColor;
+    borderWidth = components.borderWidth.ring;
+    borderColor = tone === "default" ? colors.primary : toneColors.solid;
     ringPadding = 2;
-  } else if (variant === "premium") {
-    borderWidth = 2.5;
-    borderColor = colors.accent ?? "#8B5CF6";
-    ringPadding = 2;
-  } else if (variant === "vip") {
-    borderWidth = 2.5;
-    borderColor = colors.warning ?? "#F59E0B";
-    ringPadding = 2;
+  } else if (inGroup) {
+    borderWidth = components.borderWidth.ring;
+    borderColor = colors.background;
   }
 
-  const rootStyle: ViewStyle = {
-    position: "relative",
-    width: dimension,
-    height: dimension,
-    borderRadius,
-    backgroundColor: colors.backgroundMuted,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "visible",
-    ...(borderWidth > 0
-      ? {
-          borderWidth,
-          borderColor,
-        }
-      : inGroup
-      ? {
-          borderWidth: components.borderWidth.ring,
-          borderColor: colors.background,
-        }
-      : {}),
-  };
+  const innerInset = ringPadding + borderWidth;
+
+  const rootStyle = useMemo<ViewStyle>(
+    () => ({
+      position: "relative",
+      width: dimension,
+      height: dimension,
+      borderRadius,
+      backgroundColor: colors.backgroundMuted,
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "visible",
+      ...(borderWidth > 0 ? { borderWidth, borderColor } : null),
+    }),
+    [borderColor, borderRadius, borderWidth, colors.backgroundMuted, dimension],
+  );
+
+  const contextValue = useMemo<AvatarContextType>(
+    () => ({
+      size: finalSize,
+      shape: finalShape,
+      variant,
+      innerInset,
+      hasLoaded,
+      setHasLoaded,
+      hasError,
+      setHasError,
+      inGroup,
+    }),
+    [finalShape, finalSize, hasError, hasLoaded, inGroup, innerInset, variant],
+  );
 
   const isImageSource = (val: unknown): val is ImageSourcePropType => {
     return (
@@ -205,20 +198,12 @@ export function Avatar({
   };
 
   return (
-    <AvatarContext.Provider
-      value={{
-        size: finalSize,
-        shape: finalShape,
-        variant,
-        ringPadding,
-        hasLoaded,
-        setHasLoaded,
-        hasError,
-        setHasError,
-        inGroup,
-      }}
-    >
-      <View style={[rootStyle, style]} {...props}>
+    <AvatarContext.Provider value={contextValue}>
+      <View
+        accessibilityRole="image"
+        style={[rootStyle, style]}
+        {...props}
+      >
         {children}
         {frame ? (
           isImageSource(frame) ? (
@@ -257,25 +242,28 @@ export function Avatar({
   );
 }
 
+export const Avatar = React.memo(AvatarComponent);
+
 export interface AvatarImageProps extends Omit<ImageProps, "style"> {
   style?: StyleProp<ImageStyle>;
 }
 
-export function AvatarImage({
+export const AvatarImage = React.memo(function AvatarImage({
   source,
   style,
   onLoad,
   onError,
   ...props
 }: AvatarImageProps) {
-  const { setHasLoaded, setHasError, hasError, shape, ringPadding } =
+  const { setHasLoaded, setHasError, hasError, shape, innerInset } =
     useAvatarContext();
   const { radii } = useTheme();
+  const sourceKey = getSourceIdentity(source);
 
   useEffect(() => {
     setHasLoaded(false);
     setHasError(false);
-  }, [source]);
+  }, [setHasError, setHasLoaded, sourceKey]);
 
   if (hasError) {
     return null;
@@ -291,26 +279,22 @@ export function AvatarImage({
     onError?.(e);
   };
 
-  const baseRadius =
-    shape === "circle"
-      ? radii.full
-      : shape === "square"
-      ? radii.xs
-      : radii.md;
-
-  const borderRadius = Math.max(0, baseRadius - ringPadding);
+  const baseRadius = resolveAvatarShapeRadius(shape, radii);
+  const borderRadius = Math.max(0, baseRadius - innerInset);
+  const insetOffset = Math.max(0, innerInset - 2);
 
   const imageStyle: ImageStyle = {
     position: "absolute",
-    top: ringPadding,
-    left: ringPadding,
-    right: ringPadding,
-    bottom: ringPadding,
+    top: insetOffset,
+    left: insetOffset,
+    right: insetOffset,
+    bottom: insetOffset,
     borderRadius,
   };
 
   return (
     <Image
+      accessibilityRole="image"
       source={source}
       style={[imageStyle, style]}
       onLoad={handleLoad}
@@ -318,7 +302,7 @@ export function AvatarImage({
       {...props}
     />
   );
-}
+});
 
 export interface AvatarFallbackProps extends React.ComponentPropsWithoutRef<
   typeof View
@@ -328,57 +312,50 @@ export interface AvatarFallbackProps extends React.ComponentPropsWithoutRef<
   children?: React.ReactNode;
 }
 
-export function AvatarFallback({
+export const AvatarFallback = React.memo(function AvatarFallback({
   style,
   textStyle,
   children,
   ...props
 }: AvatarFallbackProps) {
-  const { hasLoaded, hasError, size, shape, ringPadding } = useAvatarContext();
+  const { hasLoaded, hasError, size, shape, innerInset } = useAvatarContext();
   const { colors, radii } = useTheme();
 
   if (hasLoaded && !hasError) {
     return null;
   }
 
-  const baseRadius =
-    shape === "circle"
-      ? radii.full
-      : shape === "square"
-      ? radii.xs
-      : radii.md;
-
-  const borderRadius = Math.max(0, baseRadius - ringPadding);
+  const baseRadius = resolveAvatarShapeRadius(shape, radii);
+  const borderRadius = Math.max(0, baseRadius - innerInset);
+  const insetOffset = Math.max(0, innerInset - 2);
 
   const fallbackStyle: ViewStyle = {
     position: "absolute",
-    top: ringPadding,
-    left: ringPadding,
-    right: ringPadding,
-    bottom: ringPadding,
+    top: insetOffset,
+    left: insetOffset,
+    right: insetOffset,
+    bottom: insetOffset,
     borderRadius,
     backgroundColor: colors.backgroundMuted,
     alignItems: "center",
     justifyContent: "center",
   };
 
-  const fontSize =
-    typeof size === "number"
-      ? size * 0.4
-      : size === "xl"
-      ? 20
-      : size === "lg"
-      ? 16
-      : size === "sm"
-      ? 11
-      : 13;
+  const dimension = resolveAvatarDimension(size);
+  const fontSize = Math.max(9, Math.round(dimension * 0.36));
 
   return (
     <View style={[fallbackStyle, style]} {...props}>
-      {typeof children === "string" ? (
+      {typeof children === "string" || typeof children === "number" ? (
         <Text
+          numberOfLines={1}
           style={[
-            { color: colors.textMuted, fontSize, fontWeight: "600" },
+            {
+              color: colors.textMuted,
+              fontSize,
+              lineHeight: Math.round(fontSize * 1.15),
+              fontWeight: "600",
+            },
             textStyle,
           ]}
         >
@@ -389,16 +366,14 @@ export function AvatarFallback({
       )}
     </View>
   );
-}
+});
 
-export interface AvatarBadgeProps extends React.ComponentPropsWithoutRef<
-  typeof View
-> {
+export interface AvatarBadgeProps
+  extends React.ComponentPropsWithoutRef<typeof View>,
+    ToneProps<AvatarBadgeTone> {
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
-  bg?: string;
   status?: AvatarStatus;
-  tone?: AvatarBadgeTone;
   position?: AvatarBadgePosition;
   count?: number | string;
   value?: React.ReactNode;
@@ -406,10 +381,9 @@ export interface AvatarBadgeProps extends React.ComponentPropsWithoutRef<
   children?: React.ReactNode;
 }
 
-export function AvatarBadge({
+export const AvatarBadge = React.memo(function AvatarBadge({
   style,
   textStyle,
-  bg,
   status,
   tone = "danger",
   position,
@@ -419,10 +393,9 @@ export function AvatarBadge({
   children,
   ...props
 }: AvatarBadgeProps) {
-  const { size } = useAvatarContext();
-  const { colors, components } = useTheme();
+  const { size, variant } = useAvatarContext();
+  const { colors, components, radii } = useTheme();
 
-  // Determine badge position: default to "bottom-right" for status dots, "top-right" for count/custom badges
   const isStatusDot =
     status !== undefined &&
     count === undefined &&
@@ -431,43 +404,24 @@ export function AvatarBadge({
   const finalPosition: AvatarBadgePosition =
     position ?? (isStatusDot ? "bottom-right" : "top-right");
 
-  const toneColor =
-    tone === "primary"
-      ? colors.primary
-      : tone === "danger"
-      ? colors.danger
-      : tone === "warning"
-      ? colors.warning
-      : tone === "success"
-      ? colors.success
-      : tone === "secondary"
-      ? colors.secondary
-      : colors.accent;
+  const toneColors = resolveToneColors(tone, colors);
 
   const statusColor =
     status === "online"
       ? colors.success
       : status === "busy"
-      ? colors.danger
-      : status === "away"
-      ? colors.warning
-      : status === "offline"
-      ? colors.textMuted
-      : bg || toneColor;
+        ? colors.danger
+        : status === "away"
+          ? colors.warning
+          : status === "offline"
+            ? colors.textMuted
+            : toneColors.solid;
 
-  const badgeBg = bg || (status ? statusColor : toneColor);
-
-  // Position offsets based on avatar size
-  const offset =
-    typeof size === "number"
-      ? 0
-      : size === "xl"
-      ? 1
-      : size === "lg"
-      ? 0
-      : size === "sm"
-      ? -2
-      : -1;
+  const badgeBg = status ? statusColor : toneColors.solid;
+  const dimension = resolveAvatarDimension(size);
+  const borderShift = variant !== "default" ? -2 : 0;
+  const baseOffset = dimension >= 48 ? 1 : dimension >= 40 ? 0 : -2;
+  const offset = baseOffset + borderShift;
 
   const positionStyle: ViewStyle =
     finalPosition === "top-right"
@@ -478,18 +432,8 @@ export function AvatarBadge({
           ? { bottom: offset, left: offset }
           : { bottom: offset, right: offset };
 
-  // If pure status indicator dot
   if (isStatusDot) {
-    const dotSize =
-      typeof size === "number"
-        ? size * 0.28
-        : size === "xl"
-        ? 14
-        : size === "lg"
-        ? 12
-        : size === "sm"
-        ? 8
-        : 10;
+    const dotSize = Math.max(8, Math.round(dimension * 0.26));
 
     const dotStyle: ViewStyle = {
       position: "absolute",
@@ -503,10 +447,16 @@ export function AvatarBadge({
       zIndex: 10,
     };
 
-    return <View style={[dotStyle, style]} {...props} />;
+    return (
+      <View
+        accessibilityRole="text"
+        accessibilityLabel={props.accessibilityLabel ?? `Status: ${status}`}
+        style={[dotStyle, style]}
+        {...props}
+      />
+    );
   }
 
-  // Count, content, or custom decorative children
   const content =
     children ??
     value ??
@@ -519,27 +469,8 @@ export function AvatarBadge({
   const isNumericOrShortText =
     typeof content === "string" || typeof content === "number";
 
-  const minBadgeHeight =
-    typeof size === "number"
-      ? Math.max(16, size * 0.4)
-      : size === "xl"
-      ? 20
-      : size === "lg"
-      ? 18
-      : size === "sm"
-      ? 14
-      : 16;
-
-  const fontSize =
-    typeof size === "number"
-      ? Math.max(9, size * 0.25)
-      : size === "xl"
-      ? 11
-      : size === "lg"
-      ? 10
-      : size === "sm"
-      ? 8
-      : 9;
+  const minBadgeHeight = Math.max(14, Math.round(dimension * 0.42));
+  const fontSize = Math.max(8, Math.round(dimension * 0.25));
 
   const customBadgeStyle: ViewStyle = {
     position: "absolute",
@@ -547,7 +478,7 @@ export function AvatarBadge({
     minWidth: minBadgeHeight,
     height: minBadgeHeight,
     paddingHorizontal: isNumericOrShortText ? 4 : 2,
-    borderRadius: 999,
+    borderRadius: radii.full,
     backgroundColor: badgeBg,
     alignItems: "center",
     justifyContent: "center",
@@ -556,22 +487,22 @@ export function AvatarBadge({
     zIndex: 10,
   };
 
-  const badgeTextColor =
-    tone === "danger"
-      ? colors.onDanger
-      : tone === "warning"
-        ? colors.onWarning
-        : tone === "success"
-          ? colors.onSuccess
-          : colors.onPrimary ?? colors.textInverse;
-
   return (
-    <View style={[customBadgeStyle, style]} {...props}>
+    <View
+      accessibilityRole="text"
+      accessibilityLabel={
+        props.accessibilityLabel ??
+        (isNumericOrShortText ? `Notification count ${content}` : undefined)
+      }
+      style={[customBadgeStyle, style]}
+      {...props}
+    >
       {isNumericOrShortText ? (
         <Text
+          numberOfLines={1}
           style={[
             {
-              color: badgeTextColor,
+              color: toneColors.on,
               fontSize,
               fontWeight: "700",
               lineHeight: fontSize + 2,
@@ -587,7 +518,7 @@ export function AvatarBadge({
       )}
     </View>
   );
-}
+});
 
 export interface AvatarGroupProps extends React.ComponentPropsWithoutRef<
   typeof View
@@ -598,39 +529,38 @@ export interface AvatarGroupProps extends React.ComponentPropsWithoutRef<
   children?: React.ReactNode;
 }
 
-export function AvatarGroup({
-  size = "default",
+export const AvatarGroup = React.memo(function AvatarGroup({
+  size = "md",
   shape = "circle",
   style,
   children,
   ...props
 }: AvatarGroupProps) {
-  const groupStyle: ViewStyle = {
-    flexDirection: "row",
-    alignItems: "center",
-  };
-
-  const spacing =
-    typeof size === "number"
-      ? -size * 0.25
-      : size === "xl"
-      ? -14
-      : size === "lg"
-      ? -10
-      : size === "sm"
-      ? -6
-      : -8;
+  const dimension = resolveAvatarDimension(size);
+  const overlap = -Math.round(dimension * 0.24);
+  const groupValue = useMemo(
+    () => ({ inGroup: true, size, shape }),
+    [shape, size],
+  );
+  const childCount = React.Children.count(children);
 
   return (
-    <GroupContext.Provider value={{ inGroup: true, size, shape }}>
-      <View style={[groupStyle, style]} {...props}>
+    <GroupContext.Provider value={groupValue}>
+      <View
+        accessibilityRole="list"
+        style={[{ flexDirection: "row", alignItems: "center" }, style]}
+        {...props}
+      >
         {React.Children.map(children, (child, index) => {
-          if (!React.isValidElement<{ style?: StyleProp<ViewStyle> }>(child)) return child;
+          if (!React.isValidElement<{ style?: StyleProp<ViewStyle> }>(child)) {
+            return child;
+          }
 
           return React.cloneElement(child, {
             style: [
               {
-                marginLeft: index === 0 ? 0 : spacing,
+                marginLeft: index === 0 ? 0 : overlap,
+                zIndex: childCount - index,
               },
               child.props.style,
             ],
@@ -639,7 +569,7 @@ export function AvatarGroup({
       </View>
     </GroupContext.Provider>
   );
-}
+});
 
 export interface AvatarGroupCountProps extends React.ComponentPropsWithoutRef<
   typeof View
@@ -649,7 +579,7 @@ export interface AvatarGroupCountProps extends React.ComponentPropsWithoutRef<
   textStyle?: StyleProp<TextStyle>;
 }
 
-export function AvatarGroupCount({
+export const AvatarGroupCount = React.memo(function AvatarGroupCount({
   count,
   style,
   textStyle,
@@ -657,48 +587,13 @@ export function AvatarGroupCount({
 }: AvatarGroupCountProps) {
   const { colors, components, radii } = useTheme();
   const group = useContext(GroupContext);
-  const size = group ? group.size : "default";
+  const size = group ? group.size : "md";
   const shape = group ? group.shape : "circle";
 
-  const dimension =
-    typeof size === "number"
-      ? size
-      : size === "xl"
-      ? 56
-      : size === "lg"
-      ? 44
-      : size === "sm"
-      ? 28
-      : 36;
-
-  const spacing =
-    typeof size === "number"
-      ? -size * 0.25
-      : size === "xl"
-      ? -14
-      : size === "lg"
-      ? -10
-      : size === "sm"
-      ? -6
-      : -8;
-
-  const fontSize =
-    typeof size === "number"
-      ? size * 0.35
-      : size === "xl"
-      ? 16
-      : size === "lg"
-      ? 14
-      : size === "sm"
-      ? 10
-      : 12;
-
-  const borderRadius =
-    shape === "circle"
-      ? radii.full
-      : shape === "square"
-      ? radii.xs
-      : radii.md;
+  const dimension = resolveAvatarDimension(size);
+  const overlap = group ? -Math.round(dimension * 0.24) : 0;
+  const fontSize = Math.max(10, Math.round(dimension * 0.33));
+  const borderRadius = resolveAvatarShapeRadius(shape, radii);
 
   const countStyle: ViewStyle = {
     width: dimension,
@@ -709,14 +604,25 @@ export function AvatarGroupCount({
     justifyContent: "center",
     borderWidth: components.borderWidth.ring,
     borderColor: colors.background,
-    marginLeft: spacing,
+    marginLeft: overlap,
   };
 
   return (
-    <View style={[countStyle, style]} {...props}>
+    <View
+      accessibilityRole="text"
+      accessibilityLabel={`Plus ${count} more`}
+      style={[countStyle, style]}
+      {...props}
+    >
       <Text
+        numberOfLines={1}
         style={[
-          { color: colors.textMuted, fontSize, fontWeight: "600" },
+          {
+            color: colors.textMuted,
+            fontSize,
+            lineHeight: Math.round(fontSize * 1.15),
+            fontWeight: "600",
+          },
           textStyle,
         ]}
       >
@@ -724,7 +630,7 @@ export function AvatarGroupCount({
       </Text>
     </View>
   );
-}
+});
 
 export interface AvatarFrameProps
   extends Omit<React.ComponentPropsWithoutRef<typeof View>, "style"> {
@@ -735,7 +641,7 @@ export interface AvatarFrameProps
   children?: React.ReactNode;
 }
 
-export function AvatarFrame({
+export const AvatarFrame = React.memo(function AvatarFrame({
   source,
   scale = 1.3,
   style,
@@ -744,17 +650,7 @@ export function AvatarFrame({
   ...props
 }: AvatarFrameProps) {
   const { size } = useAvatarContext();
-  const dimension =
-    typeof size === "number"
-      ? size
-      : size === "xl"
-      ? 56
-      : size === "lg"
-      ? 44
-      : size === "sm"
-      ? 28
-      : 36;
-
+  const dimension = resolveAvatarDimension(size);
   const frameDimension = dimension * scale;
   const frameOffset = (dimension - frameDimension) / 2;
 
@@ -766,7 +662,6 @@ export function AvatarFrame({
     height: frameDimension,
     alignItems: "center",
     justifyContent: "center",
-    pointerEvents: "none",
     zIndex: 6,
   };
 
@@ -788,4 +683,4 @@ export function AvatarFrame({
       {children}
     </View>
   );
-}
+});

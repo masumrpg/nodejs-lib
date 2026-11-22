@@ -14,12 +14,23 @@ import {
   ThemeProvider,
   ToastProvider,
   defaultThemes,
+  minimalThemePreset,
+  neoBrutalismThemePreset,
   type ColorSchemePreference,
   type Theme,
+  type ThemePresets,
   type ThemeStorage,
 } from "@masumdev/rn-ui";
 
 const THEME_STORAGE_KEY = "rn_ui_theme_preference_v1";
+const THEME_NAME_STORAGE_KEY = "rn_ui_theme_preset_v1";
+
+const appFonts = {
+  regular: "OutfitRegular",
+  medium: "OutfitMedium",
+  semibold: "OutfitSemiBold",
+  bold: "OutfitBold",
+};
 
 const customDarkTheme: Theme = {
   ...defaultThemes.dark,
@@ -32,15 +43,26 @@ const customDarkTheme: Theme = {
     surfaceRaised: "#122B37",
     surfaceMuted: "#071B24",
     border: "rgba(242, 251, 253, 0.16)",
-    borderMuted: "rgba(242, 251, 253, 0.08)",
+    borderMuted: "rgba(242, 251, 253, 0.09)",
     divider: "rgba(242, 251, 253, 0.16)",
+    glassBorder: "rgba(242, 251, 253, 0.16)",
     input: "#0B202A",
   },
 };
 
-const appThemes = {
-  light: defaultThemes.light,
-  dark: customDarkTheme,
+const appThemePresets: ThemePresets = {
+  default: {
+    light: { ...defaultThemes.light, fonts: appFonts },
+    dark: { ...customDarkTheme, fonts: appFonts },
+  },
+  minimal: {
+    light: { ...minimalThemePreset.light, fonts: appFonts },
+    dark: { ...minimalThemePreset.dark, fonts: appFonts },
+  },
+  brutal: {
+    light: { ...neoBrutalismThemePreset.light, fonts: appFonts },
+    dark: { ...neoBrutalismThemePreset.dark, fonts: appFonts },
+  },
 };
 
 const themeStorage: ThemeStorage = {
@@ -137,9 +159,12 @@ const AppLayout = () => {
       <ThemeProvider
         colorScheme={colorScheme}
         defaultColorScheme="system"
-        themes={appThemes}
+        defaultThemeName="default"
+        presets={appThemePresets}
         storage={themeStorage}
         storageKey={THEME_STORAGE_KEY}
+        themeNameStorageKey={THEME_NAME_STORAGE_KEY}
+        waitForStorage={false}
         onColorSchemeChange={handleColorSchemeChange}
       >
         <ToastProvider placement="top" maxToasts={7} duration={5000}>

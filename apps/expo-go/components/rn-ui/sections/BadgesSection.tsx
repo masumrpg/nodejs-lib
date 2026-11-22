@@ -15,27 +15,24 @@ export function BadgesSection({ ctx }: { ctx: RnUiSectionContext }) {
               <Text weight="700" color="text">
                 Badge Variants
               </Text>
-              <Badge tone="primary" variant="solid">
-                solid, soft, outline, subtle, ghost, glass
+              <Badge tone="primary" variant="filled">
+                filled, soft, outline, ghost, glass
               </Badge>
             </Box>
             <Text color="textMuted" variant="bodySmall">
-              Supports 6 styling variants for different visual hierarchy needs.
+              Supports 4 tonal variants plus frosted glassmorphism for visual hierarchy.
             </Text>
 
             <Box gap="sm">
               <Box row gap="sm" center style={styles.wrap}>
-                <Badge tone="primary" variant="solid">
-                  Solid
+                <Badge tone="primary" variant="filled">
+                  Filled
                 </Badge>
                 <Badge tone="primary" variant="soft">
                   Soft
                 </Badge>
                 <Badge tone="primary" variant="outline">
                   Outline
-                </Badge>
-                <Badge tone="primary" variant="subtle">
-                  Subtle
                 </Badge>
                 <Badge tone="primary" variant="ghost">
                   Ghost
@@ -67,7 +64,7 @@ export function BadgesSection({ ctx }: { ctx: RnUiSectionContext }) {
               <Box row gap="sm" center style={styles.wrap}>
                 <Badge
                   tone="primary"
-                  variant="solid"
+                  variant="filled"
                   icon={({ color, size }) => <Sparkles color={color} size={size} />}
                 >
                   Featured
@@ -81,14 +78,14 @@ export function BadgesSection({ ctx }: { ctx: RnUiSectionContext }) {
                 </Badge>
                 <Badge
                   tone="warning"
-                  variant="subtle"
+                  variant="soft"
                   icon={({ color, size }) => <AlertTriangle color={color} size={size} />}
                 >
                   Warning
                 </Badge>
                 <Badge
                   tone="danger"
-                  variant="solid"
+                  variant="filled"
                   icon={({ color, size }) => <Flame color={color} size={size} />}
                 >
                   Hot Deal

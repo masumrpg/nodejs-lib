@@ -1,40 +1,49 @@
 import React, {
+  type ReactElement,
+  type ReactNode,
   useCallback,
   useEffect,
   useRef,
   useState,
-  type ReactElement,
-  type ReactNode,
 } from "react";
 import {
-  Dimensions,
-  GestureResponderEvent,
-  Modal,
-  Platform,
   Pressable,
-  StatusBar,
-  StyleProp,
   StyleSheet,
-  TextStyle,
   View,
-  ViewStyle,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
 } from "react-native";
 import Animated, {
   Easing,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
 
-import { useTheme } from "../theme";
-import { withAlpha } from "../utils/color";
+import { Portal, useTheme } from "../theme";
+import {
+  measureAnchorNode,
+  useDelayedUnmount,
+  withAlpha,
+  type AnchorMeasurement,
+} from "../utils";
 import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
-import type { BaseAnimatedProps, BaseGlassProps, BaseHapticProps } from "./types";
-
-const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+import {
+  ANIMATION_TIMING,
+  minTouchHitSlop,
+  resolveToneColors,
+  type BaseAnimatedProps,
+  type BaseGlassProps,
+  type BaseHapticProps,
+} from "./types";
 
 export type TooltipPlacement = "top" | "bottom" | "left" | "right" | "auto";
+
 export type TooltipTone =
   | "default"
   | "primary"
@@ -69,438 +78,441 @@ export interface TooltipProps
   children: ReactElement;
 }
 
-interface TargetMeasurements {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+const ARROW_SIZE = 7;
 
-/**
- * Anchored micro-interaction tooltip balloon with directional arrow and touch-outside dismissal.
- */
-export function Tooltip({
+export const Tooltip = React.memo(function Tooltip({
   content,
-  position = "top",
+  position = "auto",
   triggerMode = "longPress",
   autoFlip = true,
   tone = "default",
   arrow = true,
   delay = 0,
-  duration,
-  delayLongPress = 250,
+  duration = 0,
+  delayLongPress = 320,
   dismissOnPressOut = false,
-  visible,
+  visible: controlledVisible,
   onOpenChange,
+  glass = false,
   haptic = true,
   animated = true,
-  glass = false,
   style,
   contentStyle,
   textStyle,
   children,
 }: TooltipProps) {
-  const { colors, radii, isDark } = useTheme();
+  const { colors, components, radii, shadows, spacing, isDark } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const shouldAnimate = animated && !reducedMotion;
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+
+  const [internalOpen, setInternalOpen] = useState(false);
+  const [anchor, setAnchor] = useState<AnchorMeasurement | null>(null);
+  const [tooltipSize, setTooltipSize] = useState({ width: 0, height: 0 });
+
+  const isControlled = controlledVisible !== undefined;
+  const isOpen = isControlled ? Boolean(controlledVisible) : internalOpen;
+
+  const shouldMount = useDelayedUnmount(
+    isOpen,
+    shouldAnimate ? 130 : 0,
+  );
+
   const triggerRef = useRef<React.ComponentRef<typeof View>>(null);
+  const delayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const durationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [internalVisible, setInternalVisible] = useState(false);
-  const [targetCoords, setTargetCoords] = useState<TargetMeasurements | null>(null);
-  const [contentSize, setContentSize] = useState({ width: 0, height: 0 });
+  const animProgress = useSharedValue(isOpen ? 1 : 0);
 
-  const isVisible = visible !== undefined ? visible : internalVisible;
+  const clearTimers = useCallback(() => {
+    if (delayTimerRef.current) {
+      clearTimeout(delayTimerRef.current);
+      delayTimerRef.current = null;
+    }
+    if (durationTimerRef.current) {
+      clearTimeout(durationTimerRef.current);
+      durationTimerRef.current = null;
+    }
+  }, []);
 
-  const anim = useSharedValue(0);
-
-  const setOpen = useCallback(
+  const setOpenState = useCallback(
     (next: boolean) => {
-      if (haptic && next) {
-        triggerHaptic("light");
-      }
-      if (visible === undefined) {
-        setInternalVisible(next);
+      if (!isControlled) {
+        setInternalOpen(next);
       }
       onOpenChange?.(next);
     },
-    [haptic, onOpenChange, visible]
+    [isControlled, onOpenChange],
   );
+
+  const close = useCallback(() => {
+    clearTimers();
+    setOpenState(false);
+  }, [clearTimers, setOpenState]);
 
   const measureAndShow = useCallback(() => {
-    if (!triggerRef.current) return;
+    measureAnchorNode(triggerRef, (rect) => {
+      setAnchor(rect);
 
-    triggerRef.current.measureInWindow(
-      (x: number, y: number, width: number, height: number) => {
-        if (width > 0 && height > 0) {
-          setTargetCoords({ x, y, width, height });
-          setOpen(true);
-        } else {
-          // Fallback to measure if measureInWindow returned 0
-          triggerRef.current?.measure(
-            (_x: number, _y: number, mWidth: number, mHeight: number, pageX: number, pageY: number) => {
-              if (mWidth > 0 && mHeight > 0) {
-                setTargetCoords({
-                  x: pageX ?? 0,
-                  y: pageY ?? 0,
-                  width: mWidth,
-                  height: mHeight,
-                });
-                setOpen(true);
-              }
-            }
-          );
+      const activate = () => {
+        if (haptic) triggerHaptic("light");
+        setOpenState(true);
+        if (duration > 0) {
+          durationTimerRef.current = setTimeout(() => {
+            setOpenState(false);
+          }, duration);
         }
-      }
-    );
-  }, [setOpen]);
+      };
 
-  const childProps = (
-    React.isValidElement(children) ? children.props : {}
-  ) as {
-    onPress?: (e: GestureResponderEvent) => void;
-    onLongPress?: (e: GestureResponderEvent) => void;
-    onPressIn?: (e: GestureResponderEvent) => void;
-    onPressOut?: (e: GestureResponderEvent) => void;
-    delayLongPress?: number;
-  };
-
-  const handleTriggerPress = useCallback(
-    (e: GestureResponderEvent) => {
-      if (triggerMode === "press") {
-        if (delay > 0) {
-          setTimeout(measureAndShow, delay);
-        } else {
-          measureAndShow();
-        }
+      if (delay > 0) {
+        delayTimerRef.current = setTimeout(activate, delay);
+      } else {
+        activate();
       }
-      childProps.onPress?.(e);
-    },
-    [childProps, delay, measureAndShow, triggerMode]
-  );
-
-  const handleTriggerLongPress = useCallback(
-    (e: GestureResponderEvent) => {
-      if (triggerMode === "longPress") {
-        if (delay > 0) {
-          setTimeout(measureAndShow, delay);
-        } else {
-          measureAndShow();
-        }
-      }
-      childProps.onLongPress?.(e);
-    },
-    [childProps, delay, measureAndShow, triggerMode]
-  );
-
-  const handleTriggerPressOut = useCallback(
-    (e: GestureResponderEvent) => {
-      if (dismissOnPressOut && triggerMode === "longPress") {
-        setOpen(false);
-      }
-      childProps.onPressOut?.(e);
-    },
-    [childProps, dismissOnPressOut, setOpen, triggerMode]
-  );
+    });
+  }, [delay, duration, haptic, setOpenState]);
 
   useEffect(() => {
-    if (isVisible) {
-      if (animated) {
-        anim.set(
-          withTiming(1, {
-            duration: 180,
-            easing: EASE_OUT,
+    if (isOpen && !anchor) {
+      measureAnchorNode(triggerRef, (rect) => {
+        setAnchor(rect);
+      });
+    }
+  }, [anchor, isOpen]);
+
+  useEffect(() => {
+    if (isOpen && anchor) {
+      animProgress.value = shouldAnimate
+        ? withTiming(1, {
+            duration: ANIMATION_TIMING.transition,
+            easing: Easing.bezier(...ANIMATION_TIMING.bezier),
           })
-        );
-      } else {
-        anim.set(1);
-      }
-
-      if (duration && duration > 0) {
-        const timer = setTimeout(() => {
-          setOpen(false);
-        }, duration);
-        return () => clearTimeout(timer);
-      }
+        : 1;
     } else {
-      anim.set(0);
+      animProgress.value = shouldAnimate
+        ? withTiming(0, {
+            duration: 120,
+            easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+          })
+        : 0;
     }
-    return undefined;
-  }, [animated, anim, duration, isVisible, setOpen]);
+  }, [anchor, animProgress, isOpen, shouldAnimate]);
 
-  const isMeasured = contentSize.width > 0 && contentSize.height > 0;
+  useEffect(() => clearTimers, [clearTimers]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: isMeasured ? anim.get() : 0,
-    transform: [{ scale: 0.94 + anim.get() * 0.06 }],
-  }));
+  const resolvedPosition = (() => {
+    if (!anchor) return position === "auto" ? "top" : position;
+    const estW = tooltipSize.width || 160;
+    const estH = tooltipSize.height || 44;
+    const gap = ARROW_SIZE + 8;
 
-  // Resolve background and text colors based on tone
-  const backgroundColor =
-    tone === "primary"
-      ? colors.primary
-      : tone === "secondary"
-      ? colors.secondary
-      : tone === "accent"
-      ? colors.accent
-      : tone === "success"
-      ? colors.success
-      : tone === "warning"
-      ? colors.warning
-      : tone === "danger"
-      ? colors.danger
-      : tone === "info"
-      ? colors.info
-      : tone === "dark"
-      ? isDark
-        ? colors.surfaceRaised
-        : "#1E293B"
-      : tone === "light"
-      ? isDark
-        ? "#F8FAFC"
-        : colors.surface
-      : isDark
-      ? colors.surfaceRaised
-      : "#0F172A";
+    const spaceTop = anchor.y;
+    const spaceBottom = screenHeight - (anchor.y + anchor.height);
+    const spaceLeft = anchor.x;
+    const spaceRight = screenWidth - (anchor.x + anchor.width);
 
-  const textColor =
-    tone === "primary"
-      ? colors.onPrimary
-      : tone === "light"
-      ? "#0F172A"
-      : tone === "warning"
-      ? colors.background
-      : "#FFFFFF";
+    if (position === "auto") {
+      if (spaceTop >= estH + gap) return "top";
+      if (spaceBottom >= estH + gap) return "bottom";
+      if (spaceRight >= estW + gap) return "right";
+      if (spaceLeft >= estW + gap) return "left";
+      return spaceBottom > spaceTop ? "bottom" : "top";
+    }
+    if (!autoFlip) return position;
+    if (position === "top" && spaceTop < estH + gap && spaceBottom > spaceTop) {
+      return "bottom";
+    }
+    if (
+      position === "bottom" &&
+      spaceBottom < estH + gap &&
+      spaceTop > spaceBottom
+    ) {
+      return "top";
+    }
+    if (position === "left" && spaceLeft < estW + gap && spaceRight > spaceLeft) {
+      return "right";
+    }
+    if (
+      position === "right" &&
+      spaceRight < estW + gap &&
+      spaceLeft > spaceRight
+    ) {
+      return "left";
+    }
+    return position;
+  })();
 
-  const windowDim = Dimensions.get("window");
-  const statusBarOffset =
-    Platform.OS === "android" ? StatusBar.currentHeight ?? 0 : 0;
-  const arrowSize = 8;
-  const screenPadding = 12;
-  const targetGap = 4;
-
-  // Calculate position coordinates and smart collision flip
-  let resolvedPosition = position;
-  let top = 0;
-  let left = 0;
-  let arrowOffset: StyleProp<ViewStyle> = {};
-
-  if (targetCoords) {
-    const { x: rawX, y: rawY, width: tWidth, height: tHeight } = targetCoords;
-    const { width: cWidth, height: cHeight } = contentSize;
-
-    // Adjust Y coordinate on Android for statusBarTranslucent Modal
-    const x = rawX;
-    const y = rawY + statusBarOffset;
-
-    const spaceAbove = y - screenPadding;
-    const spaceBelow = windowDim.height - (y + tHeight) - screenPadding;
-    const spaceLeft = x - screenPadding;
-    const spaceRight = windowDim.width - (x + tWidth) - screenPadding;
-
-    const neededHeight = cHeight + arrowSize + targetGap;
-    const neededWidth = cWidth + arrowSize + targetGap;
-
-    // Smart auto-flip when constrained by viewport boundaries
-    if (autoFlip) {
-      if (position === "auto") {
-        if (spaceAbove >= neededHeight && spaceAbove >= spaceBelow) {
-          resolvedPosition = "top";
-        } else if (spaceBelow >= neededHeight) {
-          resolvedPosition = "bottom";
-        } else if (spaceRight >= neededWidth) {
-          resolvedPosition = "right";
-        } else {
-          resolvedPosition = "left";
-        }
-      } else if (position === "top" && spaceAbove < neededHeight && spaceBelow >= neededHeight) {
-        resolvedPosition = "bottom";
-      } else if (position === "bottom" && spaceBelow < neededHeight && spaceAbove >= neededHeight) {
-        resolvedPosition = "top";
-      } else if (position === "left" && spaceLeft < neededWidth && spaceRight >= neededWidth) {
-        resolvedPosition = "right";
-      } else if (position === "right" && spaceRight < neededWidth && spaceLeft >= neededWidth) {
-        resolvedPosition = "left";
-      }
+  const layoutPlacement = (() => {
+    if (!anchor) {
+      return { top: -9999, left: -9999, arrowOffsetX: 0, arrowOffsetY: 0 };
     }
 
-    // Compute coordinates based on resolved direction
-    if (resolvedPosition === "top") {
-      top = y - cHeight - arrowSize - targetGap;
-      left = x + tWidth / 2 - cWidth / 2;
-    } else if (resolvedPosition === "bottom") {
-      top = y + tHeight + arrowSize + targetGap;
-      left = x + tWidth / 2 - cWidth / 2;
-    } else if (resolvedPosition === "left") {
-      top = y + tHeight / 2 - cHeight / 2;
-      left = x - cWidth - arrowSize - targetGap;
-    } else if (resolvedPosition === "right") {
-      top = y + tHeight / 2 - cHeight / 2;
-      left = x + tWidth + arrowSize + targetGap;
+    const w = tooltipSize.width || 140;
+    const h = tooltipSize.height || 40;
+    const pad = spacing.md;
+    const gap = arrow ? ARROW_SIZE + 6 : 6;
+
+    let top = 0;
+    let left = 0;
+    let arrowOffsetX = 0;
+    let arrowOffsetY = 0;
+
+    const centerX = anchor.x + anchor.width / 2;
+    const centerY = anchor.y + anchor.height / 2;
+
+    if (resolvedPosition === "top" || resolvedPosition === "bottom") {
+      top =
+        resolvedPosition === "top"
+          ? anchor.y - h - gap
+          : anchor.y + anchor.height + gap;
+      left = Math.max(
+        pad,
+        Math.min(centerX - w / 2, screenWidth - w - pad),
+      );
+      arrowOffsetX = Math.max(
+        ARROW_SIZE + 6,
+        Math.min(centerX - left, w - ARROW_SIZE - 6),
+      );
+    } else {
+      left =
+        resolvedPosition === "left"
+          ? anchor.x - w - gap
+          : anchor.x + anchor.width + gap;
+      top = Math.max(
+        pad,
+        Math.min(centerY - h / 2, screenHeight - h - pad),
+      );
+      arrowOffsetY = Math.max(
+        ARROW_SIZE + 6,
+        Math.min(centerY - top, h - ARROW_SIZE - 6),
+      );
     }
 
-    // Edge clamping
-    left = Math.max(screenPadding, Math.min(windowDim.width - cWidth - screenPadding, left));
-    top = Math.max(screenPadding + statusBarOffset, Math.min(windowDim.height - cHeight - screenPadding, top));
+    return { top, left, arrowOffsetX, arrowOffsetY };
+  })();
 
-    // Dynamic arrow offset to point directly at trigger center
-    if (cWidth > 0 && (resolvedPosition === "top" || resolvedPosition === "bottom")) {
-      const buttonCenterX = x + tWidth / 2;
-      const arrowX = buttonCenterX - left - arrowSize / 2;
-      const clampedArrowX = Math.max(10, Math.min(cWidth - 18, arrowX));
-      arrowOffset = { left: clampedArrowX, marginLeft: 0 };
-    } else if (cHeight > 0 && (resolvedPosition === "left" || resolvedPosition === "right")) {
-      const buttonCenterY = y + tHeight / 2;
-      const arrowY = buttonCenterY - top - arrowSize / 2;
-      const clampedArrowY = Math.max(8, Math.min(cHeight - 16, arrowY));
-      arrowOffset = { top: clampedArrowY, marginTop: 0 };
+  const tonePalette = (() => {
+    if (glass) {
+      return {
+        bg: colors.glassSurfaceStrong,
+        fg: colors.text,
+        border: colors.glassBorder,
+      };
     }
-  }
+    if (tone === "default") {
+      return isDark
+        ? {
+            bg: colors.surfaceRaised,
+            fg: colors.text,
+            border: colors.border,
+          }
+        : {
+            bg: "#0F172A",
+            fg: "#F8FAFC",
+            border: "#1E293B",
+          };
+    }
+    if (tone === "dark") {
+      return { bg: "#0F172A", fg: "#F8FAFC", border: "#1E293B" };
+    }
+    if (tone === "light") {
+      return {
+        bg: "#FFFFFF",
+        fg: "#0F172A",
+        border: withAlpha("#0F172A", 0.14),
+      };
+    }
+    const resolved = resolveToneColors(tone, colors);
+    return {
+      bg: resolved.solid,
+      fg: resolved.on,
+      border: resolved.border,
+    };
+  })();
 
-  const effectiveDelayLongPress = childProps.delayLongPress ?? delayLongPress;
+  const animatedTooltipStyle = useAnimatedStyle(() => {
+    const shiftX =
+      resolvedPosition === "left" ? 6 : resolvedPosition === "right" ? -6 : 0;
+    const shiftY =
+      resolvedPosition === "top" ? 6 : resolvedPosition === "bottom" ? -6 : 0;
 
-  const clonedChild = React.isValidElement(children)
-    ? React.cloneElement(
-        children as ReactElement<{
-          onPress?: (e: GestureResponderEvent) => void;
-          onLongPress?: (e: GestureResponderEvent) => void;
-          onPressOut?: (e: GestureResponderEvent) => void;
-          delayLongPress?: number;
-        }>,
-        {
-          onPress: handleTriggerPress,
-          onLongPress: handleTriggerLongPress,
-          onPressOut: handleTriggerPressOut,
-          delayLongPress: effectiveDelayLongPress,
-        }
-      )
-    : children;
+    return {
+      opacity: animProgress.value,
+      transform: [
+        { translateX: (1 - animProgress.value) * shiftX },
+        { translateY: (1 - animProgress.value) * shiftY },
+        { scale: 0.94 + animProgress.value * 0.06 },
+      ],
+    };
+  });
+
+  const handlePress = useCallback(() => {
+    if (triggerMode !== "press") return;
+    if (isOpen) {
+      close();
+    } else {
+      measureAndShow();
+    }
+  }, [close, isOpen, measureAndShow, triggerMode]);
+
+  const handleLongPress = useCallback(() => {
+    if (triggerMode !== "longPress") return;
+    measureAndShow();
+  }, [measureAndShow, triggerMode]);
+
+  const handlePressOut = useCallback(() => {
+    if (delayTimerRef.current && !isOpen) {
+      clearTimeout(delayTimerRef.current);
+      delayTimerRef.current = null;
+    }
+    if (dismissOnPressOut && isOpen) {
+      close();
+    }
+  }, [close, dismissOnPressOut, isOpen]);
+
+  const handleBalloonLayout = useCallback((event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    setTooltipSize((prev) =>
+      prev.width === width && prev.height === height ? prev : { width, height },
+    );
+  }, []);
+
+  const canShowPortal = (shouldMount || isOpen) && anchor !== null;
 
   return (
-    <View
-      ref={triggerRef}
-      collapsable={false}
-      style={[styles.triggerWrapper, style]}
-    >
-      <Pressable
-        onPress={handleTriggerPress}
-        onLongPress={handleTriggerLongPress}
-        onPressOut={handleTriggerPressOut}
-        delayLongPress={effectiveDelayLongPress}
+    <>
+      <View
+        ref={triggerRef}
+        collapsable={false}
+        style={[styles.triggerWrapper, style]}
+        onLayout={() => {
+          if (isOpen && !anchor) {
+            measureAnchorNode(triggerRef, (rect) => {
+              setAnchor(rect);
+            });
+          }
+        }}
       >
-        {clonedChild}
-      </Pressable>
-
-      <Modal
-        visible={isVisible}
-        transparent
-        animationType="none"
-        statusBarTranslucent
-        onRequestClose={() => setOpen(false)}
-      >
-        {/* Backdrop Dismiss Area */}
         <Pressable
-          style={styles.backdrop}
-          onPress={() => setOpen(false)}
           accessibilityRole="button"
-          accessibilityLabel="Dismiss tooltip"
+          accessibilityHint="Displays tooltip"
+          hitSlop={minTouchHitSlop(32)}
+          delayLongPress={delayLongPress}
+          onPress={handlePress}
+          onLongPress={handleLongPress}
+          onPressOut={handlePressOut}
         >
-          {targetCoords && (
-            <Animated.View
-              onStartShouldSetResponder={() => true}
-              onLayout={(e) => {
-                const { width, height } = e.nativeEvent.layout;
-                if (width > 0 && height > 0) {
-                  setContentSize({ width, height });
-                }
-              }}
-              style={[
-                styles.balloon,
-                {
-                  top,
-                  left,
-                  backgroundColor: glass ? withAlpha(backgroundColor, 0.85) : backgroundColor,
-                  borderRadius: radii.md,
-                },
-                animatedStyle,
-                contentStyle,
-              ]}
-            >
-              {typeof content === "string" ? (
-                <Text
-                  variant="caption"
-                  weight="500"
-                  style={[{ color: textColor }, textStyle]}
-                >
-                  {content}
-                </Text>
-              ) : (
-                content
-              )}
-
-              {/* Directional Arrow Pointer */}
-              {arrow && (
-                <View
-                  style={[
-                    styles.arrowBase,
-                    { backgroundColor },
-                    resolvedPosition === "top" && styles.arrowTop,
-                    resolvedPosition === "bottom" && styles.arrowBottom,
-                    resolvedPosition === "left" && styles.arrowLeft,
-                    resolvedPosition === "right" && styles.arrowRight,
-                    arrowOffset,
-                  ]}
-                />
-              )}
-            </Animated.View>
-          )}
+          {children}
         </Pressable>
-      </Modal>
-    </View>
+      </View>
+
+      {canShowPortal ? (
+        <Portal layer="tooltip">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss tooltip"
+            style={StyleSheet.absoluteFill}
+            onPress={close}
+          />
+
+          <Animated.View
+            onLayout={handleBalloonLayout}
+            style={[
+              styles.balloon,
+              {
+                top: layoutPlacement.top,
+                left: layoutPlacement.left,
+                maxWidth: Math.min(280, screenWidth - spacing.md * 2),
+                backgroundColor: tonePalette.bg,
+                borderColor: tonePalette.border,
+                borderWidth: components.borderWidth.default,
+                borderRadius: radii.md,
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.xs + 3,
+              },
+              shadows.md,
+              animatedTooltipStyle,
+              contentStyle,
+            ]}
+          >
+            {typeof content === "string" || typeof content === "number" ? (
+              <Text
+                variant="caption"
+                weight="600"
+                style={[{ color: tonePalette.fg }, textStyle]}
+              >
+                {content}
+              </Text>
+            ) : (
+              content
+            )}
+
+            {arrow && tooltipSize.width > 0 ? (
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.arrowBase,
+                  resolvedPosition === "top" && {
+                    bottom: -ARROW_SIZE,
+                    left: layoutPlacement.arrowOffsetX - ARROW_SIZE,
+                    borderTopColor: tonePalette.bg,
+                    borderTopWidth: ARROW_SIZE,
+                    borderLeftWidth: ARROW_SIZE,
+                    borderRightWidth: ARROW_SIZE,
+                    borderLeftColor: "transparent",
+                    borderRightColor: "transparent",
+                  },
+                  resolvedPosition === "bottom" && {
+                    top: -ARROW_SIZE,
+                    left: layoutPlacement.arrowOffsetX - ARROW_SIZE,
+                    borderBottomColor: tonePalette.bg,
+                    borderBottomWidth: ARROW_SIZE,
+                    borderLeftWidth: ARROW_SIZE,
+                    borderRightWidth: ARROW_SIZE,
+                    borderLeftColor: "transparent",
+                    borderRightColor: "transparent",
+                  },
+                  resolvedPosition === "left" && {
+                    right: -ARROW_SIZE,
+                    top: layoutPlacement.arrowOffsetY - ARROW_SIZE,
+                    borderLeftColor: tonePalette.bg,
+                    borderLeftWidth: ARROW_SIZE,
+                    borderTopWidth: ARROW_SIZE,
+                    borderBottomWidth: ARROW_SIZE,
+                    borderTopColor: "transparent",
+                    borderBottomColor: "transparent",
+                  },
+                  resolvedPosition === "right" && {
+                    left: -ARROW_SIZE,
+                    top: layoutPlacement.arrowOffsetY - ARROW_SIZE,
+                    borderRightColor: tonePalette.bg,
+                    borderRightWidth: ARROW_SIZE,
+                    borderTopWidth: ARROW_SIZE,
+                    borderBottomWidth: ARROW_SIZE,
+                    borderTopColor: "transparent",
+                    borderBottomColor: "transparent",
+                  },
+                ]}
+              />
+            ) : null}
+          </Animated.View>
+        </Portal>
+      ) : null}
+    </>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  triggerWrapper: {},
-  backdrop: {
-    flex: 1,
-    position: "relative",
+  triggerWrapper: {
+    alignSelf: "flex-start",
   },
   balloon: {
     position: "absolute",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    maxWidth: 240,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 5,
-    elevation: 6,
-    zIndex: 9999,
   },
   arrowBase: {
     position: "absolute",
-    width: 8,
-    height: 8,
-    transform: [{ rotate: "45deg" }],
-  },
-  arrowTop: {
-    bottom: -4,
-    alignSelf: "center",
-    left: "50%",
-    marginLeft: -4,
-  },
-  arrowBottom: {
-    top: -4,
-    alignSelf: "center",
-    left: "50%",
-    marginLeft: -4,
-  },
-  arrowLeft: {
-    right: -4,
-    top: "50%",
-    marginTop: -4,
-  },
-  arrowRight: {
-    left: -4,
-    top: "50%",
-    marginTop: -4,
+    width: 0,
+    height: 0,
+    borderStyle: "solid",
   },
 });

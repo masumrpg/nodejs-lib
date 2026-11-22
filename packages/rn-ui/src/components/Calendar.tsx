@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   ScrollView,
+  StyleSheet,
   View,
   type StyleProp,
   type ViewStyle,
@@ -10,14 +11,22 @@ import { Calendar as WixCalendar } from "react-native-calendars";
 import Animated, {
   Easing,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import Svg, { Path } from "react-native-svg";
 
 import { useTheme } from "../theme";
+import { useDelayedUnmount, withAlpha } from "../utils";
 import { triggerHaptic } from "../utils/haptics";
-import { getLocaleData, type LocaleInput } from "../utils/locale";
+import {
+  getLocaleData,
+  syncCalendarLocale,
+  type LocaleInput,
+} from "../utils/locale";
 import { Text } from "./Text";
+import { ANIMATION_TIMING, minTouchHitSlop, type BaseHapticProps } from "./types";
 
 export interface CalendarDayData {
   year: number;
@@ -40,12 +49,14 @@ export interface CalendarDayMarking {
   dots?: Array<{ key?: string; color?: string }>;
 }
 
-export interface CalendarProps extends Omit<
-  React.ComponentProps<typeof WixCalendar>,
-  "current" | "markedDates"
-> {
+export interface CalendarProps
+  extends Omit<
+      React.ComponentProps<typeof WixCalendar>,
+      "current" | "markedDates"
+    >,
+    BaseHapticProps {
   style?: StyleProp<ViewStyle>;
-  current?: string; // Controlled current date string (YYYY-MM-DD)
+  current?: string;
   markedDates?: Record<string, CalendarDayMarking>;
   enableYearMonthPicker?: boolean;
   showTodayButton?: boolean;
@@ -54,46 +65,26 @@ export interface CalendarProps extends Omit<
 }
 
 interface CustomDayProps {
-  date: CalendarDayData;
-  state: "selected" | "disabled" | "today" | "";
+  date?: CalendarDayData;
+  state?: "selected" | "disabled" | "today" | "";
   marking?: CalendarDayMarking;
-  onPress: (date: CalendarDayData) => void;
-  onLongPress: (date: CalendarDayData) => void;
+  onPress?: (date: CalendarDayData) => void;
+  onLongPress?: (date: CalendarDayData) => void;
+  haptic?: boolean;
 }
 
-function ChevronLeft({ color }: { color: string }) {
-  return (
-    <View
-      style={{
-        width: 8,
-        height: 8,
-        borderLeftWidth: 1.5,
-        borderBottomWidth: 1.5,
-        borderColor: color,
-        transform: [{ rotate: "45deg" }],
-        marginRight: -2,
-      }}
-    />
-  );
+export function parseLocalDateString(dateStr?: string): Date {
+  if (!dateStr) return new Date();
+  const trimmed = dateStr.trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (match) {
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
-function ChevronRight({ color }: { color: string }) {
-  return (
-    <View
-      style={{
-        width: 8,
-        height: 8,
-        borderRightWidth: 1.5,
-        borderTopWidth: 1.5,
-        borderColor: color,
-        transform: [{ rotate: "45deg" }],
-        marginLeft: -2,
-      }}
-    />
-  );
-}
-
-export function CalendarArrow({
+export const CalendarArrow = React.memo(function CalendarArrow({
   direction,
   color,
 }: {
@@ -101,50 +92,60 @@ export function CalendarArrow({
   color?: string;
 }) {
   const { colors, isDark } = useTheme();
-  const arrowColor = color || colors.text;
+  const arrowColor = color ?? colors.text;
 
   return (
     <View
-      style={{
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: isDark
-          ? "rgba(255, 255, 255, 0.07)"
-          : "rgba(0, 0, 0, 0.05)",
-      }}
+      style={[
+        styles.arrowCircle,
+        {
+          backgroundColor: isDark
+            ? withAlpha("#FFFFFF", 0.08)
+            : withAlpha("#000000", 0.05),
+        },
+      ]}
     >
-      {direction === "left" ? (
-        <ChevronLeft color={arrowColor} />
-      ) : (
-        <ChevronRight color={arrowColor} />
-      )}
+      <Svg
+        width={14}
+        height={14}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={arrowColor}
+        strokeWidth={2.2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <Path d={direction === "left" ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
+      </Svg>
     </View>
   );
-}
+});
 
-export function CalendarDayButton({
+export const CalendarDayButton = React.memo(function CalendarDayButton({
   date,
-  state,
+  state = "",
   marking = {},
   onPress,
   onLongPress,
+  haptic = true,
 }: CustomDayProps) {
-  const { colors, radii, isDark } = useTheme();
+  const { colors, components, radii, isDark } = useTheme();
 
-  const isSelected = marking.selected || state === "selected";
+  if (!date) return null;
+
+  const isSelected = Boolean(marking.selected || state === "selected");
   const isStart = Boolean(marking.startingDay);
   const isEnd = Boolean(marking.endingDay);
   const isMiddle = Boolean(marking.isMiddle);
   const isToday = state === "today";
-  const isDisabled = state === "disabled" || marking.disabled;
+  const isDisabled = Boolean(state === "disabled" || marking.disabled);
 
   const activeColor = marking.color || colors.primary;
   const activeTextColor = marking.textColor || colors.onPrimary;
-  const middleBg = isDark ? "rgba(99, 102, 241, 0.28)" : colors.primarySoft;
-  const middleTextColor = isDark ? colors.onPrimary : colors.primary;
+  const middleBg = isDark
+    ? withAlpha(colors.primary, 0.25)
+    : colors.primarySoft;
+  const middleTextColor = isDark ? colors.text : colors.primary;
 
   let textColor = colors.text;
   if (isDisabled) {
@@ -157,161 +158,133 @@ export function CalendarDayButton({
     textColor = colors.primary;
   }
 
+  const hasDots = Boolean(
+    (marking.dots && marking.dots.length > 0) || marking.marked,
+  );
+
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={date.dateString}
+      accessibilityState={{ selected: isSelected, disabled: isDisabled }}
+      disabled={isDisabled}
+      hitSlop={minTouchHitSlop(36)}
       onPress={() => {
-        if (!isDisabled && onPress) {
-          triggerHaptic("selection");
-          onPress(date);
-        }
+        if (isDisabled) return;
+        if (haptic) triggerHaptic("selection");
+        onPress?.(date);
       }}
       onLongPress={() => {
-        if (!isDisabled && onLongPress) {
-          triggerHaptic("selection");
-          onLongPress(date);
-        }
+        if (isDisabled || !onLongPress) return;
+        if (haptic) triggerHaptic("selection");
+        onLongPress(date);
       }}
-      style={({ pressed }) => ({
-        width: "100%",
-        height: 38,
-        justifyContent: "center",
-        alignItems: "center",
-        opacity: isDisabled ? 0.35 : pressed ? 0.78 : 1,
-      })}
+      style={({ pressed }) => [
+        styles.dayButton,
+        { opacity: isDisabled ? 0.35 : pressed ? 0.78 : 1 },
+      ]}
     >
-      {/* 1. Range connector strips */}
-      {isMiddle && (
+      {isMiddle ? (
         <View
-          style={{
-            position: "absolute",
-            top: 3,
-            bottom: 3,
-            left: 0,
-            right: 0,
-            backgroundColor: marking.color || middleBg,
-          }}
+          style={[
+            styles.rangeStripFull,
+            { backgroundColor: marking.color || middleBg },
+          ]}
         />
-      )}
-      {isStart && !isEnd && (
+      ) : null}
+      {isStart && !isEnd ? (
         <View
-          style={{
-            position: "absolute",
-            top: 3,
-            bottom: 3,
-            left: "50%",
-            right: 0,
-            backgroundColor: middleBg,
-          }}
+          style={[styles.rangeStripRight, { backgroundColor: middleBg }]}
         />
-      )}
-      {isEnd && !isStart && (
+      ) : null}
+      {isEnd && !isStart ? (
         <View
-          style={{
-            position: "absolute",
-            top: 3,
-            bottom: 3,
-            left: 0,
-            right: "50%",
-            backgroundColor: middleBg,
-          }}
-        />
-      )}
-
-      {/* 2. Endpoint Circle (Start, End, Selected, or Today) */}
-      {(isStart || isEnd || isSelected) ? (
-        <View
-          style={{
-            position: "absolute",
-            width: 32,
-            height: 32,
-            borderRadius: radii.full,
-            backgroundColor: activeColor,
-          }}
-        />
-      ) : isToday ? (
-        <View
-          style={{
-            position: "absolute",
-            width: 32,
-            height: 32,
-            borderRadius: radii.full,
-            backgroundColor: colors.backgroundMuted,
-            borderWidth: 1.5,
-            borderColor: colors.primary,
-          }}
+          style={[styles.rangeStripLeft, { backgroundColor: middleBg }]}
         />
       ) : null}
 
-      {/* Date text */}
+      {isStart || isEnd || isSelected ? (
+        <View
+          style={[
+            styles.dayCircle,
+            { borderRadius: radii.full, backgroundColor: activeColor },
+          ]}
+        />
+      ) : isToday ? (
+        <View
+          style={[
+            styles.dayCircle,
+            {
+              borderRadius: radii.full,
+              backgroundColor: colors.backgroundMuted,
+              borderWidth: components.borderWidth.strong,
+              borderColor: colors.primary,
+            },
+          ]}
+        />
+      ) : null}
+
       <Text
-        style={{
-          color: textColor,
-          fontSize: 13,
-          fontWeight: isStart || isEnd || isSelected || isToday ? "700" : "400",
-          includeFontPadding: false,
-          marginTop:
-            marking.dots && marking.dots.length > 0 && (isStart || isEnd || isSelected || isToday)
-              ? -4
-              : 0,
-        }}
+        style={[
+          styles.dayText,
+          {
+            color: textColor,
+            fontWeight: isStart || isEnd || isSelected || isToday ? "700" : "400",
+            marginTop:
+              hasDots && (isStart || isEnd || isSelected || isToday) ? -4 : 0,
+          },
+        ]}
       >
         {date.day}
       </Text>
 
-      {/* Event Dots */}
       {marking.dots && marking.dots.length > 0 ? (
         <View
-          style={{
-            flexDirection: "row",
-            gap: 2,
-            position: "absolute",
-            bottom: isStart || isEnd || isSelected || isToday ? 5 : 2,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+          style={[
+            styles.dotsRow,
+            { bottom: isStart || isEnd || isSelected || isToday ? 5 : 2 },
+          ]}
         >
           {marking.dots.map((dot, idx) => (
             <View
-              key={idx}
-              style={{
-                width: 3.5,
-                height: 3.5,
-                borderRadius: 2,
-                backgroundColor:
-                  isStart || isEnd || isSelected
-                    ? colors.onPrimary
-                    : dot.color || colors.primary,
-              }}
+              key={dot.key ?? idx}
+              style={[
+                styles.multiDot,
+                {
+                  backgroundColor:
+                    isStart || isEnd || isSelected
+                      ? colors.onPrimary
+                      : dot.color || colors.primary,
+                },
+              ]}
             />
           ))}
         </View>
       ) : marking.marked ? (
         <View
-          style={{
-            position: "absolute",
-            bottom: isStart || isEnd || isSelected || isToday ? 5 : 2,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+          style={[
+            styles.dotsRow,
+            { bottom: isStart || isEnd || isSelected || isToday ? 5 : 2 },
+          ]}
         >
           <View
-            style={{
-              width: 4,
-              height: 4,
-              borderRadius: 2,
-              backgroundColor:
-                isStart || isEnd || isSelected
-                  ? colors.onPrimary
-                  : marking.dotColor || colors.primary,
-            }}
+            style={[
+              styles.singleDot,
+              {
+                backgroundColor:
+                  isStart || isEnd || isSelected
+                    ? colors.onPrimary
+                    : marking.dotColor || colors.primary,
+              },
+            ]}
           />
         </View>
       ) : null}
     </Pressable>
   );
-}
+});
 
-export function Calendar({
+export const Calendar = React.memo(function Calendar({
   style,
   theme,
   markingType = "period",
@@ -320,419 +293,467 @@ export function Calendar({
   enableYearMonthPicker = true,
   showTodayButton = true,
   locale,
+  haptic = true,
   onTodayPress,
+  onMonthChange,
   ...props
 }: CalendarProps) {
   const { colors, components, radii } = useTheme();
-  const activeLocaleData = React.useMemo(
-    () => getLocaleData(locale),
-    [locale],
-  );
+  const reducedMotion = useReducedMotion();
 
-  // Parsing initial month/year
-  const initialDate = current ? new Date(current) : new Date();
-  const [currentMonth, setCurrentMonth] = React.useState(
+  const activeLocaleData = useMemo(() => {
+    syncCalendarLocale(locale);
+    return getLocaleData(locale);
+  }, [locale]);
+
+  const initialDate = useMemo(
+    () => parseLocalDateString(current),
+    [current],
+  );
+  const [currentMonth, setCurrentMonth] = useState(
     initialDate.getMonth() + 1,
   );
-  const [currentYear, setCurrentYear] = React.useState(
-    initialDate.getFullYear(),
-  );
+  const [currentYear, setCurrentYear] = useState(initialDate.getFullYear());
 
-  const [showMonthSelector, setShowMonthSelector] = React.useState(false);
-  const [showYearSelector, setShowYearSelector] = React.useState(false);
-  const [overlayHeight, setOverlayHeight] = React.useState(260);
-  const [calendarKey, setCalendarKey] = React.useState(0);
+  const [showMonthSelector, setShowMonthSelector] = useState(false);
+  const [showYearSelector, setShowYearSelector] = useState(false);
+  const [overlayHeight, setOverlayHeight] = useState(260);
+
+  const shouldMountMonthOverlay = useDelayedUnmount(
+    showMonthSelector,
+    reducedMotion ? 0 : 180,
+  );
+  const shouldMountYearOverlay = useDelayedUnmount(
+    showYearSelector,
+    reducedMotion ? 0 : 180,
+  );
 
   const monthProgress = useSharedValue(showMonthSelector ? 1 : 0);
   const yearProgress = useSharedValue(showYearSelector ? 1 : 0);
 
-  React.useEffect(() => {
-    monthProgress.value = withTiming(showMonthSelector ? 1 : 0, {
-      duration: 200,
-      easing: Easing.bezier(0.23, 1, 0.32, 1),
-    });
-  }, [monthProgress, showMonthSelector]);
+  useEffect(() => {
+    monthProgress.value = reducedMotion
+      ? showMonthSelector
+        ? 1
+        : 0
+      : withTiming(showMonthSelector ? 1 : 0, {
+          duration: ANIMATION_TIMING.transition + 30,
+          easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+        });
+  }, [monthProgress, reducedMotion, showMonthSelector]);
 
-  React.useEffect(() => {
-    yearProgress.value = withTiming(showYearSelector ? 1 : 0, {
-      duration: 200,
-      easing: Easing.bezier(0.23, 1, 0.32, 1),
-    });
-  }, [showYearSelector, yearProgress]);
+  useEffect(() => {
+    yearProgress.value = reducedMotion
+      ? showYearSelector
+        ? 1
+        : 0
+      : withTiming(showYearSelector ? 1 : 0, {
+          duration: ANIMATION_TIMING.transition + 30,
+          easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+        });
+  }, [reducedMotion, showYearSelector, yearProgress]);
 
   const monthOverlayStyle = useAnimatedStyle(() => ({
     opacity: monthProgress.value,
-    transform: [{ translateY: -600 * (1 - monthProgress.value) }],
+    transform: [{ translateY: -12 * (1 - monthProgress.value) }],
   }));
 
   const yearOverlayStyle = useAnimatedStyle(() => ({
     opacity: yearProgress.value,
-    transform: [{ translateY: -600 * (1 - yearProgress.value) }],
+    transform: [{ translateY: -12 * (1 - yearProgress.value) }],
   }));
 
-  // Sync visible date when controlled 'current' prop changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (current) {
-      const d = new Date(current);
-      if (!isNaN(d.getTime())) {
-        setCurrentMonth(d.getMonth() + 1);
-        setCurrentYear(d.getFullYear());
-        setCalendarKey((prev) => prev + 1);
-      }
+      const parsed = parseLocalDateString(current);
+      setCurrentMonth(parsed.getMonth() + 1);
+      setCurrentYear(parsed.getFullYear());
     }
   }, [current]);
 
   const visibleMonthStr = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
 
-  const handlePrevMonth = () => {
-    triggerHaptic("selection");
-    if (currentMonth === 1) {
-      setCurrentMonth(12);
-      setCurrentYear(currentYear - 1);
-    } else {
-      setCurrentMonth(currentMonth - 1);
-    }
-    setCalendarKey((prev) => prev + 1);
-  };
+  const handlePrevMonth = useCallback(() => {
+    if (haptic) triggerHaptic("selection");
+    setCurrentMonth((prevMonth) => {
+      if (prevMonth === 1) {
+        setCurrentYear((y) => y - 1);
+        return 12;
+      }
+      return prevMonth - 1;
+    });
+  }, [haptic]);
 
-  const handleNextMonth = () => {
-    triggerHaptic("selection");
-    if (currentMonth === 12) {
-      setCurrentMonth(1);
-      setCurrentYear(currentYear + 1);
-    } else {
-      setCurrentMonth(currentMonth + 1);
-    }
-    setCalendarKey((prev) => prev + 1);
-  };
+  const handleNextMonth = useCallback(() => {
+    if (haptic) triggerHaptic("selection");
+    setCurrentMonth((prevMonth) => {
+      if (prevMonth === 12) {
+        setCurrentYear((y) => y + 1);
+        return 1;
+      }
+      return prevMonth + 1;
+    });
+  }, [haptic]);
 
-  const handleTodayClick = () => {
-    triggerHaptic("selection");
+  const handleTodayClick = useCallback(() => {
+    if (haptic) triggerHaptic("selection");
     const today = new Date();
     setCurrentMonth(today.getMonth() + 1);
     setCurrentYear(today.getFullYear());
-    setCalendarKey((prev) => prev + 1);
     setShowMonthSelector(false);
     setShowYearSelector(false);
     onTodayPress?.();
-  };
+  }, [haptic, onTodayPress]);
 
-  const handleMonthChange = (dateData: CalendarDayData) => {
-    setCurrentMonth(dateData.month);
-    setCurrentYear(dateData.year);
-    if (props.onMonthChange) {
-      props.onMonthChange(dateData);
-    }
-  };
+  const handleMonthChange = useCallback(
+    (dateData: CalendarDayData) => {
+      setCurrentMonth(dateData.month);
+      setCurrentYear(dateData.year);
+      onMonthChange?.(dateData);
+    },
+    [onMonthChange],
+  );
 
-  const customTheme: React.ComponentProps<typeof WixCalendar>["theme"] = {
-    calendarBackground: colors.surface,
-    monthTextColor: colors.text,
-    textMonthFontWeight: "600",
-    textMonthFontSize: 16,
-    textSectionTitleColor: colors.textMuted,
-    textDayHeaderFontSize: 12,
-    textDayHeaderFontWeight: "500",
-    arrowColor: colors.text,
-    disabledArrowColor: colors.disabledText,
-    ...theme,
-  };
+  const customTheme = useMemo<React.ComponentProps<typeof WixCalendar>["theme"]>(
+    () => ({
+      calendarBackground: colors.surface,
+      monthTextColor: colors.text,
+      textMonthFontWeight: "600",
+      textMonthFontSize: 16,
+      textSectionTitleColor: colors.textMuted,
+      textDayHeaderFontSize: 12,
+      textDayHeaderFontWeight: "500",
+      arrowColor: colors.text,
+      disabledArrowColor: colors.disabledText,
+      ...theme,
+    }),
+    [colors.disabledText, colors.surface, colors.text, colors.textMuted, theme],
+  );
 
-  const endYear = new Date().getFullYear() + 5;
-  const startYear = endYear - 100;
-  const years = Array.from(
-    { length: endYear - startYear + 1 },
-    (_, i) => endYear - i,
+  const years = useMemo(() => {
+    const endYear = new Date().getFullYear() + 5;
+    const startYear = endYear - 100;
+    return Array.from(
+      { length: endYear - startYear + 1 },
+      (_, i) => endYear - i,
+    );
+  }, []);
+
+  const renderDayComponent = useCallback(
+    ({
+      date,
+      state,
+      marking,
+      onPress,
+      onLongPress,
+    }: {
+      date?: CalendarDayData;
+      state?: string;
+      marking?: CalendarDayMarking;
+      onPress?: (date: CalendarDayData) => void;
+      onLongPress?: (date: CalendarDayData) => void;
+    }) => (
+      <CalendarDayButton
+        date={date}
+        state={state as "selected" | "disabled" | "today" | ""}
+        marking={marking}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        haptic={haptic}
+      />
+    ),
+    [haptic],
   );
 
   return (
     <View
       style={[
+        styles.container,
         {
           backgroundColor: colors.surface,
           borderRadius: radii.lg,
-          borderWidth: components.borderWidth.strong,
+          borderWidth: components.borderWidth.default,
           borderColor: colors.border,
-          overflow: "hidden",
-          position: "relative",
         },
         style,
       ]}
     >
-      {/* Custom header with month and year navigation */}
       <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: 12,
-          paddingVertical: 10,
-          borderBottomWidth: 0.5,
-          borderBottomColor: colors.border,
-        }}
+        style={[
+          styles.header,
+          {
+            borderBottomWidth: components.borderWidth.hairline,
+            borderBottomColor: colors.border,
+          },
+        ]}
       >
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={activeLocaleData.prev || "Previous month"}
+          hitSlop={minTouchHitSlop(32)}
           onPress={handlePrevMonth}
-          style={({ pressed }) => ({
-            padding: 8,
-            borderRadius: radii.md,
-            backgroundColor: pressed
-              ? colors.backgroundMuted
-              : colors.transparent,
-          })}
+          style={({ pressed }) => [
+            styles.headerIconBtn,
+            {
+              borderRadius: radii.md,
+              backgroundColor: pressed ? colors.backgroundMuted : "transparent",
+            },
+          ]}
         >
-          <ChevronLeft color={colors.text} />
+          <Svg
+            width={16}
+            height={16}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={colors.text}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <Path d="m15 18-6-6 6-6" />
+          </Svg>
         </Pressable>
 
-        <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+        <View style={styles.headerCenter}>
           {enableYearMonthPicker ? (
             <>
-              {/* Month Trigger */}
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Select month"
+                accessibilityState={{ expanded: showMonthSelector }}
+                hitSlop={minTouchHitSlop(28)}
                 onPress={() => {
-                  triggerHaptic("selection");
-                  setShowMonthSelector(!showMonthSelector);
+                  if (haptic) triggerHaptic("selection");
+                  setShowMonthSelector((prev) => !prev);
                   setShowYearSelector(false);
                 }}
-                style={({ pressed }) => ({
-                  paddingHorizontal: 10,
-                  paddingVertical: 6,
-                  borderRadius: radii.md,
-                  backgroundColor: showMonthSelector
-                    ? colors.backgroundMuted
-                    : pressed
-                      ? colors.backgroundMuted
-                      : colors.transparent,
-                })}
+                style={({ pressed }) => [
+                  styles.pickerTrigger,
+                  {
+                    borderRadius: radii.md,
+                    backgroundColor:
+                      showMonthSelector || pressed
+                        ? colors.backgroundMuted
+                        : "transparent",
+                  },
+                ]}
               >
-                <Text
-                  style={{
-                    fontSize: 15,
-                    fontWeight: "600",
-                    color: colors.text,
-                  }}
-                >
+                <Text style={[styles.headerTitle, { color: colors.text }]}>
                   {activeLocaleData.monthNames[currentMonth - 1]}
                 </Text>
               </Pressable>
 
-              {/* Year Trigger */}
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Select year"
+                accessibilityState={{ expanded: showYearSelector }}
+                hitSlop={minTouchHitSlop(28)}
                 onPress={() => {
-                  triggerHaptic("selection");
-                  setShowYearSelector(!showYearSelector);
+                  if (haptic) triggerHaptic("selection");
+                  setShowYearSelector((prev) => !prev);
                   setShowMonthSelector(false);
                 }}
-                style={({ pressed }) => ({
-                  paddingHorizontal: 10,
-                  paddingVertical: 6,
-                  borderRadius: radii.md,
-                  backgroundColor: showYearSelector
-                    ? colors.backgroundMuted
-                    : pressed
-                      ? colors.backgroundMuted
-                      : colors.transparent,
-                })}
+                style={({ pressed }) => [
+                  styles.pickerTrigger,
+                  {
+                    borderRadius: radii.md,
+                    backgroundColor:
+                      showYearSelector || pressed
+                        ? colors.backgroundMuted
+                        : "transparent",
+                  },
+                ]}
               >
-                <Text
-                  style={{
-                    fontSize: 15,
-                    fontWeight: "600",
-                    color: colors.text,
-                  }}
-                >
+                <Text style={[styles.headerTitle, { color: colors.text }]}>
                   {currentYear}
                 </Text>
               </Pressable>
             </>
           ) : (
-            <Text
-              style={{ fontSize: 15, fontWeight: "600", color: colors.text }}
-            >
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
               {activeLocaleData.monthNames[currentMonth - 1]} {currentYear}
             </Text>
           )}
         </View>
 
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          {showTodayButton && (
+        <View style={styles.headerRight}>
+          {showTodayButton ? (
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={activeLocaleData.today || "Today"}
+              hitSlop={minTouchHitSlop(26)}
               onPress={handleTodayClick}
-              style={({ pressed }) => ({
-                paddingHorizontal: 8,
-                paddingVertical: 4,
-                borderRadius: radii.sm,
-                backgroundColor: pressed
-                  ? colors.backgroundMuted
-                  : colors.surfaceMuted,
-                borderWidth: 1,
-                borderColor: colors.border,
-              })}
+              style={({ pressed }) => [
+                styles.todayChip,
+                {
+                  borderRadius: radii.sm,
+                  backgroundColor: pressed
+                    ? colors.backgroundMuted
+                    : colors.surfaceMuted,
+                  borderWidth: components.borderWidth.default,
+                  borderColor: colors.border,
+                },
+              ]}
             >
               <Text variant="caption" weight="600" color="primary">
                 {activeLocaleData.today || "Today"}
               </Text>
             </Pressable>
-          )}
+          ) : null}
 
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={activeLocaleData.next || "Next month"}
+            hitSlop={minTouchHitSlop(32)}
             onPress={handleNextMonth}
-            style={({ pressed }) => ({
-              padding: 8,
-              borderRadius: radii.md,
-              backgroundColor: pressed
-                ? colors.backgroundMuted
-                : colors.transparent,
-            })}
+            style={({ pressed }) => [
+              styles.headerIconBtn,
+              {
+                borderRadius: radii.md,
+                backgroundColor: pressed ? colors.backgroundMuted : "transparent",
+              },
+            ]}
           >
-            <ChevronRight color={colors.text} />
+            <Svg
+              width={16}
+              height={16}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={colors.text}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <Path d="m9 18 6-6-6-6" />
+            </Svg>
           </Pressable>
         </View>
       </View>
 
-      {/* Animated Month Fast Selector Overlay */}
-      <Animated.View
-        pointerEvents={showMonthSelector ? "auto" : "none"}
-        style={[
-          {
-            position: "absolute",
-            top: 52,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: colors.surface,
-            zIndex: 30,
-            padding: 16,
-            justifyContent: "center",
-          },
-          monthOverlayStyle,
-        ]}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            justifyContent: "center",
-          }}
-        >
-          {activeLocaleData.monthNamesShort.map((m, idx) => {
-            const isSel = currentMonth === idx + 1;
-            return (
-              <Pressable
-                key={m}
-                onPress={() => {
-                  triggerHaptic("selection");
-                  setCurrentMonth(idx + 1);
-                  setShowMonthSelector(false);
-                  setCalendarKey((prev) => prev + 1);
-                }}
-                style={({ pressed }) => ({
-                  width: "30%",
-                  margin: 4,
-                  paddingVertical: 12,
-                  borderRadius: radii.md,
-                  backgroundColor: isSel ? colors.primary : colors.transparent,
-                  borderWidth: components.borderWidth.strong,
-                  borderColor: isSel ? colors.primary : colors.border,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  opacity: pressed ? 0.78 : 1,
-                })}
-              >
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontWeight: isSel ? "600" : "400",
-                    color: isSel ? colors.onPrimary : colors.text,
-                  }}
-                >
-                  {m}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </Animated.View>
-
-      {/* Animated Year Fast Selector Overlay */}
-      <Animated.View
-        pointerEvents={showYearSelector ? "auto" : "none"}
-        onLayout={(e) => {
-          const { height } = e.nativeEvent.layout;
-          if (height > 0) {
-            setOverlayHeight(height);
+      {shouldMountMonthOverlay ? (
+        <Animated.View
+          pointerEvents={showMonthSelector ? "auto" : "none"}
+          accessibilityElementsHidden={!showMonthSelector}
+          importantForAccessibility={
+            showMonthSelector ? "yes" : "no-hide-descendants"
           }
-        }}
-        style={[
-          {
-            position: "absolute",
-            top: 52,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: colors.surface,
-            zIndex: 30,
-            padding: 8,
-            justifyContent: "center",
-            alignItems: "center",
-          },
-          yearOverlayStyle,
-        ]}
-      >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ width: "100%", height: "100%" }}
-          contentContainerStyle={{
-            flexDirection: "column",
-            flexWrap: "wrap",
-            height: overlayHeight - 24,
-            paddingHorizontal: 8,
-            paddingVertical: 12,
-          }}
+          style={[
+            styles.overlay,
+            { backgroundColor: colors.surface },
+            monthOverlayStyle,
+          ]}
         >
-          {years.map((y) => {
-            const isSel = currentYear === y;
-            return (
-              <Pressable
-                key={y}
-                onPress={() => {
-                  triggerHaptic("selection");
-                  setCurrentYear(y);
-                  setShowYearSelector(false);
-                  setCalendarKey((prev) => prev + 1);
-                }}
-                style={({ pressed }) => ({
-                  width: 75,
-                  height: 42,
-                  margin: 4,
-                  borderRadius: radii.md,
-                  backgroundColor: isSel ? colors.primary : colors.transparent,
-                  borderWidth: components.borderWidth.strong,
-                  borderColor: isSel ? colors.primary : colors.border,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  opacity: pressed ? 0.78 : 1,
-                })}
-              >
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: isSel ? "600" : "400",
-                    color: isSel ? colors.onPrimary : colors.text,
+          <View style={styles.monthGrid}>
+            {activeLocaleData.monthNamesShort.map((m, idx) => {
+              const isSel = currentMonth === idx + 1;
+              return (
+                <Pressable
+                  key={`${m}-${idx}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSel }}
+                  onPress={() => {
+                    if (haptic) triggerHaptic("selection");
+                    setCurrentMonth(idx + 1);
+                    setShowMonthSelector(false);
                   }}
+                  style={({ pressed }) => [
+                    styles.monthCell,
+                    {
+                      borderRadius: radii.md,
+                      backgroundColor: isSel ? colors.primary : "transparent",
+                      borderWidth: components.borderWidth.default,
+                      borderColor: isSel ? colors.primary : colors.border,
+                      opacity: pressed ? 0.78 : 1,
+                    },
+                  ]}
                 >
-                  {y}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </Animated.View>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: isSel ? "600" : "400",
+                      color: isSel ? colors.onPrimary : colors.text,
+                    }}
+                  >
+                    {m}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Animated.View>
+      ) : null}
+
+      {shouldMountYearOverlay ? (
+        <Animated.View
+          pointerEvents={showYearSelector ? "auto" : "none"}
+          accessibilityElementsHidden={!showYearSelector}
+          importantForAccessibility={
+            showYearSelector ? "yes" : "no-hide-descendants"
+          }
+          onLayout={(e) => {
+            const { height } = e.nativeEvent.layout;
+            if (height > 0) {
+              setOverlayHeight(height);
+            }
+          }}
+          style={[
+            styles.yearOverlay,
+            { backgroundColor: colors.surface },
+            yearOverlayStyle,
+          ]}
+        >
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.yearScroll}
+            contentContainerStyle={[
+              styles.yearGrid,
+              { height: Math.max(120, overlayHeight - 24) },
+            ]}
+          >
+            {years.map((y) => {
+              const isSel = currentYear === y;
+              return (
+                <Pressable
+                  key={y}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSel }}
+                  onPress={() => {
+                    if (haptic) triggerHaptic("selection");
+                    setCurrentYear(y);
+                    setShowYearSelector(false);
+                  }}
+                  style={({ pressed }) => [
+                    styles.yearCell,
+                    {
+                      borderRadius: radii.md,
+                      backgroundColor: isSel ? colors.primary : "transparent",
+                      borderWidth: components.borderWidth.default,
+                      borderColor: isSel ? colors.primary : colors.border,
+                      opacity: pressed ? 0.78 : 1,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: isSel ? "600" : "400",
+                      color: isSel ? colors.onPrimary : colors.text,
+                    }}
+                  >
+                    {y}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </Animated.View>
+      ) : null}
 
       <WixCalendar
-        key={`wix-cal-${calendarKey}`}
-        style={{ padding: 8 }}
+        {...props}
+        key={`${colors.surface}-${colors.primary}-${colors.text}-${components.borderWidth.default}`}
+        style={styles.wixCalendar}
         theme={customTheme}
         markingType={markingType}
         markedDates={
@@ -742,30 +763,169 @@ export function Calendar({
         }
         hideArrows={true}
         renderHeader={() => null}
+        initialDate={visibleMonthStr}
         current={visibleMonthStr}
         onMonthChange={
           handleMonthChange as unknown as (date: CalendarDayData) => void
         }
-        dayComponent={({ date, state, marking, onPress, onLongPress }) => (
-          <CalendarDayButton
-            date={date as unknown as CalendarDayData}
-            state={state as "selected" | "disabled" | "today" | ""}
-            marking={marking as unknown as CalendarDayMarking}
-            onPress={(day) => {
-              if (onPress) {
-                onPress(day);
-              }
-              if (props.onDayPress) {
-                props.onDayPress(day as unknown as React.ComponentProps<typeof WixCalendar>["onDayPress"] extends ((date: infer D) => void) | undefined ? D : never);
-              }
-            }}
-            onLongPress={
-              onLongPress as unknown as (date: CalendarDayData) => void
-            }
-          />
-        )}
-        {...props}
+        dayComponent={
+          renderDayComponent as unknown as React.ComponentProps<
+            typeof WixCalendar
+          >["dayComponent"]
+        }
       />
     </View>
   );
-}
+});
+
+const styles = StyleSheet.create({
+  container: {
+    overflow: "hidden",
+    position: "relative",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  headerIconBtn: {
+    padding: 8,
+  },
+  headerCenter: {
+    flexDirection: "row",
+    gap: 6,
+    alignItems: "center",
+  },
+  pickerTrigger: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  headerTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  todayChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  arrowCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dayButton: {
+    width: "100%",
+    height: 38,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  rangeStripFull: {
+    position: "absolute",
+    top: 3,
+    bottom: 3,
+    left: 0,
+    right: 0,
+  },
+  rangeStripRight: {
+    position: "absolute",
+    top: 3,
+    bottom: 3,
+    left: "50%",
+    right: 0,
+  },
+  rangeStripLeft: {
+    position: "absolute",
+    top: 3,
+    bottom: 3,
+    left: 0,
+    right: "50%",
+  },
+  dayCircle: {
+    position: "absolute",
+    width: 32,
+    height: 32,
+  },
+  dayText: {
+    fontSize: 13,
+    includeFontPadding: false,
+  },
+  dotsRow: {
+    flexDirection: "row",
+    gap: 2,
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  multiDot: {
+    width: 3.5,
+    height: 3.5,
+    borderRadius: 2,
+  },
+  singleDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  overlay: {
+    position: "absolute",
+    top: 52,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 30,
+    padding: 16,
+    justifyContent: "center",
+  },
+  monthGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
+  monthCell: {
+    width: "30%",
+    margin: 4,
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  yearOverlay: {
+    position: "absolute",
+    top: 52,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 30,
+    padding: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  yearScroll: {
+    width: "100%",
+    height: "100%",
+  },
+  yearGrid: {
+    flexDirection: "column",
+    flexWrap: "wrap",
+    paddingHorizontal: 8,
+    paddingVertical: 12,
+  },
+  yearCell: {
+    width: 75,
+    height: 42,
+    margin: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  wixCalendar: {
+    padding: 8,
+  },
+});

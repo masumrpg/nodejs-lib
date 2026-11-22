@@ -1,7 +1,9 @@
-import { darkTheme, lightTheme } from "./tokens";
+import { getContrastingTextColor, withAlpha } from "../utils/color";
+import { darkTheme, flatShadows, lightTheme, subtleShadows } from "./tokens";
 import type {
   DeepPartial,
   Theme,
+  ThemeColors,
   ThemeInput,
   ThemeMode,
   TypographyVariant,
@@ -36,14 +38,68 @@ export function mergeTheme<T extends object>(
   return output as T;
 }
 
+const DERIVED_TONES = [
+  { key: "primary", softKey: "primarySoft", onKey: "onPrimary" },
+  { key: "secondary", softKey: "secondarySoft", onKey: "onSecondary" },
+  { key: "accent", softKey: "accentSoft", onKey: "onAccent" },
+  { key: "success", softKey: "successSoft", onKey: "onSuccess" },
+  { key: "warning", softKey: "warningSoft", onKey: "onWarning" },
+  { key: "danger", softKey: "dangerSoft", onKey: "onDanger" },
+  { key: "info", softKey: "infoSoft", onKey: "onInfo" },
+] as const satisfies ReadonlyArray<{
+  key: keyof ThemeColors;
+  softKey: keyof ThemeColors;
+  onKey: keyof ThemeColors;
+}>;
+
+function applyDerivedColorTokens(
+  mode: ThemeMode,
+  colors: ThemeColors,
+  overrideColors?: DeepPartial<ThemeColors>,
+): ThemeColors {
+  if (!overrideColors) return colors;
+
+  const softAlpha = mode === "dark" ? 0.22 : 0.12;
+  const next: ThemeColors = { ...colors };
+
+  for (const { key, softKey, onKey } of DERIVED_TONES) {
+    const customBase = overrideColors[key];
+    if (typeof customBase === "string" && customBase.length > 0) {
+      if (overrideColors[softKey] === undefined) {
+        next[softKey] = withAlpha(customBase, softAlpha);
+      }
+      if (overrideColors[onKey] === undefined) {
+        next[onKey] = getContrastingTextColor(customBase);
+      }
+    }
+  }
+
+  if (
+    typeof overrideColors.primary === "string" &&
+    overrideColors.primary.length > 0 &&
+    overrideColors.primaryStrong === undefined
+  ) {
+    next.primaryStrong = overrideColors.primary;
+  }
+
+  return next;
+}
+
 export function createTheme(mode: ThemeMode, override?: ThemeInput): Theme {
   const base = mode === "dark" ? darkTheme : lightTheme;
   const merged = mergeTheme(base, override as DeepPartial<Theme>);
+  const elevationEnabled = override?.elevation ?? merged.elevation ?? base.elevation;
+  const resolvedShadows = elevationEnabled
+    ? mergeTheme(subtleShadows, override?.shadows)
+    : flatShadows;
 
   return {
     ...merged,
     mode,
     dark: mode === "dark",
+    elevation: elevationEnabled,
+    colors: applyDerivedColorTokens(mode, merged.colors, override?.colors),
+    shadows: resolvedShadows,
     typography: applyFontTokens(merged),
   };
 }

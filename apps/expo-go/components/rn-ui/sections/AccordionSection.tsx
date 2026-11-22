@@ -65,13 +65,13 @@ export function AccordionSection({ ctx }: { ctx: RnUiSectionContext }) {
   return (
     <Section title="Accordion">
       <Box gap="lg">
-        {/* Outlined Variant */}
+        {/* Outline Variant */}
         <Box gap="xs">
           <Text variant="labelSmall" color="textMuted">
-            Outlined Variant (Default)
+            Outline Variant (Default)
           </Text>
           <Accordion
-            variant="outlined"
+            variant="outline"
             defaultOpenIds={["theme"]}
             items={sampleItems}
           />
@@ -80,10 +80,11 @@ export function AccordionSection({ ctx }: { ctx: RnUiSectionContext }) {
         {/* Glassmorphism Variant */}
         <Box gap="xs">
           <Text variant="labelSmall" color="textMuted">
-            Glassmorphism Variant
+            Glassmorphism Overlay
           </Text>
           <Accordion
-            variant="glass"
+            variant="outline"
+            glass
             defaultOpenIds={["glass_1"]}
             items={glassItems}
           />

@@ -4,12 +4,14 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import {
   LayoutChangeEvent,
   Pressable,
+  ScrollView,
   StyleProp,
   StyleSheet,
   TextStyle,
@@ -30,7 +32,10 @@ import { triggerHaptic } from "../utils/haptics";
 import { Badge } from "./Badge";
 import { Text } from "./Text";
 import {
+  ANIMATION_TIMING,
+  minTouchHitSlop,
   renderIcon,
+  resolveToneColors,
   type BaseAnimatedProps,
   type BaseGlassProps,
   type BaseHapticProps,
@@ -42,9 +47,8 @@ import {
   type VariantProps,
 } from "./types";
 
-// Easing curves from expo-animation skill
-const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1); // Strong ease-out for UI entering
-const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1); // Smooth on-screen movement for indicator
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
 
 export type TabsVariant = "line" | "pill" | "soft";
 export type TabsTransition = "slide" | "fade" | "scale" | "none";
@@ -82,6 +86,7 @@ interface TabsContextValue {
   direction: number;
   tabChangeCount: number;
   registerTabLayout: (val: string, layout: TabLayout) => void;
+  unregisterTabLayout: (val: string) => void;
   registerTabKey: (val: string) => void;
   tabLayouts: Record<string, TabLayout>;
 }
@@ -91,15 +96,14 @@ const TabsContext = createContext<TabsContextValue | null>(null);
 function useTabsContext(): TabsContextValue {
   const context = useContext(TabsContext);
   if (!context) {
-    throw new Error("Tabs compound components must be rendered inside a <Tabs> container.");
+    throw new Error(
+      "Tabs compound components must be rendered inside a <Tabs> container.",
+    );
   }
   return context;
 }
 
-/**
- * Compound Tabs system providing accessible tab navigation with smooth indicator transitions.
- */
-export function Tabs({
+export const Tabs = React.memo(function Tabs({
   value,
   defaultValue = "",
   onValueChange,
@@ -120,6 +124,32 @@ export function Tabs({
   const [tabChangeCount, setTabChangeCount] = useState<number>(0);
 
   const activeValue = value !== undefined ? value : internalValue;
+  const prevValueRef = useRef<string>(activeValue);
+
+  const computeDirection = useCallback(
+    (fromVal: string, toVal: string) => {
+      const prevLayout = tabLayouts[fromVal];
+      const nextLayout = tabLayouts[toVal];
+      if (prevLayout && nextLayout && prevLayout.x !== nextLayout.x) {
+        return nextLayout.x > prevLayout.x ? 1 : -1;
+      }
+      const prevIdx = tabKeys.indexOf(fromVal);
+      const nextIdx = tabKeys.indexOf(toVal);
+      if (prevIdx !== -1 && nextIdx !== -1) {
+        return nextIdx >= prevIdx ? 1 : -1;
+      }
+      return 1;
+    },
+    [tabKeys, tabLayouts],
+  );
+
+  useEffect(() => {
+    if (prevValueRef.current !== activeValue) {
+      setDirection(computeDirection(prevValueRef.current, activeValue));
+      setTabChangeCount((c) => c + 1);
+      prevValueRef.current = activeValue;
+    }
+  }, [activeValue, computeDirection]);
 
   const registerTabKey = useCallback((val: string) => {
     setTabKeys((prev) => (prev.includes(val) ? prev : [...prev, val]));
@@ -134,40 +164,32 @@ export function Tabs({
     });
   }, []);
 
+  const unregisterTabLayout = useCallback((val: string) => {
+    setTabLayouts((prev) => {
+      if (!(val in prev)) return prev;
+      const next = { ...prev };
+      delete next[val];
+      return next;
+    });
+  }, []);
+
   const handleSelect = useCallback(
     (newVal: string) => {
       if (newVal === activeValue) return;
-
-      if (haptic) {
-        triggerHaptic("selection");
-      }
-
-      // Determine movement direction (-1 for leftward, 1 for rightward)
-      const prevLayout = tabLayouts[activeValue];
-      const newLayout = tabLayouts[newVal];
-      if (prevLayout && newLayout && prevLayout.x !== newLayout.x) {
-        setDirection(newLayout.x > prevLayout.x ? 1 : -1);
-      } else {
-        const prevIdx = tabKeys.indexOf(activeValue);
-        const newIdx = tabKeys.indexOf(newVal);
-        if (prevIdx !== -1 && newIdx !== -1) {
-          setDirection(newIdx >= prevIdx ? 1 : -1);
-        } else {
-          setDirection(1);
-        }
-      }
-
-      setTabChangeCount((c) => c + 1);
+      if (haptic) triggerHaptic("selection");
 
       if (value === undefined) {
+        setDirection(computeDirection(activeValue, newVal));
+        setTabChangeCount((c) => c + 1);
+        prevValueRef.current = newVal;
         setInternalValue(newVal);
       }
       onValueChange?.(newVal);
     },
-    [activeValue, haptic, onValueChange, tabKeys, tabLayouts, value]
+    [activeValue, computeDirection, haptic, onValueChange, value],
   );
 
-  const contextValue = useMemo(
+  const contextValue = useMemo<TabsContextValue>(
     () => ({
       value: activeValue,
       onSelect: handleSelect,
@@ -181,25 +203,27 @@ export function Tabs({
       direction,
       tabChangeCount,
       registerTabLayout,
+      unregisterTabLayout,
       registerTabKey,
       tabLayouts,
     }),
     [
       activeValue,
-      handleSelect,
-      variant,
-      tone,
-      size,
-      glass,
-      haptic,
       animated,
-      transition,
       direction,
-      tabChangeCount,
-      registerTabLayout,
+      glass,
+      handleSelect,
+      haptic,
       registerTabKey,
+      registerTabLayout,
+      size,
+      tabChangeCount,
       tabLayouts,
-    ]
+      tone,
+      transition,
+      unregisterTabLayout,
+      variant,
+    ],
   );
 
   return (
@@ -207,98 +231,112 @@ export function Tabs({
       <View style={[styles.root, style]}>{children}</View>
     </TabsContext.Provider>
   );
-}
+});
 
 export interface TabsListProps {
+  scrollable?: boolean;
   style?: StyleProp<ViewStyle>;
   indicatorStyle?: StyleProp<ViewStyle>;
   children: ReactNode;
 }
 
-/**
- * Horizontal tab button header list with animated indicator bar or pill capsule.
- */
-export function TabsList({ style, indicatorStyle, children }: TabsListProps) {
-  const { colors, radii } = useTheme();
-  const { value, variant, tone, tabLayouts, animated } = useTabsContext();
+export const TabsList = React.memo(function TabsList({
+  scrollable = false,
+  style,
+  indicatorStyle,
+  children,
+}: TabsListProps) {
+  const { colors, components, radii, shadows, isDark } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const { value, variant, tone, glass, tabLayouts, animated } =
+    useTabsContext();
 
+  const shouldAnimate = animated && !reducedMotion;
   const indicatorX = useSharedValue(0);
   const indicatorWidth = useSharedValue(0);
   const indicatorOpacity = useSharedValue(0);
+  const hasInitializedRef = useRef(false);
 
   const activeLayout = tabLayouts[value];
 
   useEffect(() => {
-    if (activeLayout && activeLayout.width > 0) {
-      if (animated) {
-        indicatorX.set(
-          withTiming(activeLayout.x, {
-            duration: 220,
-            easing: EASE_IN_OUT,
-          })
-        );
-        indicatorWidth.set(
-          withTiming(activeLayout.width, {
-            duration: 220,
-            easing: EASE_IN_OUT,
-          })
-        );
-        indicatorOpacity.set(withTiming(1, { duration: 150 }));
-      } else {
-        indicatorX.set(activeLayout.x);
-        indicatorWidth.set(activeLayout.width);
-        indicatorOpacity.set(1);
-      }
+    if (!activeLayout || activeLayout.width <= 0) return;
+
+    if (!hasInitializedRef.current || !shouldAnimate) {
+      hasInitializedRef.current = true;
+      indicatorX.value = activeLayout.x;
+      indicatorWidth.value = activeLayout.width;
+      indicatorOpacity.value = 1;
+      return;
     }
-  }, [activeLayout, animated, indicatorOpacity, indicatorWidth, indicatorX]);
+
+    indicatorX.value = withTiming(activeLayout.x, {
+      duration: 200,
+      easing: EASE_IN_OUT,
+    });
+    indicatorWidth.value = withTiming(activeLayout.width, {
+      duration: 200,
+      easing: EASE_IN_OUT,
+    });
+    indicatorOpacity.value = withTiming(1, { duration: 140 });
+  }, [
+    activeLayout,
+    indicatorOpacity,
+    indicatorWidth,
+    indicatorX,
+    shouldAnimate,
+  ]);
 
   const animatedIndicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: indicatorX.get() }],
-    width: indicatorWidth.get(),
-    opacity: indicatorOpacity.get(),
+    transform: [{ translateX: indicatorX.value }],
+    width: indicatorWidth.value,
+    opacity: indicatorOpacity.value,
   }));
 
-  const activeColor =
-    tone === "primary"
-      ? colors.primary
-      : tone === "secondary"
-      ? colors.secondary
-      : tone === "accent"
-      ? colors.accent
-      : tone === "success"
-      ? colors.success
-      : tone === "warning"
-      ? colors.warning
-      : tone === "danger"
-      ? colors.danger
-      : colors.info;
-
+  const activeColor = resolveToneColors(tone, colors).solid;
   const isPill = variant === "pill";
   const isSoft = variant === "soft";
 
-  return (
+  const listBg = glass
+    ? colors.glassSurface
+    : isPill || isSoft
+      ? colors.surfaceMuted
+      : "transparent";
+
+  const pillActiveBg = glass
+    ? colors.glassSurfaceStrong
+    : isDark
+      ? colors.surfaceRaised
+      : colors.surface;
+
+  const content = (
     <View
+      accessibilityRole="tablist"
       style={[
         styles.listContainer,
         isPill && {
-          backgroundColor: colors.surfaceMuted,
+          backgroundColor: listBg,
           borderRadius: radii.lg,
           padding: 4,
+          borderWidth: glass ? components.borderWidth.default : 0,
+          borderColor: glass ? colors.glassBorder : "transparent",
         },
         isSoft && {
-          backgroundColor: colors.surfaceMuted,
+          backgroundColor: listBg,
           borderRadius: radii.md,
           padding: 3,
+          borderWidth: glass ? components.borderWidth.default : 0,
+          borderColor: glass ? colors.glassBorder : "transparent",
         },
         variant === "line" && {
-          borderBottomWidth: 1,
-          borderBottomColor: colors.borderMuted,
+          borderBottomWidth: components.borderWidth.default,
+          borderBottomColor: glass ? colors.glassBorder : colors.borderMuted,
         },
-        style,
+        !scrollable && style,
       ]}
     >
-      {/* Sliding Animated Indicator */}
       <Animated.View
+        pointerEvents="none"
         style={[
           styles.indicatorBase,
           variant === "line" && {
@@ -307,21 +345,21 @@ export function TabsList({ style, indicatorStyle, children }: TabsListProps) {
             backgroundColor: activeColor,
             borderRadius: 2,
           },
-          isPill && {
-            top: 4,
-            bottom: 4,
-            backgroundColor: colors.surface,
-            borderRadius: radii.md,
-            shadowColor: colors.text,
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.1,
-            shadowRadius: 2,
-            elevation: 2,
-          },
+          isPill && [
+            {
+              top: 4,
+              bottom: 4,
+              backgroundColor: pillActiveBg,
+              borderRadius: radii.md,
+              borderWidth: isDark ? components.borderWidth.hairline : 0,
+              borderColor: isDark ? colors.border : "transparent",
+            },
+            shadows.sm,
+          ],
           isSoft && {
             top: 3,
             bottom: 3,
-            backgroundColor: withAlpha(activeColor, 0.14),
+            backgroundColor: withAlpha(activeColor, isDark ? 0.24 : 0.14),
             borderRadius: radii.sm,
           },
           animatedIndicatorStyle,
@@ -331,7 +369,21 @@ export function TabsList({ style, indicatorStyle, children }: TabsListProps) {
       {children}
     </View>
   );
-}
+
+  if (scrollable) {
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, style]}
+      >
+        {content}
+      </ScrollView>
+    );
+  }
+
+  return content;
+});
 
 export interface TabsTriggerProps {
   value: string;
@@ -344,10 +396,7 @@ export interface TabsTriggerProps {
   children?: ReactNode;
 }
 
-/**
- * Interactive tab item trigger button.
- */
-export function TabsTrigger({
+export const TabsTrigger = React.memo(function TabsTrigger({
   value,
   disabled = false,
   icon,
@@ -365,35 +414,28 @@ export function TabsTrigger({
     tone,
     size,
     registerTabLayout,
+    unregisterTabLayout,
     registerTabKey,
   } = useTabsContext();
 
   useEffect(() => {
     registerTabKey(value);
-  }, [registerTabKey, value]);
+    return () => {
+      unregisterTabLayout(value);
+    };
+  }, [registerTabKey, unregisterTabLayout, value]);
 
   const isSelected = activeValue === value;
 
-  const handleLayout = (e: LayoutChangeEvent) => {
-    const { x, width } = e.nativeEvent.layout;
-    registerTabLayout(value, { x, width });
-  };
+  const handleLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      const { x, width } = e.nativeEvent.layout;
+      registerTabLayout(value, { x, width });
+    },
+    [registerTabLayout, value],
+  );
 
-  const activeColor =
-    tone === "primary"
-      ? colors.primary
-      : tone === "secondary"
-      ? colors.secondary
-      : tone === "accent"
-      ? colors.accent
-      : tone === "success"
-      ? colors.success
-      : tone === "warning"
-      ? colors.warning
-      : tone === "danger"
-      ? colors.danger
-      : colors.info;
-
+  const activeColor = resolveToneColors(tone, colors).solid;
   const paddingVertical = size === "sm" ? 6 : size === "lg" ? 12 : 9;
   const paddingHorizontal = size === "sm" ? 10 : size === "lg" ? 18 : 14;
   const iconSize = size === "sm" ? 14 : size === "lg" ? 18 : 16;
@@ -409,6 +451,7 @@ export function TabsTrigger({
     <Pressable
       onLayout={handleLayout}
       disabled={disabled}
+      hitSlop={minTouchHitSlop(36)}
       onPress={() => onSelect(value)}
       accessibilityRole="tab"
       accessibilityState={{ selected: isSelected, disabled }}
@@ -417,13 +460,13 @@ export function TabsTrigger({
         {
           paddingVertical,
           paddingHorizontal,
-          opacity: disabled ? 0.4 : 1,
+          opacity: disabled ? 0.45 : 1,
         },
         style,
       ]}
     >
-      {icon && renderIcon(icon, textColor, iconSize)}
-      {typeof children === "string" ? (
+      {icon ? renderIcon(icon, textColor, iconSize) : null}
+      {typeof children === "string" || typeof children === "number" ? (
         <Text
           weight={isSelected ? "600" : "500"}
           style={[
@@ -440,18 +483,18 @@ export function TabsTrigger({
       ) : (
         children
       )}
-      {badge !== undefined && (
+      {badge !== undefined ? (
         <Badge
           size="sm"
-          tone={isSelected ? tone : "default"}
-          variant={isSelected ? "solid" : "soft"}
+          tone={isSelected ? tone : "secondary"}
+          variant={isSelected ? "filled" : "soft"}
         >
           {String(badge)}
         </Badge>
-      )}
+      ) : null}
     </Pressable>
   );
-}
+});
 
 export interface TabsContentProps {
   value: string;
@@ -461,11 +504,7 @@ export interface TabsContentProps {
   children: ReactNode;
 }
 
-/**
- * Tab content view rendered when the corresponding tab trigger is active.
- * Features fluid directional slide, scale, or fade transitions adhering to expo-animation.
- */
-export function TabsContent({
+export const TabsContent = React.memo(function TabsContent({
   value,
   lazy = true,
   transition: localTransition,
@@ -485,8 +524,6 @@ export function TabsContent({
 
   const effectiveTransition: TabsTransition =
     localTransition ?? contextTransition;
-
-  // Initial load before user interaction: display immediately with zero transition delay
   const isInitial = tabChangeCount === 0;
 
   const shouldSlide =
@@ -494,7 +531,7 @@ export function TabsContent({
   const shouldScale =
     animated && !reduced && effectiveTransition === "scale" && !isInitial;
 
-  const initialOpacity = isSelected ? (isInitial || !animated ? 1 : 0) : 0;
+  const initialOpacity = isSelected ? (isInitial || !animated || reduced ? 1 : 0) : 0;
   const initialTranslateX = shouldSlide ? direction * 14 : 0;
   const initialScale = shouldScale ? 0.96 : 1;
 
@@ -504,64 +541,45 @@ export function TabsContent({
 
   useEffect(() => {
     if (!isSelected) {
-      contentOpacity.set(0);
+      contentOpacity.value = 0;
       return;
     }
 
-    if (!animated || effectiveTransition === "none") {
-      contentOpacity.set(1);
-      contentTranslateX.set(0);
-      contentScale.set(1);
+    if (!animated || reduced || effectiveTransition === "none" || isInitial) {
+      contentOpacity.value = 1;
+      contentTranslateX.value = 0;
+      contentScale.value = 1;
       return;
     }
 
-    if (isInitial) {
-      contentOpacity.set(1);
-      contentTranslateX.set(0);
-      contentScale.set(1);
-      return;
-    }
-
-    // Entering transition
-    if (effectiveTransition === "slide" && !reduced) {
-      contentTranslateX.set(direction * 14);
-      contentOpacity.set(0);
-      contentTranslateX.set(
-        withTiming(0, {
-          duration: 200,
-          easing: EASE_OUT,
-        })
-      );
-      contentOpacity.set(
-        withTiming(1, {
-          duration: 200,
-          easing: EASE_OUT,
-        })
-      );
-    } else if (effectiveTransition === "scale" && !reduced) {
-      contentScale.set(0.96);
-      contentOpacity.set(0);
-      contentScale.set(
-        withTiming(1, {
-          duration: 200,
-          easing: EASE_OUT,
-        })
-      );
-      contentOpacity.set(
-        withTiming(1, {
-          duration: 200,
-          easing: EASE_OUT,
-        })
-      );
+    if (effectiveTransition === "slide") {
+      contentTranslateX.value = direction * 14;
+      contentOpacity.value = 0;
+      contentTranslateX.value = withTiming(0, {
+        duration: ANIMATION_TIMING.transition + 30,
+        easing: EASE_OUT,
+      });
+      contentOpacity.value = withTiming(1, {
+        duration: ANIMATION_TIMING.transition + 30,
+        easing: EASE_OUT,
+      });
+    } else if (effectiveTransition === "scale") {
+      contentScale.value = 0.96;
+      contentOpacity.value = 0;
+      contentScale.value = withTiming(1, {
+        duration: ANIMATION_TIMING.transition + 30,
+        easing: EASE_OUT,
+      });
+      contentOpacity.value = withTiming(1, {
+        duration: ANIMATION_TIMING.transition + 30,
+        easing: EASE_OUT,
+      });
     } else {
-      // Fade transition (or reduced motion fallback)
-      contentOpacity.set(0);
-      contentOpacity.set(
-        withTiming(1, {
-          duration: 180,
-          easing: EASE_OUT,
-        })
-      );
+      contentOpacity.value = 0;
+      contentOpacity.value = withTiming(1, {
+        duration: ANIMATION_TIMING.transition,
+        easing: EASE_OUT,
+      });
     }
   }, [
     animated,
@@ -576,10 +594,10 @@ export function TabsContent({
   ]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: contentOpacity.get(),
+    opacity: contentOpacity.value,
     transform: [
-      { translateX: contentTranslateX.get() },
-      { scale: contentScale.get() },
+      { translateX: contentTranslateX.value },
+      { scale: contentScale.value },
     ],
   }));
 
@@ -589,9 +607,11 @@ export function TabsContent({
 
   return (
     <Animated.View
+      accessibilityElementsHidden={!isSelected}
+      importantForAccessibility={isSelected ? "yes" : "no-hide-descendants"}
       style={[
         styles.content,
-        !isSelected && { display: "none" },
+        !isSelected && styles.hiddenContent,
         animatedStyle,
         style,
       ]}
@@ -599,11 +619,14 @@ export function TabsContent({
       {children}
     </Animated.View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: {
     width: "100%",
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   listContainer: {
     flexDirection: "row",
@@ -612,9 +635,11 @@ const styles = StyleSheet.create({
   },
   indicatorBase: {
     position: "absolute",
+    left: 0,
     zIndex: 0,
   },
   trigger: {
+    minHeight: 40,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -624,5 +649,8 @@ const styles = StyleSheet.create({
   content: {
     width: "100%",
     paddingTop: 12,
+  },
+  hiddenContent: {
+    display: "none",
   },
 });

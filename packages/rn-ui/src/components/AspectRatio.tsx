@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, View, type StyleProp, type ViewProps, type ViewStyle } from "react-native";
+import { StyleSheet, View, type ViewProps, type ViewStyle } from "react-native";
 
 import { useTheme } from "../theme";
 
@@ -19,7 +19,7 @@ export interface AspectRatioProps extends ViewProps {
   children?: React.ReactNode;
 }
 
-export function AspectRatio({
+function AspectRatioComponent({
   ratio = 1,
   radius,
   children,
@@ -27,26 +27,26 @@ export function AspectRatio({
   ...props
 }: AspectRatioProps) {
   const { radii } = useTheme();
+  const safeRatio =
+    typeof ratio === "number" && Number.isFinite(ratio) && ratio > 0
+      ? ratio
+      : 1;
 
-  const containerStyle: ViewStyle = {
-    width: "100%",
-    aspectRatio: ratio,
-    overflow: "hidden",
-    borderRadius: radius ? radii[radius] : undefined,
-  };
+  const containerStyle = React.useMemo<ViewStyle>(
+    () => ({
+      width: "100%",
+      aspectRatio: safeRatio,
+      overflow: "hidden",
+      ...(radius ? { borderRadius: radii[radius] } : null),
+    }),
+    [radii, radius, safeRatio],
+  );
 
   return (
     <View style={[containerStyle, style]} {...props}>
-      <View style={StyleSheet.absoluteFill}>
-        {React.Children.map(children, (child) => {
-          if (React.isValidElement<{ style?: StyleProp<ViewStyle> }>(child)) {
-            return React.cloneElement(child, {
-              style: [StyleSheet.absoluteFill, child.props.style],
-            });
-          }
-          return child;
-        })}
-      </View>
+      <View style={StyleSheet.absoluteFill}>{children}</View>
     </View>
   );
 }
+
+export const AspectRatio = React.memo(AspectRatioComponent);

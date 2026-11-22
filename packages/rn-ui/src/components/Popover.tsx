@@ -1,19 +1,39 @@
-import React from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Modal,
   Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
   type GestureResponderEvent,
   type PressableProps,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 
-import { useTheme } from "../theme";
+import { Portal, useTheme } from "../theme";
+import {
+  computeAnchoredPosition,
+  measureAnchorNode,
+  useDelayedUnmount,
+  type AnchorMeasurement,
+} from "../utils";
 import { triggerHaptic } from "../utils/haptics";
+import {
+  ANIMATION_TIMING,
+  minTouchHitSlop,
+  type BaseGlassProps,
+  type BaseHapticProps,
+} from "./types";
 
-export interface PopoverProps {
+export interface PopoverProps extends BaseHapticProps {
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -23,38 +43,84 @@ export interface PopoverProps {
 interface PopoverContextValue {
   open: boolean;
   setOpen: (open: boolean) => void;
+  triggerRef: React.RefObject<React.ComponentRef<typeof View> | null>;
+  anchor: AnchorMeasurement | null;
+  measureAndToggle: () => void;
+  haptic: boolean;
 }
 
 const PopoverContext = React.createContext<PopoverContextValue | null>(null);
 
-export function Popover({
+export const Popover = React.memo(function Popover({
   open,
   defaultOpen = false,
   onOpenChange,
+  haptic = true,
   children,
 }: PopoverProps) {
-  const [internalOpen, setInternalOpen] = React.useState(defaultOpen);
-  const currentOpen = open ?? internalOpen;
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const [anchor, setAnchor] = useState<AnchorMeasurement | null>(null);
+  const triggerRef = useRef<React.ComponentRef<typeof View>>(null);
 
-  const setOpen = (next: boolean) => {
-    if (open === undefined) setInternalOpen(next);
-    onOpenChange?.(next);
-  };
+  const isControlled = open !== undefined;
+  const currentOpen = isControlled ? Boolean(open) : internalOpen;
+
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (!isControlled) {
+        setInternalOpen(next);
+      }
+      onOpenChange?.(next);
+    },
+    [isControlled, onOpenChange],
+  );
+
+  useEffect(() => {
+    if (currentOpen) {
+      measureAnchorNode(triggerRef, (rect) => {
+        setAnchor(rect);
+      });
+    }
+  }, [currentOpen]);
+
+  const measureAndToggle = useCallback(() => {
+    const nextOpen = !currentOpen;
+    if (nextOpen) {
+      measureAnchorNode(triggerRef, (rect) => {
+        setAnchor(rect);
+      });
+    }
+    setOpen(nextOpen);
+  }, [currentOpen, setOpen]);
+
+  const value = useMemo<PopoverContextValue>(
+    () => ({
+      open: currentOpen,
+      setOpen,
+      triggerRef,
+      anchor,
+      measureAndToggle,
+      haptic,
+    }),
+    [anchor, currentOpen, haptic, measureAndToggle, setOpen],
+  );
 
   return (
-    <PopoverContext.Provider value={{ open: currentOpen, setOpen }}>
-      {children}
+    <PopoverContext.Provider value={value}>
+      <View collapsable={false}>{children}</View>
     </PopoverContext.Provider>
   );
-}
+});
 
 export interface PopoverTriggerProps extends PressableProps {
   triggerMode?: "press" | "longPress";
 }
 
-export function PopoverTrigger({
+export const PopoverTrigger = React.memo(function PopoverTrigger({
   children,
   triggerMode = "press",
+  disabled,
+  hitSlop,
   onPress,
   onLongPress,
   style,
@@ -62,151 +128,194 @@ export function PopoverTrigger({
 }: PopoverTriggerProps) {
   const context = React.useContext(PopoverContext);
 
-  const handlePress = (event: GestureResponderEvent) => {
-    triggerHaptic("selection");
-    context?.setOpen(!context.open);
-    onPress?.(event);
-  };
+  const handlePress = useCallback(
+    (event: GestureResponderEvent) => {
+      if (disabled) return;
+      if (triggerMode === "press") {
+        if (context?.haptic) triggerHaptic("selection");
+        context?.measureAndToggle();
+      }
+      onPress?.(event);
+    },
+    [context, disabled, onPress, triggerMode],
+  );
 
-  const handleLongPress = (event: GestureResponderEvent) => {
-    triggerHaptic("selection");
-    context?.setOpen(!context.open);
-    onLongPress?.(event);
-  };
-
-  if (React.isValidElement(children)) {
-    return React.cloneElement(
-      children as React.ReactElement<{
-        onPress?: (e: GestureResponderEvent) => void;
-        onLongPress?: (e: GestureResponderEvent) => void;
-      }>,
-      {
-        onPress: (e: GestureResponderEvent) => {
-          handlePress(e);
-          (
-            children.props as {
-              onPress?: (e: GestureResponderEvent) => void;
-            }
-          )?.onPress?.(e);
-        },
-        onLongPress: (e: GestureResponderEvent) => {
-          handleLongPress(e);
-          (
-            children.props as {
-              onLongPress?: (e: GestureResponderEvent) => void;
-            }
-          )?.onLongPress?.(e);
-        },
-      },
-    );
-  }
+  const handleLongPress = useCallback(
+    (event: GestureResponderEvent) => {
+      if (disabled) return;
+      if (triggerMode === "longPress") {
+        if (context?.haptic) triggerHaptic("medium");
+        context?.measureAndToggle();
+      }
+      onLongPress?.(event);
+    },
+    [context, disabled, onLongPress, triggerMode],
+  );
 
   return (
-    <Pressable
-      onPress={handlePress}
-      onLongPress={handleLongPress}
-      style={style}
-      {...props}
-    >
-      {children}
-    </Pressable>
+    <View ref={context?.triggerRef} collapsable={false}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{
+          expanded: Boolean(context?.open),
+          disabled: Boolean(disabled),
+        }}
+        disabled={disabled}
+        hitSlop={hitSlop ?? minTouchHitSlop(36)}
+        onPress={handlePress}
+        onLongPress={handleLongPress}
+        style={style}
+        {...props}
+      >
+        {children}
+      </Pressable>
+    </View>
   );
-}
+});
 
-export interface PopoverContentProps {
+export interface PopoverContentProps extends BaseGlassProps {
   children?: React.ReactNode;
   width?: number;
+  maxHeight?: number;
+  align?: "start" | "center" | "end";
+  side?: "top" | "bottom";
+  sideOffset?: number;
   style?: StyleProp<ViewStyle>;
 }
 
-export function PopoverContent({
+export const PopoverContent = React.memo(function PopoverContent({
   children,
   width = 300,
+  maxHeight = 320,
+  align = "center",
+  side = "bottom",
+  sideOffset = 8,
+  glass = false,
   style,
 }: PopoverContentProps) {
   const context = React.useContext(PopoverContext);
-  const { colors, components, radii, spacing, isDark } = useTheme();
-  const insets = useSafeAreaInsets();
+  const { colors, components, radii, shadows, spacing } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
-  const progress = useSharedValue(0);
+  const isOpen = Boolean(context?.open);
+  const shouldMount = useDelayedUnmount(
+    isOpen,
+    reducedMotion ? 0 : ANIMATION_TIMING.transition,
+  );
+  const progress = useSharedValue(isOpen ? 1 : 0);
 
-  React.useEffect(() => {
-    if (context?.open) {
-      triggerHaptic("medium");
-      progress.value = withTiming(1, {
-        duration: 180,
-        easing: Easing.bezier(0.23, 1, 0.32, 1),
-      });
+  useEffect(() => {
+    if (isOpen) {
+      progress.value = reducedMotion
+        ? 1
+        : withTiming(1, {
+            duration: ANIMATION_TIMING.transition,
+            easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+          });
     } else {
-      progress.value = withTiming(0, {
-        duration: 140,
-        easing: Easing.bezier(0.23, 1, 0.32, 1),
-      });
+      progress.value = reducedMotion
+        ? 0
+        : withTiming(0, {
+            duration: 120,
+            easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+          });
     }
-  }, [context?.open, progress]);
+  }, [isOpen, progress, reducedMotion]);
 
-  const animatedOverlayStyle = useAnimatedStyle(() => ({
+  const resolvedWidth = Math.min(width, Math.max(180, windowWidth - spacing.lg * 2));
+  const resolvedAnchor: AnchorMeasurement = context?.anchor ?? {
+    x: (windowWidth - resolvedWidth) / 2,
+    y: windowHeight * 0.25,
+    width: resolvedWidth,
+    height: 40,
+  };
+  const coords = computeAnchoredPosition({
+    anchor: resolvedAnchor,
+    contentWidth: resolvedWidth,
+    contentHeight: Math.min(maxHeight, 220),
+    windowWidth,
+    windowHeight,
+    preferredPlacement: side,
+    align,
+    offset: sideOffset,
+    viewportPadding: spacing.md,
+  });
+
+  const isTopPlacement = coords.resolvedPlacement === "top";
+  const animatedStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
+    transform: [
+      {
+        translateY: isTopPlacement
+          ? (1 - progress.value) * 6
+          : (1 - progress.value) * -6,
+      },
+      { scale: 0.96 + progress.value * 0.04 },
+    ],
   }));
 
-  const animatedCardStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [{ scale: 0.92 + 0.08 * progress.value }],
-  }));
+  if (!shouldMount && !isOpen) return null;
 
-  if (!context?.open) return null;
+  const portalBody = (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss popover"
+        style={StyleSheet.absoluteFill}
+        onPress={() => {
+          if (context?.haptic) triggerHaptic("selection");
+          context?.setOpen(false);
+        }}
+      />
 
-  return (
-    <Modal
-      visible={context.open}
-      transparent
-      animationType="none"
-      statusBarTranslucent
-      navigationBarTranslucent
-      hardwareAccelerated
-      onRequestClose={() => context.setOpen(false)}
-    >
       <Animated.View
         style={[
+          styles.content,
           {
-            flex: 1,
-            backgroundColor: isDark ? "rgba(0,0,0,0.72)" : "rgba(15,23,42,0.55)",
-            alignItems: "center",
-            justifyContent: "center",
-            paddingHorizontal: spacing.xl,
-            paddingBottom: insets.bottom,
+            top: coords.top,
+            left: coords.left,
+            width: resolvedWidth,
+            maxHeight,
+            borderRadius: radii.xl,
+            borderWidth: components.borderWidth.default,
+            borderColor: glass ? colors.glassBorder : colors.border,
+            backgroundColor: glass
+              ? colors.glassSurfaceStrong
+              : colors.surface,
+            padding: spacing.md,
           },
-          animatedOverlayStyle,
+          shadows.lg,
+          animatedStyle,
+          style,
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
-          onPress={() => {
-            triggerHaptic("selection");
-            context.setOpen(false);
-          }}
-        />
-
-        <Animated.View
-          style={[
-            {
-              width,
-              maxWidth: "100%",
-              borderRadius: radii.xl,
-              borderWidth: components.borderWidth.strong,
-              borderColor: colors.border,
-              backgroundColor: colors.surface,
-              padding: spacing.xl,
-              elevation: 0,
-            },
-            animatedCardStyle,
-            style,
-          ]}
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
         >
           {children}
-        </Animated.View>
+        </ScrollView>
       </Animated.View>
-    </Modal>
+    </>
   );
-}
+
+  return (
+    <Portal layer="popover">
+      {context ? (
+        <PopoverContext.Provider value={context}>
+          {portalBody}
+        </PopoverContext.Provider>
+      ) : (
+        portalBody
+      )}
+    </Portal>
+  );
+});
+
+const styles = StyleSheet.create({
+  content: {
+    position: "absolute",
+  },
+});

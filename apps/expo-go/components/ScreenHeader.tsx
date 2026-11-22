@@ -2,9 +2,15 @@ import React from "react";
 import { StyleProp, View, ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { ChevronLeft, Moon, Sun } from "lucide-react-native";
+import { ChevronLeft, Moon, Palette, Sun } from "lucide-react-native";
 import {
   Box,
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
   IconButton,
   Text,
   useTheme,
@@ -32,6 +38,12 @@ export interface ScreenHeaderProps {
   sticky?: boolean;
 }
 
+const PRESET_LABELS: Record<string, string> = {
+  default: "Default",
+  minimal: "Minimal (HeroUI)",
+  brutal: "Neo-Brutalism",
+};
+
 export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   title,
   subtitle,
@@ -44,7 +56,16 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
 }) => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors, isDark, setColorScheme } = useTheme();
+  const {
+    colors,
+    isDark,
+    setColorScheme,
+    themeName,
+    availableThemes,
+    setThemeName,
+    elevation,
+    toggleElevation,
+  } = useTheme();
   const styles = useStyles();
 
   const handleBack = () => {
@@ -69,12 +90,47 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
       return rightAction;
     }
     return (
-      <IconButton
-        icon={icon(isDark ? Sun : Moon)}
-        variant="outline"
-        size="md"
-        onPress={toggleTheme}
-      />
+      <Box row center gap="xs">
+        <DropdownMenu>
+          <DropdownMenuTrigger>
+            <IconButton
+              accessibilityLabel="Switch theme preset"
+              icon={icon(Palette)}
+              variant="outline"
+              size="md"
+            />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" width={210}>
+            <DropdownMenuLabel>Theme Preset</DropdownMenuLabel>
+            {availableThemes.map((presetKey) => (
+              <DropdownMenuCheckboxItem
+                key={presetKey}
+                checked={themeName === presetKey}
+                onCheckedChange={() => setThemeName(presetKey)}
+              >
+                {PRESET_LABELS[presetKey] ?? presetKey}
+              </DropdownMenuCheckboxItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem
+              checked={elevation}
+              onCheckedChange={() => toggleElevation()}
+            >
+              Shadows (elevation)
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <IconButton
+          accessibilityLabel={
+            isDark ? "Switch to light mode" : "Switch to dark mode"
+          }
+          icon={icon(isDark ? Sun : Moon)}
+          variant="outline"
+          size="md"
+          onPress={toggleTheme}
+        />
+      </Box>
     );
   };
 
@@ -142,15 +198,15 @@ function useStyles() {
       zIndex: 999,
       paddingHorizontal: theme.spacing.lg,
       paddingBottom: theme.spacing.md,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.borderMuted,
+      borderBottomWidth: theme.components.borderWidth.default,
+      borderBottomColor: theme.colors.border,
     },
     staticContainer: {
       position: "relative",
       paddingHorizontal: theme.spacing.lg,
       paddingBottom: theme.spacing.md,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.borderMuted,
+      borderBottomWidth: theme.components.borderWidth.default,
+      borderBottomColor: theme.colors.border,
     },
     contentRow: {
       minHeight: 48,

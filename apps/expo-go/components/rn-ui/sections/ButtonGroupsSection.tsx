@@ -11,14 +11,17 @@ import {
 import React from "react";
 import { type LayoutChangeEvent } from "react-native";
 import Animated, {
+  Easing,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
 import { Section, type RnUiSectionContext } from "../shared";
 
 export function ButtonGroupsSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
-  const { colors, radii } = useTheme();
+  const { colors, components, radii } = useTheme();
+  const reducedMotion = useReducedMotion();
   const [activeSegment, setActiveSegment] = React.useState<"weekly" | "monthly" | "yearly">("weekly");
   const [containerWidth, setContainerWidth] = React.useState(0);
   const padding = 4;
@@ -26,14 +29,23 @@ export function ButtonGroupsSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) 
   const translateX = useSharedValue(0);
 
   React.useEffect(() => {
+    if (activeBlockWidth <= 0) return;
+
     let index = 0;
     if (activeSegment === "monthly") index = 1;
     if (activeSegment === "yearly") index = 2;
 
-    translateX.value = withTiming(index * activeBlockWidth, {
+    const target = index * activeBlockWidth;
+    if (reducedMotion) {
+      translateX.value = target;
+      return;
+    }
+
+    translateX.value = withTiming(target, {
       duration: 160,
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
     });
-  }, [activeSegment, activeBlockWidth, translateX]);
+  }, [activeSegment, activeBlockWidth, reducedMotion, translateX]);
 
   const animatedIndicatorStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
@@ -75,7 +87,7 @@ export function ButtonGroupsSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) 
               style={{
                 backgroundColor: colors.backgroundMuted,
                 borderRadius: radii.lg,
-                borderWidth: 1,
+                borderWidth: components.borderWidth.default,
                 borderColor: colors.border,
                 position: "relative",
                 overflow: "hidden",
@@ -85,22 +97,22 @@ export function ButtonGroupsSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) 
                 setContainerWidth(e.nativeEvent.layout.width)
               }
             >
-              {containerWidth > 0 && (
-                <Animated.View
-                  style={[
-                    {
-                      position: "absolute",
-                      top: padding,
-                      bottom: padding,
-                      left: padding,
-                      width: activeBlockWidth,
-                      backgroundColor: colors.primary,
-                      borderRadius: radii.md,
-                    },
-                    animatedIndicatorStyle,
-                  ]}
-                />
-              )}
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  {
+                    position: "absolute",
+                    top: padding,
+                    bottom: padding,
+                    left: padding,
+                    width: activeBlockWidth,
+                    opacity: containerWidth > 0 ? 1 : 0,
+                    backgroundColor: colors.primary,
+                    borderRadius: radii.md,
+                  },
+                  animatedIndicatorStyle,
+                ]}
+              />
               <Button
                 variant="ghost"
                 style={{ flex: 1 }}

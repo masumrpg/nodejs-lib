@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect } from "react";
 import {
   Modal,
   Pressable,
+  ScrollView,
+  StyleSheet,
   View,
   type ModalProps,
   type StyleProp,
@@ -11,21 +13,26 @@ import {
 import Animated, {
   Easing,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { scheduleOnRN } from "react-native-worklets";
+import Svg, { Path } from "react-native-svg";
 
 import { useTheme } from "../theme";
-import { withAlpha } from "../utils";
+import { useDelayedUnmount, withAlpha } from "../utils";
 import { triggerHaptic } from "../utils/haptics";
 import { Button } from "./Button";
 import { Text } from "./Text";
 import {
+  ANIMATION_TIMING,
+  minTouchHitSlop,
   renderIcon,
-  type RenderIcon,
+  resolveToneColors,
+  type BaseAnimatedProps,
   type BaseGlassProps,
   type BaseHapticProps,
+  type RenderIcon,
   type ToneProps,
 } from "./types";
 
@@ -42,7 +49,8 @@ export type AlertDialogAlign = "center" | "left";
 export interface AlertDialogProps
   extends ToneProps<AlertDialogTone>,
     BaseGlassProps,
-    BaseHapticProps {
+    BaseHapticProps,
+    BaseAnimatedProps {
   visible: boolean;
   align?: AlertDialogAlign;
   title?: React.ReactNode;
@@ -59,7 +67,6 @@ export interface AlertDialogProps
   confirmDisabled?: boolean;
   cancelDisabled?: boolean;
   dismissOnBackdropPress?: boolean;
-  animated?: boolean;
   animationDuration?: number;
   modalProps?: Omit<
     ModalProps,
@@ -72,19 +79,9 @@ export interface AlertDialogProps
   descriptionStyle?: StyleProp<TextStyle>;
 }
 
-function getToneColor(
-  tone: AlertDialogTone,
-  colors: ReturnType<typeof useTheme>["colors"],
-) {
-  if (tone === "primary") return colors.primary;
-  if (tone === "success") return colors.success;
-  if (tone === "warning") return colors.warning;
-  if (tone === "danger") return colors.danger;
-  if (tone === "info") return colors.info;
-  return colors.secondary;
-}
+const CLOSE_BUTTON_SIZE = 34;
 
-export function AlertDialog({
+export const AlertDialog = React.memo(function AlertDialog({
   visible,
   align = "center",
   title,
@@ -105,7 +102,7 @@ export function AlertDialog({
   cancelDisabled = false,
   dismissOnBackdropPress = true,
   animated = true,
-  animationDuration = 180,
+  animationDuration = 160,
   modalProps,
   overlayStyle,
   style,
@@ -113,47 +110,35 @@ export function AlertDialog({
   titleStyle,
   descriptionStyle,
 }: AlertDialogProps) {
-  const { colors, components, radii, spacing, isDark } = useTheme();
-  const [mounted, setMounted] = useState(visible);
-  if (visible && !mounted) {
-    setMounted(true);
-  }
+  const { colors, components, radii, shadows, spacing, isDark } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const shouldAnimate = animated && !reducedMotion;
+  const exitDuration = shouldAnimate ? Math.max(110, animationDuration - 30) : 0;
+  const shouldMount = useDelayedUnmount(visible, exitDuration);
 
   const progress = useSharedValue(visible ? 1 : 0);
-  const toneColor = getToneColor(tone, colors);
+  const toneColor = resolveToneColors(tone, colors).solid;
 
   useEffect(() => {
     if (visible) {
       if (haptic) triggerHaptic("medium");
-      if (animated) {
-        progress.value = 0;
+      if (shouldAnimate) {
         progress.value = withTiming(1, {
           duration: animationDuration,
-          easing: Easing.bezier(0.23, 1, 0.32, 1),
+          easing: Easing.bezier(...ANIMATION_TIMING.bezier),
         });
       } else {
         progress.value = 1;
       }
+    } else if (shouldAnimate) {
+      progress.value = withTiming(0, {
+        duration: exitDuration,
+        easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+      });
     } else {
-      if (animated) {
-        progress.value = withTiming(
-          0,
-          {
-            duration: Math.max(120, animationDuration - 40),
-            easing: Easing.bezier(0.23, 1, 0.32, 1),
-          },
-          (finished) => {
-            if (finished) {
-              scheduleOnRN(setMounted, false);
-            }
-          },
-        );
-      } else {
-        progress.value = 0;
-        setMounted(false);
-      }
+      progress.value = 0;
     }
-  }, [animated, animationDuration, haptic, progress, visible]);
+  }, [animationDuration, exitDuration, haptic, progress, shouldAnimate, visible]);
 
   const backdropAnimatedStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
@@ -167,43 +152,50 @@ export function AlertDialog({
     ],
   }));
 
-  if (!mounted && !visible) return null;
-
-  const requestClose = () => {
+  const requestClose = useCallback(() => {
     if (haptic) triggerHaptic("selection");
-    onClose?.();
-  };
+    if (onClose) {
+      onClose();
+    } else {
+      onCancel?.();
+    }
+  }, [haptic, onCancel, onClose]);
 
-  const handleBackdropPress = () => {
+  const handleBackdropPress = useCallback(() => {
     if (dismissOnBackdropPress) {
       requestClose();
     }
-  };
+  }, [dismissOnBackdropPress, requestClose]);
 
-  const handleConfirm = () => {
+  const handleConfirm = useCallback(() => {
+    if (confirmDisabled || confirmLoading) return;
     if (haptic) triggerHaptic("light");
     onConfirm?.();
-  };
+  }, [confirmDisabled, confirmLoading, haptic, onConfirm]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
+    if (cancelDisabled) return;
     if (haptic) triggerHaptic("selection");
     onCancel?.();
-  };
+  }, [cancelDisabled, haptic, onCancel]);
 
-  const glassBg = isDark
-    ? "rgba(15, 27, 45, 0.92)"
-    : "rgba(255, 255, 255, 0.96)";
+  if (!shouldMount && !visible) return null;
 
-  const dialogBg = glass ? glassBg : colors.surface;
-  const borderColor = withAlpha(toneColor, isDark ? 0.35 : 0.25);
+  const dialogBg = glass ? colors.glassSurfaceStrong : colors.surface;
+  const borderColor = glass
+    ? colors.glassBorder
+    : components.surface.filledBorderColor === "border" ||
+        components.surface.outlineBorderColor === "border"
+      ? colors.border
+      : withAlpha(toneColor, isDark ? 0.35 : 0.25);
   const isCentered = align === "center";
 
   const dialog = (
     <View
+      accessibilityViewIsModal={true}
       style={[
+        styles.dialog,
         {
-          width: "100%",
-          maxWidth: 400,
           backgroundColor: dialogBg,
           borderRadius: radii.xxl,
           borderWidth: components.borderWidth.strong,
@@ -211,44 +203,47 @@ export function AlertDialog({
           padding: spacing.xl,
           gap: spacing.lg,
           alignItems: isCentered ? "center" : "stretch",
-          position: "relative",
-          elevation: 0,
         },
+        shadows.lg,
         style,
       ]}
     >
-      {/* Top Close Button (✕) */}
       {onClose ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close dialog"
           onPress={requestClose}
-          hitSlop={12}
-          style={({ pressed }) => ({
-            position: "absolute",
-            top: spacing.md,
-            right: spacing.md,
-            width: 32,
-            height: 32,
-            borderRadius: 16,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: pressed ? colors.backgroundMuted : "transparent",
-            zIndex: 10,
-            opacity: pressed ? 0.8 : 0.7,
-          })}
+          hitSlop={minTouchHitSlop(CLOSE_BUTTON_SIZE)}
+          style={({ pressed }) => [
+            styles.closeButton,
+            {
+              top: spacing.md,
+              right: spacing.md,
+              borderRadius: radii.full,
+              backgroundColor: pressed ? colors.backgroundMuted : "transparent",
+              opacity: pressed ? 0.8 : 0.75,
+            },
+          ]}
         >
           {closeIcon ? (
             renderIcon(closeIcon, colors.textMuted, 16)
           ) : (
-            <Text style={{ color: colors.textMuted, fontSize: 16, fontWeight: "600" }}>
-              ✕
-            </Text>
+            <Svg
+              width={16}
+              height={16}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={colors.textMuted}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <Path d="M18 6L6 18M6 6l12 12" />
+            </Svg>
           )}
         </Pressable>
       ) : null}
 
-      {/* Icon Badge */}
       {icon ? (
         <View
           style={{
@@ -256,7 +251,7 @@ export function AlertDialog({
             height: isCentered ? 56 : 44,
             borderRadius: isCentered ? 28 : radii.lg,
             backgroundColor: withAlpha(toneColor, 0.14),
-            borderWidth: 1.5,
+            borderWidth: components.borderWidth.strong,
             borderColor: withAlpha(toneColor, 0.28),
             alignItems: "center",
             justifyContent: "center",
@@ -267,11 +262,13 @@ export function AlertDialog({
         </View>
       ) : null}
 
-      {/* Title & Description */}
-      <View
-        style={[
+      <ScrollView
+        bounces={false}
+        showsVerticalScrollIndicator={false}
+        style={styles.bodyScroll}
+        contentContainerStyle={[
+          styles.content,
           {
-            width: "100%",
             gap: spacing.xs,
             alignItems: isCentered ? "center" : "flex-start",
           },
@@ -317,27 +314,31 @@ export function AlertDialog({
             description
           )
         ) : null}
-      </View>
 
-      {children ? <View style={{ width: "100%" }}>{children}</View> : null}
+        {children ? (
+          <View style={[styles.fullWidth, { marginTop: spacing.xs }]}>
+            {children}
+          </View>
+        ) : null}
+      </ScrollView>
 
-      {/* Action Buttons */}
       {onCancel || onConfirm ? (
         <View
-          style={{
-            width: "100%",
-            flexDirection: "row",
-            justifyContent: isCentered ? "center" : "flex-end",
-            gap: spacing.sm,
-            marginTop: spacing.xs,
-          }}
+          style={[
+            styles.actions,
+            {
+              justifyContent: isCentered ? "center" : "flex-end",
+              gap: spacing.sm,
+              marginTop: spacing.xs,
+            },
+          ]}
         >
           {onCancel ? (
             <Button
               variant="outline"
               tone="secondary"
               size="md"
-              style={{ flex: isCentered ? 1 : undefined }}
+              style={isCentered ? styles.flexOne : undefined}
               disabled={cancelDisabled}
               onPress={handleCancel}
             >
@@ -350,7 +351,7 @@ export function AlertDialog({
               variant="filled"
               tone={tone}
               size="md"
-              style={{ flex: isCentered ? 1 : undefined }}
+              style={isCentered ? styles.flexOne : undefined}
               loading={confirmLoading}
               disabled={confirmDisabled}
               onPress={handleConfirm}
@@ -365,7 +366,7 @@ export function AlertDialog({
 
   return (
     <Modal
-      visible={mounted}
+      visible={shouldMount}
       transparent
       animationType="none"
       statusBarTranslucent
@@ -374,26 +375,14 @@ export function AlertDialog({
       onRequestClose={requestClose}
       {...modalProps}
     >
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          padding: spacing.xl,
-        }}
-      >
-        {/* Independent Backdrop Overlay Layer */}
+      <View style={[styles.container, { padding: spacing.xl }]}>
         <Animated.View
           style={[
+            StyleSheet.absoluteFill,
             {
-              position: "absolute",
-              top: 0,
-              right: 0,
-              bottom: 0,
-              left: 0,
               backgroundColor: isDark
-                ? "rgba(0, 0, 0, 0.78)"
-                : "rgba(15, 23, 42, 0.65)",
+                ? withAlpha("#000000", 0.78)
+                : withAlpha("#0F172A", 0.65),
             },
             backdropAnimatedStyle,
             overlayStyle,
@@ -401,23 +390,14 @@ export function AlertDialog({
         >
           <Pressable
             accessibilityRole="button"
-            style={{ flex: 1 }}
+            accessibilityLabel="Dismiss dialog"
+            style={styles.flexOne}
             onPress={handleBackdropPress}
           />
         </Animated.View>
 
-        {/* Dialog Card Layer (independent opacity, no parent opacity multiplication) */}
-        {animated ? (
-          <Animated.View
-            style={[
-              {
-                width: "100%",
-                maxWidth: 400,
-                alignItems: "center",
-              },
-              cardAnimatedStyle,
-            ]}
-          >
+        {shouldAnimate ? (
+          <Animated.View style={[styles.cardWrap, cardAnimatedStyle]}>
             {dialog}
           </Animated.View>
         ) : (
@@ -426,4 +406,48 @@ export function AlertDialog({
       </View>
     </Modal>
   );
-}
+});
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardWrap: {
+    width: "100%",
+    maxWidth: 400,
+    alignItems: "center",
+  },
+  dialog: {
+    width: "100%",
+    maxWidth: 400,
+    maxHeight: "85%",
+    position: "relative",
+  },
+  bodyScroll: {
+    width: "100%",
+  },
+  closeButton: {
+    position: "absolute",
+    width: CLOSE_BUTTON_SIZE,
+    height: CLOSE_BUTTON_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
+  },
+  content: {
+    width: "100%",
+  },
+  fullWidth: {
+    width: "100%",
+  },
+  actions: {
+    width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  flexOne: {
+    flex: 1,
+  },
+});

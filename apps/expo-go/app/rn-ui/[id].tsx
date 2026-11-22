@@ -7,6 +7,7 @@ import { ScreenHeader } from "../../components/ScreenHeader";
 import { useHeaderScroll } from "../../components/useHeaderScroll";
 import { useSectionContext } from "../../components/rn-ui/useSectionContext";
 import {
+  ThemeProviderSection,
   AccordionSection,
   AlertDialogSection,
   AlertSection,
@@ -81,6 +82,10 @@ export default function RnUiComponentDetailScreen() {
 
   const renderComponentShowcase = () => {
     switch (id) {
+      // Foundations & Theme
+      case "theme-provider":
+        return <ThemeProviderSection ctx={ctx} />;
+
       // Layout Primitives
       case "box":
         return <BoxSection ctx={ctx} />;

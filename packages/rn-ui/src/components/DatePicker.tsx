@@ -1,31 +1,35 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   Pressable,
-  StyleProp,
   StyleSheet,
-  TextStyle,
   View,
-  ViewStyle,
+  type FlatList,
+  type ListRenderItemInfo,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
 } from "react-native";
 import Animated, {
   interpolate,
   useAnimatedScrollHandler,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   type SharedValue,
 } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 
 import { useTheme } from "../theme";
+import { withAlpha } from "../utils/color";
 import { triggerHaptic } from "../utils/haptics";
 import { getLocaleData, LocaleConfig, type LocaleInput } from "../utils/locale";
 import { Button } from "./Button";
 import { Calendar } from "./Calendar";
 import { Text } from "./Text";
-import { type BaseHapticProps } from "./types";
+import { minTouchHitSlop, webDeps, type BaseHapticProps } from "./types";
 
 export type DatePickerVariant = "wheel" | "calendar";
 
@@ -45,7 +49,8 @@ export interface WheelPickerItem<T = string | number> {
   value: T;
 }
 
-export interface WheelPickerColumnProps<T = string | number> extends BaseHapticProps {
+export interface WheelPickerColumnProps<T = string | number>
+  extends BaseHapticProps {
   items: WheelPickerItem<T>[];
   selectedValue: T;
   onValueChange: (value: T) => void;
@@ -74,7 +79,11 @@ function formatDateToIso(d: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function formatTime(date: Date, is24Hour: boolean = true): string {
+export function formatTime(
+  date: Date,
+  is24Hour: boolean = true,
+  locale?: LocaleInput,
+): string {
   const hours = date.getHours();
   const mins = String(date.getMinutes()).padStart(2, "0");
 
@@ -82,15 +91,44 @@ export function formatTime(date: Date, is24Hour: boolean = true): string {
     return `${String(hours).padStart(2, "0")}:${mins}`;
   }
 
+  const localeData = getLocaleData(locale);
   const isPM = hours >= 12;
   const h12 = hours % 12 === 0 ? 12 : hours % 12;
-  const ampm = isPM ? "PM" : "AM";
+  const ampm = isPM ? localeData.pm : localeData.am;
   return `${String(h12).padStart(2, "0")}:${mins} ${ampm}`;
 }
 
+function buildUpdatedDate(
+  base: Date,
+  parts: {
+    year?: number;
+    month?: number;
+    day?: number;
+    hours?: number;
+    minutes?: number;
+  },
+): Date {
+  const year = parts.year ?? base.getFullYear();
+  const month = parts.month ?? base.getMonth();
+  const maxDay = getDaysInMonth(year, month);
+  const day = Math.min(parts.day ?? base.getDate(), maxDay);
+  const hours = parts.hours ?? base.getHours();
+  const minutes = parts.minutes ?? base.getMinutes();
+  return new Date(
+    year,
+    month,
+    day,
+    hours,
+    minutes,
+    base.getSeconds(),
+    base.getMilliseconds(),
+  );
+}
+
 interface AnimatedWheelItemProps {
-  item: WheelPickerItem<unknown>;
+  label: string;
   index: number;
+  isSelected: boolean;
   scrollY: SharedValue<number>;
   itemHeight: number;
   onPress: (index: number) => void;
@@ -99,19 +137,29 @@ interface AnimatedWheelItemProps {
   selectedItemStyle?: StyleProp<TextStyle>;
 }
 
-function AnimatedWheelItem({
-  item,
+const AnimatedWheelItem = React.memo(function AnimatedWheelItem({
+  label,
   index,
+  isSelected,
   scrollY,
   itemHeight,
   onPress,
   textColor,
   itemStyle,
+  selectedItemStyle,
 }: AnimatedWheelItemProps) {
+  const reducedMotion = useReducedMotion();
+
   const animatedStyle = useAnimatedStyle(() => {
+    if (reducedMotion) {
+      const distance = Math.abs(scrollY.value - index * itemHeight);
+      const opacity = distance < itemHeight * 0.6 ? 1 : 0.4;
+      return { opacity };
+    }
+
     const itemPosition = index * itemHeight;
     const distance = Math.abs(scrollY.value - itemPosition);
-    const normalizedDistance = distance / itemHeight;
+    const normalizedDistance = itemHeight > 0 ? distance / itemHeight : 0;
 
     const opacity = interpolate(
       normalizedDistance,
@@ -127,7 +175,8 @@ function AnimatedWheelItem({
       "clamp",
     );
 
-    const rawVal = itemHeight > 0 ? (scrollY.value - itemPosition) / itemHeight : 0;
+    const rawVal =
+      itemHeight > 0 ? (scrollY.value - itemPosition) / itemHeight : 0;
     const interpDeg = interpolate(
       Number.isFinite(rawVal) ? rawVal : 0,
       [-2, -1, 0, 1, 2],
@@ -138,53 +187,33 @@ function AnimatedWheelItem({
 
     return {
       opacity,
-      transform: [
-        { perspective: 600 },
-        { rotateX },
-        { scale },
-      ],
+      transform: [{ perspective: 600 }, { rotateX }, { scale }],
     };
-  });
+  }, webDeps([index, itemHeight, reducedMotion]));
 
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: isSelected }}
       onPress={() => onPress(index)}
-      style={{
-        height: itemHeight,
-        alignItems: "center",
-        justifyContent: "center",
-      }}
+      style={[styles.wheelItemPress, { height: itemHeight }]}
     >
-      <Animated.View
-        style={[
-          {
-            alignItems: "center",
-            justifyContent: "center",
-          },
-          animatedStyle,
-        ]}
-      >
+      <Animated.View style={[styles.wheelItemInner, animatedStyle]}>
         <Text
           style={[
-            {
-              color: textColor,
-              fontSize: 18,
-              fontWeight: "600",
-              textAlign: "center",
-            },
+            styles.wheelItemText,
+            { color: textColor },
             itemStyle,
+            isSelected ? selectedItemStyle : undefined,
           ]}
         >
-          {item.label}
+          {label}
         </Text>
       </Animated.View>
     </Pressable>
   );
-}
+});
 
-/**
- * Reanimated 60fps WheelPicker Column with precise drag & momentum snapping
- */
 export function WheelPickerColumn<T = string | number>({
   items,
   selectedValue,
@@ -198,26 +227,48 @@ export function WheelPickerColumn<T = string | number>({
   style,
 }: WheelPickerColumnProps<T>) {
   const { colors } = useTheme();
-  const scrollRef = useRef<Animated.ScrollView>(null);
+  const listRef = useRef<FlatList<number>>(null);
   const containerHeight = itemHeight * visibleItems;
   const paddingCount = Math.floor(visibleItems / 2);
   const scrollY = useSharedValue(0);
+
+  const isDraggingRef = useRef(false);
+  const isMomentumRef = useRef(false);
+  const dragCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selectedIndex = useMemo(() => {
     const idx = items.findIndex((it) => it.value === selectedValue);
     return idx >= 0 ? idx : 0;
   }, [items, selectedValue]);
 
-  // Initial scroll position sync
+  const itemIndices = useMemo(
+    () => Array.from({ length: items.length }, (_, i) => i),
+    [items.length],
+  );
+
   useEffect(() => {
     scrollY.value = selectedIndex * itemHeight;
-    if (scrollRef.current && selectedIndex >= 0 && items.length > 0) {
-      scrollRef.current.scrollTo({
-        y: selectedIndex * itemHeight,
+    if (
+      !isDraggingRef.current &&
+      !isMomentumRef.current &&
+      listRef.current &&
+      items.length > 0
+    ) {
+      listRef.current.scrollToOffset({
+        offset: selectedIndex * itemHeight,
         animated: false,
       });
     }
   }, [selectedIndex, itemHeight, items.length, scrollY]);
+
+  useEffect(
+    () => () => {
+      if (dragCommitTimerRef.current) {
+        clearTimeout(dragCommitTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -225,84 +276,147 @@ export function WheelPickerColumn<T = string | number>({
     },
   });
 
-  const handleScrollEnd = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const offsetY = event.nativeEvent.contentOffset.y;
+  const commitOffset = useCallback(
+    (offsetY: number) => {
       const index = Math.round(offsetY / itemHeight);
       const clampedIndex = Math.max(0, Math.min(index, items.length - 1));
-
-      if (items[clampedIndex] && items[clampedIndex].value !== selectedValue) {
-        if (haptic) {
-          triggerHaptic(hapticType);
-        }
-        onValueChange(items[clampedIndex].value);
+      const picked = items[clampedIndex];
+      if (picked && picked.value !== selectedValue) {
+        if (haptic) triggerHaptic(hapticType);
+        onValueChange(picked.value);
       }
     },
     [haptic, hapticType, itemHeight, items, onValueChange, selectedValue],
+  );
+
+  const handleScrollBeginDrag = useCallback(() => {
+    isDraggingRef.current = true;
+    isMomentumRef.current = false;
+    if (dragCommitTimerRef.current) {
+      clearTimeout(dragCommitTimerRef.current);
+      dragCommitTimerRef.current = null;
+    }
+  }, []);
+
+  const handleScrollEndDrag = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      isDraggingRef.current = false;
+      const offsetY = event.nativeEvent.contentOffset.y;
+      if (dragCommitTimerRef.current) {
+        clearTimeout(dragCommitTimerRef.current);
+      }
+      dragCommitTimerRef.current = setTimeout(() => {
+        if (!isMomentumRef.current) {
+          commitOffset(offsetY);
+        }
+      }, 60);
+    },
+    [commitOffset],
+  );
+
+  const handleMomentumScrollBegin = useCallback(() => {
+    isMomentumRef.current = true;
+    if (dragCommitTimerRef.current) {
+      clearTimeout(dragCommitTimerRef.current);
+      dragCommitTimerRef.current = null;
+    }
+  }, []);
+
+  const handleMomentumScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      isMomentumRef.current = false;
+      isDraggingRef.current = false;
+      commitOffset(event.nativeEvent.contentOffset.y);
+    },
+    [commitOffset],
   );
 
   const handleItemPress = useCallback(
     (index: number) => {
-      scrollRef.current?.scrollTo({
-        y: index * itemHeight,
+      listRef.current?.scrollToOffset({
+        offset: index * itemHeight,
         animated: true,
       });
-      if (haptic) {
-        triggerHaptic(hapticType);
-      }
-      if (items[index] && items[index].value !== selectedValue) {
-        onValueChange(items[index].value);
+      if (haptic) triggerHaptic(hapticType);
+      const picked = items[index];
+      if (picked && picked.value !== selectedValue) {
+        onValueChange(picked.value);
       }
     },
     [haptic, hapticType, itemHeight, items, onValueChange, selectedValue],
   );
 
+  const renderWheelRow = useCallback(
+    ({ item: idx }: ListRenderItemInfo<number>) => {
+      const option = items[idx];
+      if (!option) return null;
+      return (
+        <AnimatedWheelItem
+          label={option.label}
+          index={idx}
+          isSelected={idx === selectedIndex}
+          scrollY={scrollY}
+          itemHeight={itemHeight}
+          onPress={handleItemPress}
+          textColor={colors.text}
+          itemStyle={itemStyle}
+          selectedItemStyle={selectedItemStyle}
+        />
+      );
+    },
+    [
+      colors.text,
+      handleItemPress,
+      itemHeight,
+      itemStyle,
+      items,
+      scrollY,
+      selectedIndex,
+      selectedItemStyle,
+    ],
+  );
+
+  const getItemLayout = useCallback(
+    (_: ArrayLike<number> | null | undefined, index: number) => ({
+      length: itemHeight,
+      offset: itemHeight * index,
+      index,
+    }),
+    [itemHeight],
+  );
+
   return (
-    <View
-      style={[
-        {
-          height: containerHeight,
-          flex: 1,
-          overflow: "hidden",
-        },
-        style,
-      ]}
-    >
-      <Animated.ScrollView
-        ref={scrollRef}
+    <View style={[styles.wheelColumn, { height: containerHeight }, style]}>
+      <Animated.FlatList<number>
+        ref={listRef}
+        data={itemIndices}
+        keyExtractor={(idx) => `${idx}`}
+        renderItem={renderWheelRow}
+        getItemLayout={getItemLayout}
+        windowSize={5}
+        initialNumToRender={visibleItems + 4}
+        maxToRenderPerBatch={10}
         nestedScrollEnabled
         snapToInterval={itemHeight}
         decelerationRate="fast"
-        contentOffset={{ x: 0, y: selectedIndex * itemHeight }}
         showsVerticalScrollIndicator={false}
         onScroll={scrollHandler}
-        onMomentumScrollEnd={handleScrollEnd}
-        onScrollEndDrag={handleScrollEnd}
+        onScrollBeginDrag={handleScrollBeginDrag}
+        onScrollEndDrag={handleScrollEndDrag}
+        onMomentumScrollBegin={handleMomentumScrollBegin}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
         scrollEventThrottle={16}
         contentContainerStyle={{
           paddingVertical: paddingCount * itemHeight,
         }}
-      >
-        {items.map((item, index) => (
-          <AnimatedWheelItem
-            key={`${item.value}-${index}`}
-            item={item}
-            index={index}
-            scrollY={scrollY}
-            itemHeight={itemHeight}
-            onPress={handleItemPress}
-            textColor={colors.text}
-            itemStyle={itemStyle}
-            selectedItemStyle={selectedItemStyle}
-          />
-        ))}
-      </Animated.ScrollView>
+      />
     </View>
   );
 }
 
-export interface DatePickerProps {
+export interface DatePickerProps extends BaseHapticProps {
   value?: Date;
+  defaultValue?: Date;
   onChange?: (date: Date) => void;
   variant?: DatePickerVariant;
   mode?: DatePickerMode;
@@ -316,14 +430,14 @@ export interface DatePickerProps {
   itemHeight?: number;
   visibleItems?: number;
   highlightColor?: string;
+  selectedItemStyle?: StyleProp<TextStyle>;
+  itemStyle?: StyleProp<TextStyle>;
   style?: StyleProp<ViewStyle>;
 }
 
-/**
- * Universal DatePicker supporting 'wheel' and 'calendar' variants, 12h AM/PM & 24h modes, and localization
- */
-export function DatePicker({
+export const DatePicker = React.memo(function DatePicker({
   value,
+  defaultValue,
   onChange,
   variant = "wheel",
   mode = "date",
@@ -337,25 +451,45 @@ export function DatePicker({
   itemHeight = 44,
   visibleItems = 5,
   highlightColor,
+  haptic = true,
+  selectedItemStyle,
+  itemStyle,
   style,
 }: DatePickerProps) {
-  const { colors, radii, spacing } = useTheme();
+  const { colors, components, radii, spacing } = useTheme();
   const localeData = useMemo(() => getLocaleData(locale), [locale]);
+  const [internalDate, setInternalDate] = useState<Date>(
+    () => value ?? defaultValue ?? new Date(),
+  );
 
-  const currentDate = useMemo(() => value ?? new Date(), [value]);
+  const isControlled = value !== undefined;
+  const currentDate = isControlled ? value : internalDate;
+
+  const emitChange = useCallback(
+    (next: Date) => {
+      if (!isControlled) {
+        setInternalDate(next);
+      }
+      onChange?.(next);
+    },
+    [isControlled, onChange],
+  );
+
+  const safeMinuteInterval = useMemo(() => {
+    if (!Number.isFinite(minuteInterval)) return 1;
+    return Math.max(1, Math.min(60, Math.trunc(minuteInterval)));
+  }, [minuteInterval]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const day = currentDate.getDate();
   const hours = currentDate.getHours();
-  const minutes = currentDate.getMinutes();
+  const rawMinutes = currentDate.getMinutes();
 
-  // 12-hour AM/PM calculations
   const isPM = hours >= 12;
   const current12Hour = hours % 12 === 0 ? 12 : hours % 12;
   const currentAmPm = isPM ? "PM" : "AM";
 
-  // Year items
   const yearItems = useMemo<WheelPickerItem<number>[]>(() => {
     const list: WheelPickerItem<number>[] = [];
     for (let y = startYear; y <= endYear; y++) {
@@ -364,21 +498,20 @@ export function DatePicker({
     return list;
   }, [startYear, endYear]);
 
-  // Month items localized
-  const monthItems = useMemo<WheelPickerItem<number>[]>(() => {
-    return Array.from({ length: 12 }, (_, i) => {
-      let label = String(i + 1).padStart(2, "0");
-      if (monthFormat === "short") {
-        label = localeData.monthNamesShort[i] || String(i + 1);
-      }
-      if (monthFormat === "full") {
-        label = localeData.monthNames[i] || String(i + 1);
-      }
-      return { label, value: i };
-    });
-  }, [monthFormat, localeData]);
+  const monthItems = useMemo<WheelPickerItem<number>[]>(
+    () =>
+      Array.from({ length: 12 }, (_, i) => {
+        let label = String(i + 1).padStart(2, "0");
+        if (monthFormat === "short") {
+          label = localeData.monthNamesShort[i] || label;
+        } else if (monthFormat === "full") {
+          label = localeData.monthNames[i] || label;
+        }
+        return { label, value: i };
+      }),
+    [monthFormat, localeData],
+  );
 
-  // Day items dynamically calculated based on year & month
   const dayItems = useMemo<WheelPickerItem<number>[]>(() => {
     const maxDays = getDaysInMonth(year, month);
     return Array.from({ length: maxDays }, (_, i) => {
@@ -387,94 +520,93 @@ export function DatePicker({
     });
   }, [year, month]);
 
-  // 24-hour items (00 - 23)
-  const hour24Items = useMemo<WheelPickerItem<number>[]>(() => {
-    return Array.from({ length: 24 }, (_, i) => ({
-      label: String(i).padStart(2, "0"),
-      value: i,
-    }));
-  }, []);
-
-  // 12-hour items (01 - 12)
-  const hour12Items = useMemo<WheelPickerItem<number>[]>(() => {
-    return Array.from({ length: 12 }, (_, i) => {
-      const h = i + 1;
-      return {
-        label: String(h).padStart(2, "0"),
-        value: h,
-      };
-    });
-  }, []);
-
-  // AM / PM items
-  const amPmItems = useMemo<WheelPickerItem<string>[]>(
-    () => [
-      { label: "AM", value: "AM" },
-      { label: "PM", value: "PM" },
-    ],
+  const hour24Items = useMemo<WheelPickerItem<number>[]>(
+    () =>
+      Array.from({ length: 24 }, (_, i) => ({
+        label: String(i).padStart(2, "0"),
+        value: i,
+      })),
     [],
   );
 
-  // Minutes items (00 - 59)
+  const hour12Items = useMemo<WheelPickerItem<number>[]>(
+    () =>
+      Array.from({ length: 12 }, (_, i) => {
+        const h = i + 1;
+        return { label: String(h).padStart(2, "0"), value: h };
+      }),
+    [],
+  );
+
+  const amPmItems = useMemo<WheelPickerItem<string>[]>(
+    () => [
+      { label: localeData.am, value: "AM" },
+      { label: localeData.pm, value: "PM" },
+    ],
+    [localeData.am, localeData.pm],
+  );
+
   const minuteItems = useMemo<WheelPickerItem<number>[]>(() => {
     const list: WheelPickerItem<number>[] = [];
-    for (let m = 0; m < 60; m += minuteInterval) {
-      list.push({
-        label: String(m).padStart(2, "0"),
-        value: m,
-      });
+    for (let m = 0; m < 60; m += safeMinuteInterval) {
+      list.push({ label: String(m).padStart(2, "0"), value: m });
     }
     return list;
-  }, [minuteInterval]);
+  }, [safeMinuteInterval]);
+
+  const snappedMinutes = useMemo(() => {
+    let best = minuteItems[0]?.value ?? 0;
+    let bestDist = Infinity;
+    for (const item of minuteItems) {
+      const dist = Math.abs(item.value - rawMinutes);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = item.value;
+      }
+    }
+    return best;
+  }, [minuteItems, rawMinutes]);
 
   const handleYearChange = useCallback(
     (newYear: number) => {
-      const maxDays = getDaysInMonth(newYear, month);
-      const safeDay = Math.min(day, maxDays);
-      const nextDate = new Date(newYear, month, safeDay, hours, minutes);
-      onChange?.(nextDate);
+      emitChange(buildUpdatedDate(currentDate, { year: newYear }));
     },
-    [day, hours, minutes, month, onChange],
+    [currentDate, emitChange],
   );
 
   const handleMonthChange = useCallback(
     (newMonth: number) => {
-      const maxDays = getDaysInMonth(year, newMonth);
-      const safeDay = Math.min(day, maxDays);
-      const nextDate = new Date(year, newMonth, safeDay, hours, minutes);
-      onChange?.(nextDate);
+      emitChange(buildUpdatedDate(currentDate, { month: newMonth }));
     },
-    [day, hours, minutes, onChange, year],
+    [currentDate, emitChange],
   );
 
   const handleDayChange = useCallback(
     (newDay: number) => {
-      const nextDate = new Date(year, month, newDay, hours, minutes);
-      onChange?.(nextDate);
+      emitChange(buildUpdatedDate(currentDate, { day: newDay }));
     },
-    [hours, minutes, month, onChange, year],
+    [currentDate, emitChange],
   );
 
   const handle24HourChange = useCallback(
     (newHour: number) => {
-      const nextDate = new Date(year, month, day, newHour, minutes);
-      onChange?.(nextDate);
+      emitChange(buildUpdatedDate(currentDate, { hours: newHour }));
     },
-    [day, minutes, month, onChange, year],
+    [currentDate, emitChange],
   );
 
   const handle12HourChange = useCallback(
     (new12Hour: number) => {
-      let new24Hour: number;
-      if (isPM) {
-        new24Hour = new12Hour === 12 ? 12 : new12Hour + 12;
-      } else {
-        new24Hour = new12Hour === 12 ? 0 : new12Hour;
-      }
-      const nextDate = new Date(year, month, day, new24Hour, minutes);
-      onChange?.(nextDate);
+      const new24Hour = isPM
+        ? new12Hour === 12
+          ? 12
+          : new12Hour + 12
+        : new12Hour === 12
+          ? 0
+          : new12Hour;
+      emitChange(buildUpdatedDate(currentDate, { hours: new24Hour }));
     },
-    [day, isPM, minutes, month, onChange, year],
+    [currentDate, emitChange, isPM],
   );
 
   const handleAmPmChange = useCallback(
@@ -485,18 +617,16 @@ export function DatePicker({
       } else if (newAmPm === "AM" && hours >= 12) {
         new24Hour = hours - 12;
       }
-      const nextDate = new Date(year, month, day, new24Hour, minutes);
-      onChange?.(nextDate);
+      emitChange(buildUpdatedDate(currentDate, { hours: new24Hour }));
     },
-    [day, hours, minutes, month, onChange, year],
+    [currentDate, emitChange, hours],
   );
 
   const handleMinuteChange = useCallback(
     (newMinute: number) => {
-      const nextDate = new Date(year, month, day, hours, newMinute);
-      onChange?.(nextDate);
+      emitChange(buildUpdatedDate(currentDate, { minutes: newMinute }));
     },
-    [day, hours, month, onChange, year],
+    [currentDate, emitChange],
   );
 
   const renderDateColumn = (col: "year" | "month" | "day") => {
@@ -509,6 +639,9 @@ export function DatePicker({
           onValueChange={handleYearChange}
           itemHeight={itemHeight}
           visibleItems={visibleItems}
+          haptic={haptic}
+          itemStyle={itemStyle}
+          selectedItemStyle={selectedItemStyle}
         />
       );
     }
@@ -521,6 +654,9 @@ export function DatePicker({
           onValueChange={handleMonthChange}
           itemHeight={itemHeight}
           visibleItems={visibleItems}
+          haptic={haptic}
+          itemStyle={itemStyle}
+          selectedItemStyle={selectedItemStyle}
         />
       );
     }
@@ -532,62 +668,61 @@ export function DatePicker({
         onValueChange={handleDayChange}
         itemHeight={itemHeight}
         visibleItems={visibleItems}
+        haptic={haptic}
+        itemStyle={itemStyle}
+        selectedItemStyle={selectedItemStyle}
       />
     );
   };
 
-  // Calendar Grid Mode
-  if (variant === "calendar" && mode !== "time") {
+  if (
+    variant === "calendar" &&
+    mode !== "time" &&
+    mode !== "month-year" &&
+    mode !== "year"
+  ) {
     const isoString = formatDateToIso(currentDate);
 
     return (
-      <View style={[{ width: "100%", gap: spacing.md }, style]}>
+      <View style={[styles.calendarWrap, { gap: spacing.md }, style]}>
         <Calendar
-          key={`${isoString}-${typeof locale === "string" ? locale : "default"}`}
           current={isoString}
           locale={locale}
+          haptic={haptic}
           markedDates={{
             [isoString]: {
               selected: true,
               color: colors.primary,
-              textColor: colors.onPrimary ?? "#FFFFFF",
+              textColor: colors.onPrimary,
             },
           }}
           onDayPress={(dayData) => {
-            triggerHaptic("selection");
-            const next = new Date(dayData.year, dayData.month - 1, dayData.day, hours, minutes);
-            onChange?.(next);
+            if (haptic) triggerHaptic("selection");
+            emitChange(
+              buildUpdatedDate(currentDate, {
+                year: dayData.year,
+                month: dayData.month - 1,
+                day: dayData.day,
+              }),
+            );
           }}
         />
 
-        {/* If datetime mode, also show time wheel underneath */}
-        {mode === "datetime" && (
+        {mode === "datetime" ? (
           <View
-            style={{
-              paddingTop: spacing.xs,
-              borderTopWidth: 1,
-              borderColor: colors.border,
-            }}
+            style={[
+              styles.inlineTimeSection,
+              {
+                paddingTop: spacing.xs,
+                borderTopWidth: components.borderWidth.default,
+                borderColor: colors.border,
+              },
+            ]}
           >
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: "600",
-                color: colors.textMuted,
-                marginBottom: 4,
-                textAlign: "center",
-              }}
-            >
-              TIME SELECTION {is24Hour ? "(24H)" : "(12H AM/PM)"}
+            <Text style={[styles.inlineTimeLabel, { color: colors.textMuted }]}>
+              {localeData.selectTime} ({is24Hour ? "24H" : `${localeData.am}/${localeData.pm}`})
             </Text>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                height: 100,
-              }}
-            >
+            <View style={styles.inlineTimeRow}>
               {is24Hour ? (
                 <WheelPickerColumn
                   items={hour24Items}
@@ -595,6 +730,7 @@ export function DatePicker({
                   onValueChange={handle24HourChange}
                   itemHeight={34}
                   visibleItems={3}
+                  haptic={haptic}
                 />
               ) : (
                 <WheelPickerColumn
@@ -603,98 +739,77 @@ export function DatePicker({
                   onValueChange={handle12HourChange}
                   itemHeight={34}
                   visibleItems={3}
+                  haptic={haptic}
                 />
               )}
 
-              <Text
-                style={{
-                  color: colors.text,
-                  fontSize: 18,
-                  fontWeight: "700",
-                  marginHorizontal: 4,
-                }}
-              >
-                :
-              </Text>
+              <Text style={[styles.colon, { color: colors.text }]}>:</Text>
 
               <WheelPickerColumn
                 items={minuteItems}
-                selectedValue={minutes}
+                selectedValue={snappedMinutes}
                 onValueChange={handleMinuteChange}
                 itemHeight={34}
                 visibleItems={3}
+                haptic={haptic}
               />
 
-              {!is24Hour && (
+              {!is24Hour ? (
                 <WheelPickerColumn
                   items={amPmItems}
                   selectedValue={currentAmPm}
                   onValueChange={handleAmPmChange}
                   itemHeight={34}
                   visibleItems={3}
-                  style={{ maxWidth: 70 }}
+                  haptic={haptic}
+                  style={styles.amPmNarrow}
                 />
-              )}
+              ) : null}
             </View>
           </View>
-        )}
+        ) : null}
       </View>
     );
   }
 
-  // Wheel Roller Mode (or pure time mode)
   const containerHeight = itemHeight * visibleItems;
 
   return (
     <View
       style={[
-        {
-          position: "relative",
-          height: containerHeight,
-          width: "100%",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-        },
+        styles.wheelContainer,
+        { height: containerHeight },
         style,
       ]}
     >
-      {/* Center Highlight Selection Bar */}
       <View
         pointerEvents="none"
-        style={{
-          position: "absolute",
-          top: (containerHeight - itemHeight) / 2,
-          left: 8,
-          right: 8,
-          height: itemHeight,
-          borderRadius: radii.md,
-          backgroundColor:
-            highlightColor ??
-            (colors.surfaceRaised
-              ? colors.surfaceRaised
-              : "rgba(128, 128, 128, 0.12)"),
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.border,
-          zIndex: 0,
-        }}
+        style={[
+          styles.selectionHighlight,
+          {
+            top: (containerHeight - itemHeight) / 2,
+            height: itemHeight,
+            borderRadius: radii.md,
+            backgroundColor: highlightColor ?? colors.surfaceRaised,
+            borderTopWidth: components.borderWidth.hairline,
+            borderBottomWidth: components.borderWidth.hairline,
+            borderColor: colors.border,
+          },
+        ]}
       />
 
-      {/* Date columns */}
-      {mode === "date" && order.map((col) => renderDateColumn(col))}
+      {mode === "date" ? order.map((col) => renderDateColumn(col)) : null}
 
-      {mode === "month-year" && (
+      {mode === "month-year" ? (
         <>
           {renderDateColumn("month")}
           {renderDateColumn("year")}
         </>
-      )}
+      ) : null}
 
-      {mode === "year" && renderDateColumn("year")}
+      {mode === "year" ? renderDateColumn("year") : null}
 
-      {/* Pure Time mode (24h or 12h AM/PM) */}
-      {mode === "time" && (
+      {mode === "time" ? (
         <>
           {is24Hour ? (
             <WheelPickerColumn
@@ -704,6 +819,9 @@ export function DatePicker({
               onValueChange={handle24HourChange}
               itemHeight={itemHeight}
               visibleItems={visibleItems}
+              haptic={haptic}
+              itemStyle={itemStyle}
+              selectedItemStyle={selectedItemStyle}
             />
           ) : (
             <WheelPickerColumn
@@ -713,31 +831,27 @@ export function DatePicker({
               onValueChange={handle12HourChange}
               itemHeight={itemHeight}
               visibleItems={visibleItems}
+              haptic={haptic}
+              itemStyle={itemStyle}
+              selectedItemStyle={selectedItemStyle}
             />
           )}
 
-          <Text
-            style={{
-              color: colors.text,
-              fontSize: 20,
-              fontWeight: "700",
-              marginHorizontal: 4,
-              zIndex: 2,
-            }}
-          >
-            :
-          </Text>
+          <Text style={[styles.colonLarge, { color: colors.text }]}>:</Text>
 
           <WheelPickerColumn
             key="minutes"
             items={minuteItems}
-            selectedValue={minutes}
+            selectedValue={snappedMinutes}
             onValueChange={handleMinuteChange}
             itemHeight={itemHeight}
             visibleItems={visibleItems}
+            haptic={haptic}
+            itemStyle={itemStyle}
+            selectedItemStyle={selectedItemStyle}
           />
 
-          {!is24Hour && (
+          {!is24Hour ? (
             <WheelPickerColumn
               key="ampm"
               items={amPmItems}
@@ -745,84 +859,87 @@ export function DatePicker({
               onValueChange={handleAmPmChange}
               itemHeight={itemHeight}
               visibleItems={visibleItems}
-              style={{ maxWidth: 85 }}
+              haptic={haptic}
+              itemStyle={itemStyle}
+              selectedItemStyle={selectedItemStyle}
+              style={styles.amPmWide}
             />
-          )}
+          ) : null}
         </>
-      )}
+      ) : null}
 
-      {/* DateTime columns */}
-      {mode === "datetime" && (
+      {mode === "datetime" ? (
         <>
-          {renderDateColumn("month")}
-          {renderDateColumn("day")}
-          {renderDateColumn("year")}
+          {order.map((col) => renderDateColumn(col))}
           <View
-            style={{
-              width: 1,
-              height: containerHeight * 0.7,
-              backgroundColor: colors.border,
-              marginHorizontal: 4,
-            }}
+            style={[
+              styles.datetimeDivider,
+              {
+                height: containerHeight * 0.7,
+                backgroundColor: colors.border,
+              },
+            ]}
           />
 
           {is24Hour ? (
             <WheelPickerColumn
-              key="hours-24"
+              key="dt-hours-24"
               items={hour24Items}
               selectedValue={hours}
               onValueChange={handle24HourChange}
               itemHeight={itemHeight}
               visibleItems={visibleItems}
+              haptic={haptic}
+              itemStyle={itemStyle}
+              selectedItemStyle={selectedItemStyle}
             />
           ) : (
             <WheelPickerColumn
-              key="hours-12"
+              key="dt-hours-12"
               items={hour12Items}
               selectedValue={current12Hour}
               onValueChange={handle12HourChange}
               itemHeight={itemHeight}
               visibleItems={visibleItems}
+              haptic={haptic}
+              itemStyle={itemStyle}
+              selectedItemStyle={selectedItemStyle}
             />
           )}
 
-          <Text
-            style={{
-              color: colors.text,
-              fontSize: 18,
-              fontWeight: "700",
-              marginHorizontal: 2,
-              zIndex: 2,
-            }}
-          >
-            :
-          </Text>
+          <Text style={[styles.colon, { color: colors.text }]}>:</Text>
 
           <WheelPickerColumn
-            key="minutes"
+            key="dt-minutes"
             items={minuteItems}
-            selectedValue={minutes}
+            selectedValue={snappedMinutes}
             onValueChange={handleMinuteChange}
             itemHeight={itemHeight}
             visibleItems={visibleItems}
+            haptic={haptic}
+            itemStyle={itemStyle}
+            selectedItemStyle={selectedItemStyle}
           />
 
-          {!is24Hour && (
+          {!is24Hour ? (
             <WheelPickerColumn
-              key="ampm"
+              key="dt-ampm"
               items={amPmItems}
               selectedValue={currentAmPm}
               onValueChange={handleAmPmChange}
               itemHeight={itemHeight}
               visibleItems={visibleItems}
-              style={{ maxWidth: 70 }}
+              haptic={haptic}
+              itemStyle={itemStyle}
+              selectedItemStyle={selectedItemStyle}
+              style={styles.amPmNarrow}
             />
-          )}
+          ) : null}
         </>
-      )}
+      ) : null}
     </View>
   );
-}
+});
 
 export interface DatePickerCardProps extends DatePickerProps {
   title?: string;
@@ -835,39 +952,41 @@ export interface DatePickerCardProps extends DatePickerProps {
   cardStyle?: StyleProp<ViewStyle>;
 }
 
-/**
- * Self-contained card layout with built-in Wheel vs Calendar switcher, 12h/24h time, & locale support
- */
-export function DatePickerCard({
+export const DatePickerCard = React.memo(function DatePickerCard({
   title,
   value,
+  defaultValue,
   onChange,
   onClose,
   onConfirm,
-  confirmText = "Confirm",
+  confirmText,
   variant = "wheel",
   showVariantToggle = true,
   locale,
   is24Hour = true,
   mode = "date",
   order = ["year", "month", "day"],
+  haptic = true,
   cardStyle,
   ...props
 }: DatePickerCardProps) {
-  const { colors, radii, spacing } = useTheme();
+  const { colors, components, radii, shadows, spacing } = useTheme();
   const localeData = useMemo(() => getLocaleData(locale), [locale]);
-  const [internalDate, setInternalDate] = useState(() => value ?? new Date());
+  const [internalDate, setInternalDate] = useState(
+    () => value ?? defaultValue ?? new Date(),
+  );
   const [currentVariant, setCurrentVariant] = useState<DatePickerVariant>(
     variant ?? "wheel",
   );
 
-  const defaultTitle = useMemo(() => {
+  const resolvedTitle = useMemo(() => {
     if (title) return title;
-    if (mode === "time") return "SET TIME";
-    if (mode === "datetime") return "SET SCHEDULE";
-    if (mode === "month-year") return "SET EXPIRATION";
-    return "SET BIRTHDAY";
-  }, [title, mode]);
+    if (mode === "time") return localeData.selectTime;
+    if (mode === "datetime") {
+      return `${localeData.selectDate} & ${localeData.selectTime}`;
+    }
+    return localeData.selectDate;
+  }, [localeData.selectDate, localeData.selectTime, mode, title]);
 
   useEffect(() => {
     if (value) {
@@ -881,138 +1000,150 @@ export function DatePickerCard({
     }
   }, [variant]);
 
-  const handleChange = (d: Date) => {
-    setInternalDate(d);
-    onChange?.(d);
-  };
+  const handleChange = useCallback(
+    (d: Date) => {
+      setInternalDate(d);
+      onChange?.(d);
+    },
+    [onChange],
+  );
 
-  const handleConfirm = () => {
-    triggerHaptic("selection");
+  const handleConfirm = useCallback(() => {
+    if (haptic) triggerHaptic("selection");
     onConfirm?.(internalDate);
-  };
+  }, [haptic, internalDate, onConfirm]);
+
+  const supportsCalendarVariant =
+    mode === "date" || mode === "datetime";
+
+  const summaryText = useMemo(() => {
+    const dName = localeData.dayNames[internalDate.getDay()];
+    const dayNum = internalDate.getDate();
+    const monthName = localeData.monthNames[internalDate.getMonth()];
+    const yearNum = internalDate.getFullYear();
+    const timeStr = formatTime(internalDate, is24Hour, locale);
+
+    if (mode === "time") return timeStr;
+    if (mode === "datetime") {
+      return `${dName}, ${dayNum} ${monthName} ${yearNum} • ${timeStr}`;
+    }
+    if (mode === "month-year") return `${monthName} ${yearNum}`;
+    if (mode === "year") return `${yearNum}`;
+    return `${dName}, ${dayNum} ${monthName} ${yearNum}`;
+  }, [internalDate, is24Hour, locale, localeData.dayNames, localeData.monthNames, mode]);
 
   return (
     <View
       style={[
+        styles.card,
         {
-          width: "100%",
-          maxWidth: 360,
-          borderRadius: radii.xl ?? 24,
-          backgroundColor: colors.surfaceRaised ?? colors.surface,
-          borderWidth: 1,
+          borderRadius: radii.xl,
+          backgroundColor: colors.surface,
+          borderWidth: components.borderWidth.default,
           borderColor: colors.border,
           padding: spacing.lg,
           gap: spacing.md,
-          alignSelf: "center",
         },
+        shadows.lg,
         cardStyle,
       ]}
     >
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingBottom: spacing.xs,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 14,
-            fontWeight: "700",
-            color: colors.text,
-            letterSpacing: 0.8,
-            textTransform: "uppercase",
-          }}
-        >
-          {defaultTitle}
+      <View style={[styles.cardHeader, { paddingBottom: spacing.xs }]}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>
+          {resolvedTitle}
         </Text>
 
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          {/* Wheel vs Calendar Live Switcher */}
-          {showVariantToggle && mode !== "time" && (
+        <View style={styles.cardHeaderActions}>
+          {showVariantToggle && supportsCalendarVariant ? (
             <View
-              style={{
-                flexDirection: "row",
-                backgroundColor: colors.backgroundMuted,
-                borderRadius: radii.full,
-                padding: 2,
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor: colors.border,
-              }}
+              style={[
+                styles.variantSwitch,
+                {
+                  backgroundColor: colors.backgroundMuted,
+                  borderRadius: radii.full,
+                  borderWidth: components.borderWidth.hairline,
+                  borderColor: colors.border,
+                },
+              ]}
             >
               <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: currentVariant === "wheel" }}
+                hitSlop={minTouchHitSlop(24)}
                 onPress={() => {
-                  triggerHaptic("selection");
+                  if (haptic) triggerHaptic("selection");
                   setCurrentVariant("wheel");
                 }}
-                style={{
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  borderRadius: radii.full,
-                  backgroundColor:
-                    currentVariant === "wheel"
-                      ? colors.primary
-                      : "transparent",
-                }}
+                style={[
+                  styles.variantChip,
+                  {
+                    borderRadius: radii.full,
+                    backgroundColor:
+                      currentVariant === "wheel" ? colors.primary : "transparent",
+                  },
+                ]}
               >
                 <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: "700",
-                    color:
-                      currentVariant === "wheel"
-                        ? colors.onPrimary ?? "#FFFFFF"
-                        : colors.textMuted,
-                  }}
+                  style={[
+                    styles.variantText,
+                    {
+                      color:
+                        currentVariant === "wheel"
+                          ? colors.onPrimary
+                          : colors.textMuted,
+                    },
+                  ]}
                 >
-                  Wheel
+                  {localeData.wheel}
                 </Text>
               </Pressable>
 
               <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: currentVariant === "calendar" }}
+                hitSlop={minTouchHitSlop(24)}
                 onPress={() => {
-                  triggerHaptic("selection");
+                  if (haptic) triggerHaptic("selection");
                   setCurrentVariant("calendar");
                 }}
-                style={{
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  borderRadius: radii.full,
-                  backgroundColor:
-                    currentVariant === "calendar"
-                      ? colors.primary
-                      : "transparent",
-                }}
+                style={[
+                  styles.variantChip,
+                  {
+                    borderRadius: radii.full,
+                    backgroundColor:
+                      currentVariant === "calendar"
+                        ? colors.primary
+                        : "transparent",
+                  },
+                ]}
               >
                 <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: "700",
-                    color:
-                      currentVariant === "calendar"
-                        ? colors.onPrimary ?? "#FFFFFF"
-                        : colors.textMuted,
-                  }}
+                  style={[
+                    styles.variantText,
+                    {
+                      color:
+                        currentVariant === "calendar"
+                          ? colors.onPrimary
+                          : colors.textMuted,
+                    },
+                  ]}
                 >
-                  Calendar
+                  {localeData.calendar}
                 </Text>
               </Pressable>
             </View>
-          )}
+          ) : null}
 
-          {onClose && (
+          {onClose ? (
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={localeData.cancel}
               onPress={() => {
-                triggerHaptic("selection");
+                if (haptic) triggerHaptic("selection");
                 onClose();
               }}
-              hitSlop={8}
-              style={{
-                padding: 4,
-                borderRadius: radii.full,
-              }}
+              hitSlop={minTouchHitSlop(26)}
+              style={[styles.closeButton, { borderRadius: radii.full }]}
             >
               <Svg
                 width={18}
@@ -1027,12 +1158,12 @@ export function DatePickerCard({
                 <Path d="M18 6L6 18M6 6l12 12" />
               </Svg>
             </Pressable>
-          )}
+          ) : null}
         </View>
       </View>
 
-      {/* DatePicker */}
       <DatePicker
+        {...props}
         value={internalDate}
         onChange={handleChange}
         variant={currentVariant}
@@ -1040,23 +1171,19 @@ export function DatePickerCard({
         is24Hour={is24Hour}
         mode={mode}
         order={order}
-        {...props}
+        haptic={haptic}
       />
 
-      {/* Selected Date/Time Summary Display */}
       <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: colors.backgroundMuted,
-          borderRadius: radii.md,
-          paddingVertical: 7,
-          paddingHorizontal: 12,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.border,
-          gap: 6,
-        }}
+        style={[
+          styles.summaryBox,
+          {
+            backgroundColor: colors.backgroundMuted,
+            borderRadius: radii.md,
+            borderWidth: components.borderWidth.hairline,
+            borderColor: colors.border,
+          },
+        ]}
       >
         <Svg
           width={15}
@@ -1080,39 +1207,11 @@ export function DatePickerCard({
             </>
           )}
         </Svg>
-        <Text
-          style={{
-            fontSize: 13,
-            fontWeight: "600",
-            color: colors.text,
-            textAlign: "center",
-          }}
-        >
-          {(() => {
-            const dName = localeData.dayNames[internalDate.getDay()];
-            const day = internalDate.getDate();
-            const month = localeData.monthNames[internalDate.getMonth()];
-            const year = internalDate.getFullYear();
-            const timeStr = formatTime(internalDate, is24Hour);
-
-            if (mode === "time") {
-              return timeStr;
-            }
-            if (mode === "datetime") {
-              return `${dName}, ${day} ${month} ${year} • ${timeStr}`;
-            }
-            if (mode === "month-year") {
-              return `${month} ${year}`;
-            }
-            if (mode === "year") {
-              return `${year}`;
-            }
-            return `${dName}, ${day} ${month} ${year}`;
-          })()}
+        <Text style={[styles.summaryText, { color: colors.text }]}>
+          {summaryText}
         </Text>
       </View>
 
-      {/* Submit Button */}
       <Button
         variant="filled"
         tone="primary"
@@ -1124,21 +1223,18 @@ export function DatePickerCard({
         }}
         onPress={handleConfirm}
       >
-        {confirmText}
+        {confirmText ?? localeData.confirm}
       </Button>
     </View>
   );
-}
+});
 
 export interface DatePickerModalProps extends DatePickerCardProps {
   visible: boolean;
   onClose: () => void;
 }
 
-/**
- * Modal dialog displaying the DatePickerCard without touch responder interception
- */
-export function DatePickerModal({
+export const DatePickerModal = React.memo(function DatePickerModal({
   visible,
   onClose,
   ...props
@@ -1150,42 +1246,37 @@ export function DatePickerModal({
       visible={visible}
       transparent
       animationType="fade"
+      statusBarTranslucent
+      navigationBarTranslucent
+      hardwareAccelerated
       onRequestClose={onClose}
     >
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 20,
-        }}
-      >
-        {/* Background Dim Overlay */}
+      <View style={styles.modalBackdrop}>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close date picker"
           style={StyleSheet.absoluteFill}
           onPress={onClose}
         >
           <View
-            style={{
-              flex: 1,
-              backgroundColor: "rgba(0, 0, 0, 0.6)",
-            }}
+            style={[
+              styles.flexOne,
+              { backgroundColor: withAlpha("#000000", 0.6) },
+            ]}
           />
         </Pressable>
 
-        {/* Modal Card Content (Native View ensures 100% responsive calendar & button taps) */}
-        <View style={{ width: "100%", maxWidth: 360, zIndex: 10 }}>
+        <View style={styles.modalCardWrap}>
           <DatePickerCard key={String(visible)} onClose={onClose} {...props} />
         </View>
       </View>
     </Modal>
   );
-}
+});
 
-// Dialog alias
 export const DatePickerDialog = DatePickerModal;
 
-export interface DatePickerInputProps {
+export interface DatePickerInputProps extends BaseHapticProps {
   value?: Date;
   onChange?: (date: Date) => void;
   variant?: DatePickerVariant;
@@ -1203,10 +1294,7 @@ export interface DatePickerInputProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/**
- * Trigger field that opens DatePickerModal / DatePickerDialog with locale & 12h/24h time support
- */
-export function DatePickerInput({
+export const DatePickerInput = React.memo(function DatePickerInput({
   value,
   onChange,
   variant = "wheel",
@@ -1219,28 +1307,31 @@ export function DatePickerInput({
   mode = "date",
   order = ["year", "month", "day"],
   monthFormat = "full",
+  haptic = true,
   disabled,
   style,
 }: DatePickerInputProps) {
-  const { colors, radii, spacing } = useTheme();
+  const { colors, components, radii, spacing } = useTheme();
   const localeData = useMemo(() => getLocaleData(locale), [locale]);
   const [open, setOpen] = useState(false);
 
   const defaultPlaceholder = useMemo(() => {
     if (placeholder) return placeholder;
-    if (mode === "time") return "Select time";
-    if (mode === "datetime") return "Select date & time";
-    if (mode === "month-year") return "Select month & year";
-    return "Select date";
-  }, [placeholder, mode]);
+    if (mode === "time") return localeData.selectTime;
+    if (mode === "datetime") {
+      return `${localeData.selectDate} & ${localeData.selectTime}`;
+    }
+    return localeData.selectDate;
+  }, [localeData.selectDate, localeData.selectTime, mode, placeholder]);
 
   const defaultTitle = useMemo(() => {
     if (title) return title;
-    if (mode === "time") return "SET TIME";
-    if (mode === "datetime") return "SET SCHEDULE";
-    if (mode === "month-year") return "SET EXPIRATION";
-    return "SET BIRTHDAY";
-  }, [title, mode]);
+    if (mode === "time") return localeData.selectTime;
+    if (mode === "datetime") {
+      return `${localeData.selectDate} & ${localeData.selectTime}`;
+    }
+    return localeData.selectDate;
+  }, [localeData.selectDate, localeData.selectTime, mode, title]);
 
   const formattedValue = useMemo(() => {
     if (!value) return "";
@@ -1250,48 +1341,50 @@ export function DatePickerInput({
       monthFormat === "short"
         ? localeData.monthNamesShort[value.getMonth()]
         : monthFormat === "full"
-        ? localeData.monthNames[value.getMonth()]
-        : String(value.getMonth() + 1).padStart(2, "0");
+          ? localeData.monthNames[value.getMonth()]
+          : String(value.getMonth() + 1).padStart(2, "0");
     const d = String(value.getDate()).padStart(2, "0");
-    const timeStr = formatTime(value, is24Hour);
+    const timeStr = formatTime(value, is24Hour, locale);
 
     const prefix = showDayOfWeek ? `${dName}, ` : "";
 
-    if (mode === "date") {
-      return `${prefix}${d} ${m} ${y}`;
-    }
-    if (mode === "time") {
-      return timeStr;
-    }
-    if (mode === "datetime") {
-      return `${prefix}${d} ${m} ${y} • ${timeStr}`;
-    }
-    if (mode === "month-year") {
-      return `${m} ${y}`;
-    }
+    if (mode === "date") return `${prefix}${d} ${m} ${y}`;
+    if (mode === "time") return timeStr;
+    if (mode === "datetime") return `${prefix}${d} ${m} ${y} • ${timeStr}`;
+    if (mode === "month-year") return `${m} ${y}`;
     return String(y);
-  }, [value, mode, monthFormat, showDayOfWeek, localeData, is24Hour]);
+  }, [
+    is24Hour,
+    locale,
+    localeData.dayNames,
+    localeData.monthNames,
+    localeData.monthNamesShort,
+    mode,
+    monthFormat,
+    showDayOfWeek,
+    value,
+  ]);
 
   return (
     <>
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={formattedValue || defaultPlaceholder}
+        accessibilityState={{ disabled: Boolean(disabled), expanded: open }}
         disabled={disabled}
+        hitSlop={minTouchHitSlop(48)}
         onPress={() => {
-          triggerHaptic("selection");
+          if (haptic) triggerHaptic("selection");
           setOpen(true);
         }}
         style={[
+          styles.inputTrigger,
           {
-            height: 48,
-            width: "100%",
             borderRadius: radii.md,
-            borderWidth: 1,
+            borderWidth: components.borderWidth.default,
             borderColor: colors.border,
             backgroundColor: colors.surface,
             paddingHorizontal: spacing.md,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
             opacity: disabled ? 0.6 : 1,
           },
           style,
@@ -1306,7 +1399,6 @@ export function DatePickerInput({
           {formattedValue || defaultPlaceholder}
         </Text>
 
-        {/* Calendar / Clock Icon */}
         <Svg
           width={18}
           height={18}
@@ -1340,6 +1432,7 @@ export function DatePickerInput({
         is24Hour={is24Hour}
         mode={mode}
         order={order}
+        haptic={haptic}
         value={value}
         onClose={() => setOpen(false)}
         onConfirm={(selected) => {
@@ -1349,36 +1442,163 @@ export function DatePickerInput({
       />
     </>
   );
-}
+});
 
-/**
- * Dedicated TimePicker Component (mode="time") with 24h & 12h AM/PM support
- */
 export function TimePicker(props: Omit<DatePickerProps, "mode">) {
   return <DatePicker mode="time" {...props} />;
 }
 
-/**
- * Dedicated TimePickerCard Component (mode="time") with 24h & 12h AM/PM support
- */
 export function TimePickerCard(props: Omit<DatePickerCardProps, "mode">) {
   return <DatePickerCard mode="time" {...props} />;
 }
 
-/**
- * Dedicated TimePickerModal Component (mode="time") with 24h & 12h AM/PM support
- */
 export function TimePickerModal(props: Omit<DatePickerModalProps, "mode">) {
   return <DatePickerModal mode="time" {...props} />;
 }
 
-export const TimePickerDialog = TimePickerModal;
-
-/**
- * Dedicated TimePickerInput Component (mode="time") with 24h & 12h AM/PM support
- */
 export function TimePickerInput(props: Omit<DatePickerInputProps, "mode">) {
   return <DatePickerInput mode="time" {...props} />;
 }
 
 export { LocaleConfig, getLocaleData, type LocaleInput };
+
+const styles = StyleSheet.create({
+  flexOne: {
+    flex: 1,
+  },
+  wheelColumn: {
+    flex: 1,
+    overflow: "hidden",
+  },
+  wheelItemPress: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  wheelItemInner: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  wheelItemText: {
+    fontSize: 18,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  calendarWrap: {
+    width: "100%",
+  },
+  inlineTimeSection: {},
+  inlineTimeLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 4,
+    textAlign: "center",
+  },
+  inlineTimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 100,
+  },
+  colon: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginHorizontal: 2,
+    zIndex: 2,
+  },
+  colonLarge: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginHorizontal: 4,
+    zIndex: 2,
+  },
+  amPmNarrow: {
+    maxWidth: 70,
+  },
+  amPmWide: {
+    maxWidth: 85,
+  },
+  wheelContainer: {
+    position: "relative",
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectionHighlight: {
+    position: "absolute",
+    left: 8,
+    right: 8,
+    zIndex: 0,
+  },
+  datetimeDivider: {
+    width: 1,
+    marginHorizontal: 4,
+  },
+  card: {
+    width: "100%",
+    maxWidth: 360,
+    alignSelf: "center",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
+  cardHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  variantSwitch: {
+    flexDirection: "row",
+    padding: 2,
+  },
+  variantChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  variantText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  closeButton: {
+    padding: 4,
+  },
+  summaryBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    gap: 6,
+  },
+  summaryText: {
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  modalBackdrop: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalCardWrap: {
+    width: "100%",
+    maxWidth: 360,
+    zIndex: 10,
+  },
+  inputTrigger: {
+    height: 48,
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+});

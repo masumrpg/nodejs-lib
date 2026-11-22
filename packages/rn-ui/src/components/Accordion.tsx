@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
-  Text as RNText,
+  StyleSheet,
   View,
+  type LayoutChangeEvent,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
@@ -10,16 +11,28 @@ import {
 import Animated, {
   Easing,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import Svg, { Path } from "react-native-svg";
 import { scheduleOnRN } from "react-native-worklets";
 
 import { useTheme } from "../theme";
 import { triggerHaptic } from "../utils/haptics";
-import { renderIcon, type RenderIcon, type BaseGlassProps } from "./types";
+import { Text } from "./Text";
+import {
+  ANIMATION_TIMING,
+  renderIcon,
+  type BaseAnimatedProps,
+  type BaseGlassProps,
+  type BaseHapticProps,
+  type RenderIcon,
+  type VariantProps,
+  webDeps,
+} from "./types";
 
-export type AccordionVariant = "outlined" | "flat" | "ghost" | "glass";
+export type AccordionVariant = "outline" | "flat" | "ghost";
 
 export interface AccordionItem {
   id: string;
@@ -59,16 +72,17 @@ export type AccordionIndicator =
   | React.ReactNode
   | ((props: AccordionIndicatorProps) => React.ReactNode);
 
-export interface AccordionProps extends BaseGlassProps {
+export interface AccordionProps
+  extends VariantProps<AccordionVariant>,
+    BaseGlassProps,
+    BaseHapticProps,
+    BaseAnimatedProps {
   items: AccordionItem[];
-  variant?: AccordionVariant;
   allowMultiple?: boolean;
   defaultOpenIds?: string[];
   openIds?: string[];
   onOpenChange?: (openIds: string[]) => void;
   disabled?: boolean;
-  animated?: boolean;
-  haptic?: boolean;
   animationDuration?: number;
   animationComponents?: AccordionAnimationComponents;
   indicator?: AccordionIndicator;
@@ -80,7 +94,7 @@ export interface AccordionProps extends BaseGlassProps {
   style?: StyleProp<ViewStyle>;
 }
 
-function renderIndicator(
+function renderDefaultIndicator(
   indicator: AccordionIndicator | undefined,
   expanded: boolean,
   color: string,
@@ -89,88 +103,128 @@ function renderIndicator(
   if (typeof indicator === "function") {
     return indicator({ expanded, color, size });
   }
-
   if (indicator) {
     return indicator;
   }
 
   return (
-    <RNText
-      style={{
-        color,
-        fontSize: size,
-        lineHeight: size,
-        fontWeight: "700",
-      }}
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
     >
-      {expanded ? "-" : "+"}
-    </RNText>
+      <Path d="m6 9 6 6 6-6" />
+    </Svg>
   );
 }
 
-function DefaultAccordionContent({
+const DefaultAccordionContent = React.memo(function DefaultAccordionContent({
   expanded,
   children,
   duration,
   style,
 }: AccordionAnimatedContentProps) {
-  const progress = useSharedValue(expanded ? 1 : 0);
+  const reducedMotion = useReducedMotion();
   const [contentHeight, setContentHeight] = useState(0);
   const [shouldRender, setShouldRender] = useState(expanded);
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
+
+  const progress = useSharedValue(expanded ? 1 : 0);
+
+  const handleCloseComplete = useCallback(() => {
+    if (!expandedRef.current) {
+      setShouldRender(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (expanded) {
       setShouldRender(true);
     }
 
+    if (reducedMotion || duration <= 0) {
+      progress.value = expanded ? 1 : 0;
+      if (!expanded) {
+        setShouldRender(false);
+      }
+      return;
+    }
+
     progress.value = withTiming(
       expanded ? 1 : 0,
-      { duration, easing: Easing.bezier(0.23, 1, 0.32, 1) },
+      { duration, easing: Easing.bezier(...ANIMATION_TIMING.bezier) },
       (finished) => {
-        if (finished && !expanded) {
-          scheduleOnRN(setShouldRender, false);
+        if (finished) {
+          scheduleOnRN(handleCloseComplete);
         }
       },
     );
-  }, [duration, expanded, progress]);
+  }, [duration, expanded, handleCloseComplete, progress, reducedMotion]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    height: progress.value * contentHeight,
-    opacity: progress.value,
-  }));
+  const animatedStyle = useAnimatedStyle(() => {
+    if (contentHeight <= 0) {
+      return {
+        opacity: progress.value,
+      };
+    }
+    return {
+      height: progress.value * contentHeight,
+      opacity: progress.value,
+    };
+  }, webDeps([contentHeight]));
+
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = event.nativeEvent.layout.height;
+    if (nextHeight > 0) {
+      setContentHeight((prev) => (prev === nextHeight ? prev : nextHeight));
+    }
+  }, []);
 
   if (!shouldRender && !expanded) {
     return null;
   }
 
   return (
-    <Animated.View style={[{ overflow: "hidden" }, animatedStyle]}>
+    <Animated.View style={[styles.contentMask, animatedStyle]}>
       <View
-        style={[style, { position: "absolute", left: 0, right: 0 }]}
-        onLayout={(event) => {
-          setContentHeight(event.nativeEvent.layout.height);
-        }}
+        style={[
+          contentHeight > 0 ? styles.measuredAbsolute : undefined,
+          style,
+        ]}
+        onLayout={handleLayout}
       >
         {children}
       </View>
     </Animated.View>
   );
-}
+});
 
-function DefaultAccordionIndicator({
+const DefaultAccordionIndicator = React.memo(function DefaultAccordionIndicator({
   expanded,
   children,
   duration,
   style,
 }: AccordionAnimatedIndicatorProps) {
+  const reducedMotion = useReducedMotion();
   const progress = useSharedValue(expanded ? 1 : 0);
 
   useEffect(() => {
-    progress.value = withTiming(expanded ? 1 : 0, {
-      duration,
-      easing: Easing.bezier(0.23, 1, 0.32, 1),
-    });
-  }, [duration, expanded, progress]);
+    progress.value =
+      reducedMotion || duration <= 0
+        ? expanded
+          ? 1
+          : 0
+        : withTiming(expanded ? 1 : 0, {
+            duration,
+            easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+          });
+  }, [duration, expanded, progress, reducedMotion]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${progress.value * 180}deg` }],
@@ -179,11 +233,11 @@ function DefaultAccordionIndicator({
   return (
     <Animated.View style={[style, animatedStyle]}>{children}</Animated.View>
   );
-}
+});
 
-export function Accordion({
+export const Accordion = React.memo(function Accordion({
   items,
-  variant = "outlined",
+  variant = "outline",
   allowMultiple = false,
   defaultOpenIds = [],
   openIds,
@@ -192,7 +246,7 @@ export function Accordion({
   animated = true,
   glass = false,
   haptic = true,
-  animationDuration = 180,
+  animationDuration = 160,
   animationComponents,
   indicator,
   itemStyle,
@@ -202,7 +256,10 @@ export function Accordion({
   contentStyle,
   style,
 }: AccordionProps) {
-  const { colors, components, radii, spacing, typography, isDark } = useTheme();
+  const { colors, components, radii, spacing, typography } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const shouldAnimate = animated && !reducedMotion;
+
   const [internalOpenIds, setInternalOpenIds] = useState(defaultOpenIds);
   const activeOpenIds = openIds ?? internalOpenIds;
 
@@ -210,10 +267,9 @@ export function Accordion({
 
   const setNextOpenIds = useCallback(
     (nextOpenIds: string[]) => {
-      if (!openIds) {
+      if (openIds === undefined) {
         setInternalOpenIds(nextOpenIds);
       }
-
       onOpenChange?.(nextOpenIds);
     },
     [onOpenChange, openIds],
@@ -224,13 +280,8 @@ export function Accordion({
   const AnimatedIndicator =
     animationComponents?.Indicator ?? DefaultAccordionIndicator;
 
-  const isGlass = glass || variant === "glass";
   const isFlat = variant === "flat";
   const isGhost = variant === "ghost";
-
-  const glassBg = isDark
-    ? "rgba(15, 27, 45, 0.60)"
-    : "rgba(255, 255, 255, 0.75)";
 
   const toggleItem = useCallback(
     (item: AccordionItem) => {
@@ -253,49 +304,43 @@ export function Accordion({
     <View style={[{ gap: isGhost ? 0 : spacing.sm }, style]}>
       {items.map((item, index) => {
         const expanded = openSet.has(item.id);
-        const itemDisabled = disabled || item.disabled;
+        const itemDisabled = Boolean(disabled || item.disabled);
 
-        const itemBg = isGlass
-          ? glassBg
+        const itemBg = glass
+          ? colors.glassSurface
           : isGhost
-            ? colors.transparent
+            ? "transparent"
             : isFlat
-              ? isDark
-                ? "rgba(15, 28, 38, 0.6)"
-                : colors.backgroundMuted
+              ? colors.surfaceMuted
               : colors.surface;
 
-        const itemBorderColor = isGlass
-          ? isDark
-            ? "rgba(248, 250, 252, 0.20)"
-            : "rgba(15, 23, 42, 0.14)"
+        const itemBorderColor = glass
+          ? colors.glassBorder
           : isGhost
-            ? colors.border
+            ? colors.borderMuted
             : isFlat
               ? "transparent"
               : expanded
                 ? colors.primary
                 : colors.border;
 
-        const borderWidth = isGhost
-          ? 0
-          : isFlat
-            ? 0
-            : components.borderWidth.strong;
-
-        const borderBottomWidth = isGhost && index < items.length - 1 ? 1 : borderWidth;
+        const borderWidth = isGhost || isFlat ? 0 : components.borderWidth.default;
+        const borderBottomWidth =
+          isGhost && index < items.length - 1
+            ? components.borderWidth.default
+            : borderWidth;
 
         return (
           <View
             key={item.id}
             style={[
+              styles.itemContainer,
               {
                 backgroundColor: itemBg,
                 borderRadius: isGhost ? 0 : radii.xl,
                 borderWidth,
                 borderBottomWidth,
                 borderColor: itemBorderColor,
-                overflow: "hidden",
                 opacity: itemDisabled ? 0.58 : 1,
               },
               itemStyle,
@@ -307,28 +352,29 @@ export function Accordion({
               disabled={itemDisabled}
               onPress={() => toggleItem(item)}
               style={({ pressed }) => [
+                styles.header,
                 {
                   padding: spacing.lg,
-                  flexDirection: "row",
-                  alignItems: "center",
                   gap: spacing.md,
                   backgroundColor:
                     pressed && !itemDisabled
                       ? colors.backgroundMuted
-                      : colors.transparent,
+                      : "transparent",
                 },
                 headerStyle,
               ]}
             >
-              {renderIcon(
-                item.icon,
-                expanded ? colors.primary : colors.textMuted,
-                20,
-              )}
+              {item.icon
+                ? renderIcon(
+                    item.icon,
+                    expanded ? colors.primary : colors.textMuted,
+                    20,
+                  )
+                : null}
 
-              <View style={{ flex: 1, gap: spacing.xxs }}>
-                {typeof item.title === "string" ? (
-                  <RNText
+              <View style={[styles.headerTextWrap, { gap: spacing.xxs }]}>
+                {typeof item.title === "string" || typeof item.title === "number" ? (
+                  <Text
                     style={[
                       typography.subtitle,
                       { color: expanded ? colors.primary : colors.text },
@@ -336,40 +382,36 @@ export function Accordion({
                     ]}
                   >
                     {item.title}
-                  </RNText>
+                  </Text>
                 ) : (
                   item.title
                 )}
 
-                {typeof item.subtitle === "string" ? (
-                  <RNText
-                    style={[
-                      typography.bodySmall,
-                      { color: colors.textMuted },
-                      subtitleStyle,
-                    ]}
-                  >
-                    {item.subtitle}
-                  </RNText>
-                ) : (
-                  item.subtitle
-                )}
+                {item.subtitle !== undefined ? (
+                  typeof item.subtitle === "string" ||
+                  typeof item.subtitle === "number" ? (
+                    <Text
+                      style={[
+                        typography.bodySmall,
+                        { color: colors.textMuted },
+                        subtitleStyle,
+                      ]}
+                    >
+                      {item.subtitle}
+                    </Text>
+                  ) : (
+                    item.subtitle
+                  )
+                ) : null}
               </View>
 
-              <View
-                style={{
-                  width: 24,
-                  height: 24,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {animated ? (
+              <View style={styles.indicatorWrap}>
+                {shouldAnimate ? (
                   <AnimatedIndicator
                     expanded={expanded}
                     duration={animationDuration}
                   >
-                    {renderIndicator(
+                    {renderDefaultIndicator(
                       indicator,
                       expanded,
                       expanded ? colors.primary : colors.textMuted,
@@ -377,7 +419,7 @@ export function Accordion({
                     )}
                   </AnimatedIndicator>
                 ) : (
-                  renderIndicator(
+                  renderDefaultIndicator(
                     indicator,
                     expanded,
                     expanded ? colors.primary : colors.textMuted,
@@ -387,26 +429,26 @@ export function Accordion({
               </View>
             </Pressable>
 
-            {animated ? (
+            {shouldAnimate ? (
               <AnimatedContent
                 expanded={expanded}
                 duration={animationDuration}
                 style={[
                   {
-                    borderTopWidth: isGhost ? 0 : 1,
-                    borderTopColor: colors.border,
+                    borderTopWidth: isGhost
+                      ? 0
+                      : components.borderWidth.default,
+                    borderTopColor: colors.borderMuted,
                     padding: spacing.lg,
-                    backgroundColor: colors.transparent,
                   },
                   contentStyle,
                 ]}
               >
-                {typeof item.content === "string" ? (
-                  <RNText
-                    style={[typography.body, { color: colors.textMuted }]}
-                  >
+                {typeof item.content === "string" ||
+                typeof item.content === "number" ? (
+                  <Text variant="body" color="textMuted">
                     {item.content}
-                  </RNText>
+                  </Text>
                 ) : (
                   item.content
                 )}
@@ -416,20 +458,20 @@ export function Accordion({
                 <View
                   style={[
                     {
-                      borderTopWidth: isGhost ? 0 : 1,
-                      borderTopColor: colors.border,
+                      borderTopWidth: isGhost
+                        ? 0
+                        : components.borderWidth.default,
+                      borderTopColor: colors.borderMuted,
                       padding: spacing.lg,
-                      backgroundColor: colors.transparent,
                     },
                     contentStyle,
                   ]}
                 >
-                  {typeof item.content === "string" ? (
-                    <RNText
-                      style={[typography.body, { color: colors.textMuted }]}
-                    >
+                  {typeof item.content === "string" ||
+                  typeof item.content === "number" ? (
+                    <Text variant="body" color="textMuted">
                       {item.content}
-                    </RNText>
+                    </Text>
                   ) : (
                     item.content
                   )}
@@ -441,4 +483,32 @@ export function Accordion({
       })}
     </View>
   );
-}
+});
+
+const styles = StyleSheet.create({
+  itemContainer: {
+    overflow: "hidden",
+  },
+  header: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerTextWrap: {
+    flex: 1,
+  },
+  indicatorWrap: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  contentMask: {
+    overflow: "hidden",
+  },
+  measuredAbsolute: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+  },
+});

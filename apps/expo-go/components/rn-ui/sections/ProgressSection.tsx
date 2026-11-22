@@ -55,7 +55,7 @@ export function ProgressSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
               Reanimated UI thread progress bar with smooth spring/cubic easing.
             </Text>
 
-            <Progress value={liveProgress} tone="primary" size="default" />
+            <Progress value={liveProgress} tone="primary" size="md" />
 
             <Box row gap="sm" style={{ marginTop: 4 }}>
               <Button
@@ -87,7 +87,7 @@ export function ProgressSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
               <Text weight="700" color="text">
                 Progress Bar Sizes
               </Text>
-              <Badge tone="accent">xs, sm, default, lg, xl</Badge>
+              <Badge tone="accent">xs, sm, md, lg, xl</Badge>
             </Box>
             <Text color="textMuted" variant="bodySmall">
               Predefined bar height scale ranging from ultra-thin (xs = 4px) to thick (xl = 18px).
@@ -110,9 +110,9 @@ export function ProgressSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
 
               <Box gap="xxs">
                 <Text variant="caption" color="textMuted">
-                  Default (10px)
+                  Medium (md = 10px)
                 </Text>
-                <Progress value={55} size="default" tone="warning" />
+                <Progress value={55} size="md" tone="warning" />
               </Box>
 
               <Box gap="xxs">

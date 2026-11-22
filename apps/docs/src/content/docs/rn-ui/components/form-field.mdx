@@ -1,6 +1,6 @@
 ---
 title: Form Field
-description: Accessible form control container with FormLabel, FormControl, FormDescription, and FormMessage error context.
+description: Accessible form control container with FormLabel, FormControl, FormDescription, and FormError context.
 sidebar:
   badge:
     text: Updated
@@ -11,17 +11,17 @@ import { Code } from '@astrojs/starlight/components';
 import TypeTable from '@/components/TypeTable.astro';
 
 export const formFieldCode = `import React from 'react';
-import { FormField, FormLabel, FormControl, FormDescription, FormMessage, Input } from '@masumdev/rn-ui';
+import { FormField, FormLabel, FormControl, FormDescription, FormError, Input } from '@masumdev/rn-ui';
 
 export function FormFieldExample() {
   return (
     <FormField invalid required>
       <FormLabel>Username</FormLabel>
       <FormControl>
-        <Input placeholder="enter_username" error />
+        <Input placeholder="enter_username" invalid />
       </FormControl>
       <FormDescription>Choose a unique public handle.</FormDescription>
-      <FormMessage>Username is already taken.</FormMessage>
+      <FormError>Username is already taken.</FormError>
     </FormField>
   );
 }`;
@@ -30,7 +30,7 @@ export function FormFieldExample() {
 
 ## Usage
 
-<Code code={formFieldCode} lang="tsx" title="FormFieldExample.tsx" mark={['FormField', 'FormLabel', 'FormControl', 'FormDescription', 'FormMessage']} />
+<Code code={formFieldCode} lang="tsx" title="FormFieldExample.tsx" mark={['FormField', 'FormLabel', 'FormControl', 'FormDescription', 'FormError']} />
 
 ## Props API
 
@@ -48,7 +48,7 @@ export function FormFieldExample() {
 
 Inherits all props from `<Label />`.
 
-### FormMessage
+### FormError
 
 <TypeTable
   type={{

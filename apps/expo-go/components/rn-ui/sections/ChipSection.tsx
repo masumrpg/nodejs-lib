@@ -35,7 +35,7 @@ export function ChipSection(_props?: { ctx?: RnUiSectionContext }) {
   };
 
   return (
-    <Section title="Chip & Tag">
+    <Section title="Chip">
       <Box gap="lg">
         {/* 1. Filter Chips (Multi-Selectable) */}
         <Card outlined>
@@ -70,17 +70,17 @@ export function ChipSection(_props?: { ctx?: RnUiSectionContext }) {
           </Box>
         </Card>
 
-        {/* 2. Removable Input Tags */}
+        {/* 2. Removable Input Chips */}
         <Card outlined>
           <Box gap="md">
             <Box row center style={{ justifyContent: "space-between" }}>
               <Text weight="700" color="text">
-                Removable Input Tags
+                Removable Input Chips
               </Text>
               <Badge tone="accent">onClose Handler</Badge>
             </Box>
             <Text color="textMuted" variant="bodySmall">
-              Dismissible tag items for forms, keyword selectors, and filters.
+              Dismissible chip items for forms, keyword selectors, and filters.
             </Text>
 
             <Box row style={{ flexWrap: "wrap", gap: 8 }}>
@@ -97,11 +97,11 @@ export function ChipSection(_props?: { ctx?: RnUiSectionContext }) {
 
               {tags.length < 6 && (
                 <Chip
-                  label="Add Tag"
+                  label="Add Chip"
                   variant="filled"
                   tone="secondary"
                   icon={({ color, size }) => <Plus color={color} size={size} />}
-                  onPress={() => setTags((prev) => [...prev, `New Tag ${prev.length + 1}`])}
+                  onPress={() => setTags((prev) => [...prev, `New Chip ${prev.length + 1}`])}
                 />
               )}
             </Box>

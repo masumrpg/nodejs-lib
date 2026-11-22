@@ -1,39 +1,47 @@
 import React from "react";
 import {
   Pressable,
+  StyleSheet,
   type GestureResponderEvent,
   type PressableProps,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
 import Animated, {
+  cancelAnimation,
   Easing,
   interpolateColor,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
-  withSpring,
   withTiming,
 } from "react-native-reanimated";
 
 import { useTheme } from "../theme";
+import { withAlpha } from "../utils";
 import { triggerHaptic } from "../utils/haptics";
 import {
+  ANIMATION_TIMING,
+  minTouchHitSlop,
   renderIcon,
-  type RenderIcon,
+  resolveToneColors,
+  webDeps,
+  type BaseAnimatedProps,
   type BaseGlassProps,
   type BaseHapticProps,
+  type ComponentSize,
+  type ComponentTone,
+  type RenderIcon,
+  type ShapeProps,
+  type SizeProps,
+  type ToneProps,
+  type VariantProps,
 } from "./types";
 
-export type SwitchSize = "sm" | "md" | "lg";
-export type SwitchVariant = "round" | "oval";
-export type SwitchTone =
-  | "primary"
-  | "secondary"
-  | "accent"
-  | "success"
-  | "warning"
-  | "danger"
-  | "info";
+export type SwitchSize = ComponentSize;
+export type SwitchVariant = "filled" | "outline";
+export type SwitchShape = "pill" | "oval" | "rounded";
+export type SwitchTone = ComponentTone;
 
 export interface SwitchRenderThumbParams {
   checked: boolean;
@@ -49,16 +57,18 @@ export type SwitchThumbContent =
 
 export interface SwitchProps
   extends Omit<PressableProps, "onPress" | "style" | "children">,
+    VariantProps<SwitchVariant>,
+    ToneProps<SwitchTone>,
+    SizeProps<SwitchSize>,
+    ShapeProps<SwitchShape>,
     BaseGlassProps,
-    BaseHapticProps {
+    BaseHapticProps,
+    BaseAnimatedProps {
   value?: boolean;
   defaultValue?: boolean;
   onValueChange?: (value: boolean) => void;
   disabled?: boolean;
   invalid?: boolean;
-  size?: SwitchSize;
-  variant?: SwitchVariant;
-  tone?: SwitchTone;
   style?: StyleProp<ViewStyle>;
   trackStyle?: StyleProp<ViewStyle>;
   thumbStyle?: StyleProp<ViewStyle>;
@@ -71,17 +81,20 @@ export interface SwitchProps
   onPress?: (event: GestureResponderEvent) => void;
 }
 
-export function Switch({
+function SwitchComponent({
   value,
   defaultValue = false,
   onValueChange,
   disabled = false,
   invalid = false,
   size = "md",
-  variant = "round",
+  variant = "filled",
+  shape = "pill",
   tone = "primary",
   glass = false,
   haptic = true,
+  animated = true,
+  hitSlop,
   style,
   trackStyle,
   thumbStyle,
@@ -98,6 +111,9 @@ export function Switch({
   ...props
 }: SwitchProps) {
   const { colors, components, radii, isDark } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const shouldAnimate = animated && !reducedMotion;
+
   const isControlled = value !== undefined;
   const [uncontrolledValue, setUncontrolledValue] =
     React.useState(defaultValue);
@@ -106,18 +122,33 @@ export function Switch({
   const pressed = useSharedValue(0);
 
   React.useEffect(() => {
-    progress.value = withSpring(checked ? 1 : 0, {
-      duration: 200,
-      dampingRatio: 1,
-      overshootClamping: true,
+    if (!shouldAnimate) {
+      cancelAnimation(progress);
+      progress.value = checked ? 1 : 0;
+      return;
+    }
+    progress.value = withTiming(checked ? 1 : 0, {
+      duration: ANIMATION_TIMING.transition,
+      easing: Easing.bezier(...ANIMATION_TIMING.bezier),
     });
-  }, [checked, progress]);
+  }, [checked, progress, shouldAnimate]);
 
-  const activeColor = invalid ? colors.danger : colors[tone];
+  React.useEffect(() => {
+    return () => {
+      cancelAnimation(progress);
+      cancelAnimation(pressed);
+    };
+  }, [pressed, progress]);
+
+  const toneColors = resolveToneColors(invalid ? "danger" : tone, colors);
+  const activeColor = toneColors.solid;
+
   const thumbIcon = checked ? activeIcon : inactiveIcon;
   const selectedThumbContent =
     (checked ? activeThumbContent : inactiveThumbContent) ?? thumbContent;
-  const isOval = variant === "oval";
+  const isOval = shape === "oval";
+  const isRounded = shape === "rounded";
+
   const baseWidth = components.switch.width[size];
   const width = isOval ? Math.round(baseWidth * 1.14) : baseWidth;
   const height = components.switch.height[size];
@@ -125,50 +156,60 @@ export function Switch({
   const thumbWidth = isOval ? Math.round(baseThumbSize * 1.18) : baseThumbSize;
   const thumbHeight = baseThumbSize;
   const iconSize = components.switch.iconSize[size];
-  const borderWidth = components.borderWidth.focus;
-  const inset = (height - thumbHeight) / 2;
-  const travel = width - thumbWidth - (inset + borderWidth) * 2;
+  const borderWidth = components.borderWidth.control;
+  const inset = Math.max(2, (height - thumbHeight) / 2);
+  const travel = Math.max(0, width - thumbWidth - (inset + borderWidth) * 2);
 
-  const glassBg = isDark
-    ? "rgba(15, 27, 45, 0.60)"
-    : "rgba(255, 255, 255, 0.70)";
+  const trackBorderRadius = isRounded ? radii.md : radii.full;
+  const thumbBorderRadius = isRounded ? radii.sm : radii.full;
 
   const inactiveTrackColor = disabled
     ? colors.disabled
     : glass
-      ? glassBg
-      : isDark
-        ? "rgba(30, 41, 59, 0.90)"
-        : colors.backgroundMuted;
+      ? colors.glassSurface
+      : variant === "outline"
+        ? colors.transparent
+        : isDark
+          ? colors.surfaceRaised
+          : colors.backgroundMuted;
 
-  const activeTrackColor = disabled ? colors.disabled : activeColor;
+  const activeTrackColor = disabled
+    ? colors.disabled
+    : variant === "outline"
+      ? withAlpha(activeColor, 0.14)
+      : activeColor;
 
   const inactiveBorderColor = invalid
     ? colors.danger
     : glass
-      ? isDark
-        ? "rgba(248, 250, 252, 0.20)"
-        : "rgba(15, 23, 42, 0.14)"
-      : isDark
-        ? "rgba(148, 163, 184, 0.30)"
-        : colors.border;
+      ? colors.glassBorder
+      : colors.border;
 
-  const activeBorderColor = invalid ? colors.danger : activeColor;
+  const activeBorderColor = disabled
+    ? colors.disabled
+    : invalid
+      ? colors.danger
+      : activeColor;
 
-  // Crisp knob for OFF/ON state adhering to theme surface tokens
   const inactiveThumbColor = disabled
     ? colors.disabledText
     : isDark
-      ? colors.surfaceRaised ?? colors.surface
+      ? colors.text
       : colors.surface;
 
   const activeThumbColor = disabled
     ? colors.disabledText
-    : colors.onPrimary ?? colors.surface;
+    : variant === "outline"
+      ? activeColor
+      : toneColors.on;
+
+  const inactiveThumbBorder = colors.transparent;
+  const activeThumbBorder =
+    variant === "outline" ? colors.transparent : withAlpha(activeColor, 0.25);
 
   const handlePress = (event: GestureResponderEvent) => {
-    onPress?.(event);
     if (disabled) return;
+    onPress?.(event);
 
     if (haptic) triggerHaptic("selection");
     const nextValue = !checked;
@@ -179,58 +220,96 @@ export function Switch({
   };
 
   const handlePressIn = (event: GestureResponderEvent) => {
+    if (disabled) return;
     onPressIn?.(event);
-    pressed.value = withTiming(1, {
-      duration: 100,
-      easing: Easing.bezier(0.23, 1, 0.32, 1),
-    });
+    if (shouldAnimate) {
+      pressed.value = withTiming(1, {
+        duration: ANIMATION_TIMING.pressIn,
+        easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+      });
+    }
   };
 
   const handlePressOut = (event: GestureResponderEvent) => {
+    if (disabled) return;
     onPressOut?.(event);
-    pressed.value = withTiming(0, {
-      duration: 140,
-      easing: Easing.bezier(0.23, 1, 0.32, 1),
-    });
+    if (shouldAnimate) {
+      pressed.value = withTiming(0, {
+        duration: ANIMATION_TIMING.pressOut,
+        easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+      });
+    }
   };
 
-  const trackAnimatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      progress.value,
-      [0, 1],
-      [inactiveTrackColor, activeTrackColor],
-    ),
-    borderColor: interpolateColor(
-      progress.value,
-      [0, 1],
-      [inactiveBorderColor, activeBorderColor],
-    ),
-  }));
+  const trackAnimatedStyle = useAnimatedStyle(
+    () => ({
+      backgroundColor: interpolateColor(
+        progress.value,
+        [0, 1],
+        [inactiveTrackColor, activeTrackColor],
+      ),
+      borderColor: interpolateColor(
+        progress.value,
+        [0, 1],
+        [inactiveBorderColor, activeBorderColor],
+      ),
+    }),
+    webDeps([
+      activeBorderColor,
+      activeTrackColor,
+      inactiveBorderColor,
+      inactiveTrackColor,
+    ]),
+  );
 
-  const thumbAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: progress.value * travel },
-      { scaleX: isOval ? 1 + pressed.value * 0.12 : 1 + pressed.value * 0.06 },
-      { scaleY: 1 - pressed.value * 0.04 },
-    ],
-    backgroundColor: interpolateColor(
-      progress.value,
-      [0, 1],
-      [inactiveThumbColor, activeThumbColor],
-    ),
-  }));
+  const thumbAnimatedStyle = useAnimatedStyle(
+    () => ({
+      transform: [
+        { translateX: progress.value * travel },
+        {
+          scaleX: isOval ? 1 + pressed.value * 0.1 : 1 + pressed.value * 0.05,
+        },
+        { scaleY: 1 - pressed.value * 0.04 },
+      ],
+      backgroundColor: interpolateColor(
+        progress.value,
+        [0, 1],
+        [inactiveThumbColor, activeThumbColor],
+      ),
+      borderColor: interpolateColor(
+        progress.value,
+        [0, 1],
+        [inactiveThumbBorder, activeThumbBorder],
+      ),
+    }),
+    webDeps([
+      activeThumbBorder,
+      activeThumbColor,
+      inactiveThumbBorder,
+      inactiveThumbColor,
+      isOval,
+      travel,
+    ]),
+  );
 
-  const iconColor = checked
-    ? invalid
-      ? colors.danger
-      : activeColor
-    : colors.textSubtle;
+  const iconColor = disabled
+    ? colors.disabledText
+    : checked
+      ? variant === "outline"
+        ? toneColors.on
+        : activeColor
+      : colors.textSubtle;
+
+  const safeIconColor =
+    checked && variant !== "outline" && tone === "warning" && !isDark
+      ? "#92400E"
+      : iconColor;
 
   const thumbContentParams: SwitchRenderThumbParams = {
     checked,
     disabled,
     invalid,
-    color: iconColor,
+    color: safeIconColor,
     size: iconSize,
   };
   const renderedThumbContent =
@@ -243,14 +322,16 @@ export function Switch({
       accessibilityRole="switch"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ checked, disabled }}
+      accessibilityHint={invalid ? "Invalid selection" : undefined}
       disabled={disabled}
+      hitSlop={hitSlop ?? minTouchHitSlop(height)}
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       style={({ pressed: isPressed }) => [
+        styles.wrapper,
         {
-          opacity: disabled ? 0.45 : isPressed ? 0.9 : 1,
-          alignSelf: "flex-start",
+          opacity: disabled ? 0.55 : isPressed ? 0.9 : 1,
         },
         style,
       ]}
@@ -258,13 +339,13 @@ export function Switch({
     >
       <Animated.View
         style={[
+          styles.track,
           {
             width,
             height,
-            borderRadius: radii.full,
+            borderRadius: trackBorderRadius,
             borderWidth,
             padding: inset,
-            justifyContent: "center",
           },
           trackAnimatedStyle,
           trackStyle,
@@ -272,14 +353,12 @@ export function Switch({
       >
         <Animated.View
           style={[
+            styles.thumb,
             {
               width: thumbWidth,
               height: thumbHeight,
-              borderRadius: radii.full,
-              alignItems: "center",
-              justifyContent: "center",
-              borderWidth: components.borderWidth.default,
-              borderColor: checked ? activeColor : "transparent",
+              borderRadius: thumbBorderRadius,
+              borderWidth: components.borderWidth.hairline,
             },
             thumbAnimatedStyle,
             thumbStyle,
@@ -290,10 +369,25 @@ export function Switch({
             : renderedThumbContent
               ? renderedThumbContent
               : thumbIcon
-                ? renderIcon(thumbIcon, iconColor, iconSize)
+                ? renderIcon(thumbIcon, safeIconColor, iconSize)
                 : null}
         </Animated.View>
       </Animated.View>
     </Pressable>
   );
 }
+
+export const Switch = React.memo(SwitchComponent);
+
+const styles = StyleSheet.create({
+  wrapper: {
+    alignSelf: "flex-start",
+  },
+  track: {
+    justifyContent: "center",
+  },
+  thumb: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});
