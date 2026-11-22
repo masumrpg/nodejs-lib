@@ -152,6 +152,8 @@ export interface DetectionOverlayProps {
   landmarkStyle?: StyleProp<ViewStyle>;
   /** Whether to show class/identity label badges (default: true) */
   showLabels?: boolean;
+  /** Suppress colliding label badges in dense document/text scenes so underlying text remains unobstructed (default: false) */
+  avoidLabelOverlap?: boolean;
   /** Whether to show confidence percentage in label badges (default: true) */
   showConfidence?: boolean;
   /** Anchor position of the label badge relative to the bounding box (default: 'top-left') */
@@ -496,6 +498,66 @@ export function projectDetectionsWorklet(
   }
 
   return projected;
+}
+
+function computeVisibleLabelIndices(
+  items: ProjectedDetectionItem[],
+  labelPosition: LabelBadgePosition,
+  viewDimensions: ViewDimensions,
+  formatLabel?: (detection: DetectionResult) => string
+): Set<number> {
+  const visible = new Set<number>();
+  const placed: Array<{ x: number; y: number; w: number; h: number }> = [];
+  const badgeHeight = 20;
+  const pad = 2;
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const text = formatLabel ? formatLabel(item.detection) : item.formattedText;
+    if (!text) {
+      continue;
+    }
+
+    const { pixelBox } = item;
+    if (items.length > 8 && pixelBox.height < 14) {
+      continue;
+    }
+
+    const estW = Math.min(
+      Math.max(40, text.length * 6.4 + 14),
+      Math.max(72, viewDimensions.width - 16)
+    );
+    const isRight = labelPosition === 'top-right' || labelPosition === 'bottom-right';
+    const isBottom = labelPosition === 'bottom-left' || labelPosition === 'bottom-right';
+
+    const bx = isRight
+      ? Math.max(4, pixelBox.x + pixelBox.width - estW)
+      : Math.max(4, Math.min(viewDimensions.width - estW - 4, pixelBox.x));
+    const by = isBottom
+      ? Math.max(4, pixelBox.y + pixelBox.height - badgeHeight)
+      : Math.max(4, Math.min(viewDimensions.height - badgeHeight - 4, pixelBox.y));
+
+    let collides = false;
+    for (let j = 0; j < placed.length; j++) {
+      const p = placed[j];
+      if (
+        bx < p.x + p.w + pad &&
+        bx + estW + pad > p.x &&
+        by < p.y + p.h + pad &&
+        by + badgeHeight + pad > p.y
+      ) {
+        collides = true;
+        break;
+      }
+    }
+
+    if (!collides) {
+      placed.push({ x: bx, y: by, w: estW, h: badgeHeight });
+      visible.add(item.index);
+    }
+  }
+
+  return visible;
 }
 
 function getLabelPositionStyle(
@@ -843,6 +905,7 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
   landmarkColor,
   landmarkStyle,
   showLabels,
+  avoidLabelOverlap,
   showConfidence,
   labelPosition,
   labelBackgroundColor,
@@ -878,6 +941,8 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
   const resolvedBoxStyle = boxStyle ?? overlayTheme?.boxStyle;
 
   const resolvedShowLabels = showLabels ?? overlayTheme?.showLabels ?? true;
+  const resolvedAvoidLabelOverlap =
+    avoidLabelOverlap ?? overlayTheme?.avoidLabelOverlap ?? false;
   const resolvedShowConfidence = showConfidence ?? overlayTheme?.showConfidence ?? true;
   const resolvedLabelPosition: LabelBadgePosition =
     labelPosition ?? overlayTheme?.labelPosition ?? 'top-left';
@@ -1011,6 +1076,15 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
   const isSolidOrDashed =
     resolvedShowBoxes &&
     (resolvedBoxVariant === 'solid' || resolvedBoxVariant === 'dashed');
+  const visibleLabelIndices =
+    resolvedShowLabels && resolvedAvoidLabelOverlap && !renderLabel
+      ? computeVisibleLabelIndices(
+          items,
+          resolvedLabelPosition,
+          viewDimensions,
+          resolvedFormatLabel
+        )
+      : null;
 
   return (
     <View style={[StyleSheet.absoluteFill, styles.container, style]} pointerEvents="none">
@@ -1042,6 +1116,10 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
           isCornersMode || isSolidOrDashed ? activeBoxRadius : 4;
         const labelEdgeOffset = isSolidOrDashed ? -resolvedBoxBorderWidth : 0;
 
+        const shouldRenderDefaultLabel =
+          resolvedShowLabels &&
+          (!visibleLabelIndices || visibleLabelIndices.has(detIndex));
+
         const labelNode = renderLabel ? (
           renderLabel({
             detection,
@@ -1050,7 +1128,7 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
             color: effectiveBoxColor,
             formattedText,
           })
-        ) : resolvedShowLabels ? (
+        ) : shouldRenderDefaultLabel ? (
           <View
             style={[
               styles.labelBadge,
@@ -1067,6 +1145,7 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
             ]}
           >
             <Text
+              numberOfLines={resolvedAvoidLabelOverlap ? 1 : undefined}
               style={[
                 styles.labelText,
                 { color: resolvedLabelTextColor },

@@ -2,17 +2,37 @@
 title: Changelog
 sidebar:
   order: 99
-description: Release notes and version history for @masumdev/rn-camera-ai and @masumdev/rn-camera-ai-tflite.
+description: Release notes and version history for @masumdev/rn-camera-ai, @masumdev/rn-camera-ai-tflite, and @masumdev/rn-camera-ai-mlkit.
 ---
 
 import ChangelogTimeline from '@/components/ChangelogTimeline.astro';
 
 export const releases = [
   {
-    version: 'v0.2.0',
+    version: 'v0.3.0',
     date: '2026-11-22',
     tag: 'Latest Release',
     isLatest: true,
+    changes: [
+      {
+        type: 'fix',
+        text: 'Added <code>avoidLabelOverlap</code> collision suppression to <code>&lt;DetectionOverlay /&gt;</code>, configurable <code>photoResolution</code>/<code>photoQualityPrioritization</code> props on <code>&lt;CameraAI /&gt;</code>, and auto-fit paper zoom, clean highlights, tap-to-inspect line banners, and a full-text reader overlay in <code>/ocr-scanner</code> so distant document scans remain crisp and readable.',
+      },
+      {
+        type: 'fix',
+        text: 'Hardened YUV document boundary detector (<code>analyzeFrameDocumentWorklet</code>) with 3-point median cell sampling, near-black mount exclusion, strict 4-connected flood-fill, and conditional morphological opening so top corners lock cleanly onto tilted sheets without leaking across mattress seams or tiles.',
+      },
+      {
+        type: 'fix',
+        text: 'Migrated Reanimated 4 dynamic constants inside <code>&lt;DocumentGuideOverlay /&gt;</code> and <code>&lt;ScannerAnimationOverlay /&gt;</code> to synced <code>SharedValue</code>s, eliminating all native <code>useAnimatedStyle</code> dependency-array warnings.',
+      },
+    ],
+  },
+  {
+    version: 'v0.2.0',
+    date: '2026-11-22',
+    tag: 'Feature Release',
+    isLatest: false,
     changes: [
       {
         type: 'feat',

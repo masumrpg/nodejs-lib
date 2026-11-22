@@ -3,12 +3,12 @@ title: RN Camera AI
 sidebar:
   label: Overview & Architecture
   order: 1
-description: High-performance React Native camera preview with zero-JS-thread AI inference overlays, pluggable TFLite adapters, and normalized coordinate math.
+description: High-performance React Native camera preview with zero-JS-thread AI inference overlays, modular TFLite and ML Kit OCR adapters, plus normalized coordinate math.
 ---
 
 import { LinkCard, CardGrid, Card, Badge, Tabs, TabItem } from '@astrojs/starlight/components';
 
-`@masumdev/rn-camera-ai` and `@masumdev/rn-camera-ai-tflite` form a modular, production-ready computer vision and on-device AI system for React Native and Expo. They unify real-time camera streaming, on-device machine learning inference, and hardware-accelerated bounding box overlays with zero JS-thread lag.
+`@masumdev/rn-camera-ai` forms a modular, production-ready computer vision and on-device AI ecosystem for React Native and Expo alongside optional adapter packages (`@masumdev/rn-camera-ai-tflite` and `@masumdev/rn-camera-ai-mlkit`). Install only the adapters your app uses, unifying hardware preview, on-device inference, and zero-JS-thread overlays.
 
 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '16px 0' }}>
   <Badge text="React Native >= 0.74" variant="note" size="medium" />
@@ -194,7 +194,7 @@ On Android, GPU delegates can fail on budget chipsets or corrupted vendor driver
   <LinkCard
     title="ML Kit OCR & Text Recognition Adapter"
     href="/rn-camera-ai/mlkit-ocr/"
-    description="On-device Google ML Kit v2 OCR adapter with zero-copy YUV frames, live granularity switching, and structured entity parsing."
+    description="On-device Google ML Kit v2 OCR adapter with zero-copy YUV frames, Smart Document Capture, and structured entity parsing."
   />
   <LinkCard
     title="Writing Custom Processors"

@@ -614,4 +614,55 @@ describe('CameraAI React Lifecycle & Callback Refs', () => {
     expect(seenAngles.some((ang) => Math.abs(ang) > 0.05)).toBe(true);
     expect(customSlotsGuideHtml).toContain('SLOT:Dokumen Miring:64');
   });
+
+  it('forwards custom photoResolution and avoids overlapping labels when avoidLabelOverlap is enabled', () => {
+    const renderer = createTestRenderer();
+    renderer.mount(
+      React.createElement(CameraAI, {
+        captureMode: 'photo',
+        photoResolution: { width: 2448, height: 3264 },
+        photoQualityPrioritization: 'quality',
+      })
+    );
+    expect(mockCameraState.lastPhotoOutputOptions?.targetResolution).toEqual({
+      width: 2448,
+      height: 3264,
+    });
+    expect(mockCameraState.lastPhotoOutputOptions?.qualityPrioritization).toBe('quality');
+    renderer.unmount();
+
+    const stackedLines: DetectionResult[] = [
+      {
+        id: 'line-0',
+        label: 'UNDANGAN',
+        confidence: 0.96,
+        boundingBox: { x: 0.25, y: 0.20, width: 0.40, height: 0.03 },
+      },
+      {
+        id: 'line-1',
+        label: 'BERAT BADAN IDEAL',
+        confidence: 0.95,
+        boundingBox: { x: 0.25, y: 0.215, width: 0.45, height: 0.025 },
+      },
+      {
+        id: 'line-2',
+        label: 'WIDIYA 082113838832',
+        confidence: 0.94,
+        boundingBox: { x: 0.25, y: 0.62, width: 0.45, height: 0.035 },
+      },
+    ];
+
+    const antiOverlapHtml = renderToStaticMarkup(
+      React.createElement(DetectionOverlay, {
+        detections: stackedLines,
+        viewDimensions: { width: 390, height: 520 },
+        showLabels: true,
+        avoidLabelOverlap: true,
+        showConfidence: false,
+      })
+    );
+    expect(antiOverlapHtml).toContain('UNDANGAN');
+    expect(antiOverlapHtml).not.toContain('BERAT BADAN IDEAL');
+    expect(antiOverlapHtml).toContain('WIDIYA 082113838832');
+  });
 });

@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import {
+  type GestureResponderEvent,
   Image,
   type ImageLoadEvent,
   type LayoutChangeEvent,
@@ -173,6 +174,76 @@ const GRANULARITY_ORDER: readonly OcrGranularity[] = [
   "element",
 ];
 
+const OCR_MAX_RESULTS = 150;
+const OCR_MIN_TEXT_LENGTH = 2;
+
+function computeOcrContentBounds(
+  detections: DetectionResult[],
+  fallbackBox: BoundingBox
+): BoundingBox {
+  if (detections.length === 0) {
+    return fallbackBox;
+  }
+  let minX = 1;
+  let minY = 1;
+  let maxX = 0;
+  let maxY = 0;
+  for (let i = 0; i < detections.length; i++) {
+    const b = detections[i].boundingBox;
+    if (b.x < minX) minX = b.x;
+    if (b.y < minY) minY = b.y;
+    if (b.x + b.width > maxX) maxX = b.x + b.width;
+    if (b.y + b.height > maxY) maxY = b.y + b.height;
+  }
+  const padX = 0.045;
+  const padY = 0.055;
+  const x = Math.max(0, minX - padX);
+  const y = Math.max(0, minY - padY);
+  const right = Math.min(1, maxX + padX);
+  const bottom = Math.min(1, maxY + padY);
+  return {
+    x,
+    y,
+    width: Math.max(0.08, right - x),
+    height: Math.max(0.08, bottom - y),
+  };
+}
+
+function computeFitZoomTransform(
+  focusBox: BoundingBox,
+  viewDims: ViewDimensions,
+  streamDims: StreamDimensions
+): { scale: number; tx: number; ty: number } {
+  if (viewDims.width <= 0 || viewDims.height <= 0) {
+    return { scale: 1, tx: 0, ty: 0 };
+  }
+  const px = transformNormalizedToPixelBox(focusBox, {
+    viewDimensions: viewDims,
+    streamDimensions: streamDims,
+    resizeMode: "cover",
+    isMirrored: false,
+    orientation: "portrait",
+  });
+  if (px.width <= 12 || px.height <= 12) {
+    return { scale: 1, tx: 0, ty: 0 };
+  }
+  const rawScale = Math.min(
+    (viewDims.width * 0.88) / px.width,
+    (viewDims.height * 0.84) / px.height
+  );
+  const scale = Math.max(1, Math.min(2.8, rawScale));
+  if (scale <= 1.08) {
+    return { scale: 1, tx: 0, ty: 0 };
+  }
+  const cx = px.x + px.width * 0.5;
+  const cy = px.y + px.height * 0.5;
+  const maxTx = (viewDims.width * (scale - 1)) * 0.5;
+  const maxTy = (viewDims.height * (scale - 1)) * 0.5;
+  const tx = Math.max(-maxTx, Math.min(maxTx, (viewDims.width * 0.5 - cx) * scale));
+  const ty = Math.max(-maxTy, Math.min(maxTy, (viewDims.height * 0.5 - cy) * scale));
+  return { scale, tx, ty };
+}
+
 const ENTITY_FILTERS: ReadonlyArray<{
   id: OcrEntityFilter;
   label: string;
@@ -276,14 +347,21 @@ export default function OcrScannerScreen(): React.JSX.Element {
   const [isCapturingPhoto, setIsCapturingPhoto] = useState<boolean>(false);
   const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState<boolean>(false);
   const [captureFlashTick, setCaptureFlashTick] = useState<number>(0);
+  const [showOverlayTags, setShowOverlayTags] = useState<boolean>(false);
+  const [isPaperZoomEnabled, setIsPaperZoomEnabled] = useState<boolean>(true);
+  const [isReaderOpen, setIsReaderOpen] = useState<boolean>(false);
+  const [selectedBoxText, setSelectedBoxText] = useState<string | null>(null);
 
   const analysisRunIdRef = useRef<number>(0);
   const activePreset = UI_THEME_PRESETS[themeIndex] ?? UI_THEME_PRESETS[0];
 
-  // Reanimated UI-thread press scale & transcript reveal (zero bounce)
+  // Reanimated UI-thread press scale, transcript reveal & fit-paper review zoom (zero bounce)
   const shutterScale = useSharedValue<number>(1);
   const transcriptReveal = useSharedValue<number>(1);
   const transcriptTranslateY = useSharedValue<number>(0);
+  const reviewZoomScale = useSharedValue<number>(1);
+  const reviewZoomTx = useSharedValue<number>(0);
+  const reviewZoomTy = useSharedValue<number>(0);
 
   const shutterAnimatedStyle = useAnimatedStyle(() => {
     "worklet";
@@ -297,6 +375,17 @@ export default function OcrScannerScreen(): React.JSX.Element {
     return {
       opacity: transcriptReveal.get(),
       transform: [{ translateY: transcriptTranslateY.get() }],
+    };
+  });
+
+  const reviewZoomAnimatedStyle = useAnimatedStyle(() => {
+    "worklet";
+    return {
+      transform: [
+        { translateX: reviewZoomTx.get() },
+        { translateY: reviewZoomTy.get() },
+        { scale: reviewZoomScale.get() },
+      ],
     };
   });
 
@@ -332,8 +421,8 @@ export default function OcrScannerScreen(): React.JSX.Element {
         language: "LATIN",
         granularity: "line",
         entityFilter: "all",
-        minTextLength: 2,
-        maxResults: 30,
+        minTextLength: OCR_MIN_TEXT_LENGTH,
+        maxResults: OCR_MAX_RESULTS,
         preferredPixelFormat: "yuv",
       });
       setOcrProcessor(instance);
@@ -521,6 +610,9 @@ export default function OcrScannerScreen(): React.JSX.Element {
       setCapturedStreamDims(initialDims);
       setCapturedRawResult(null);
       setCapturedDetections([]);
+      setSelectedBoxText(null);
+      setIsReaderOpen(false);
+      setIsPaperZoomEnabled(true);
       setFullText("");
       setEntities(EMPTY_ENTITIES);
       setIsCapturingPhoto(false);
@@ -557,8 +649,8 @@ export default function OcrScannerScreen(): React.JSX.Element {
             {
               granularity,
               entityFilter,
-              minTextLength: 2,
-              maxResults: 30,
+              minTextLength: OCR_MIN_TEXT_LENGTH,
+              maxResults: OCR_MAX_RESULTS,
             }
           );
           setCapturedDetections(reprojected);
@@ -580,6 +672,9 @@ export default function OcrScannerScreen(): React.JSX.Element {
     setCapturedPhoto(null);
     setCapturedRawResult(null);
     setCapturedDetections([]);
+    setSelectedBoxText(null);
+    setIsReaderOpen(false);
+    setIsPaperZoomEnabled(true);
     setAlignment(INITIAL_ALIGNMENT_STATE);
     setIsAnalyzingPhoto(false);
     setIsCapturingPhoto(false);
@@ -600,8 +695,8 @@ export default function OcrScannerScreen(): React.JSX.Element {
         {
           granularity: nextGranularity,
           entityFilter: nextFilter,
-          minTextLength: 2,
-          maxResults: 30,
+          minTextLength: OCR_MIN_TEXT_LENGTH,
+          maxResults: OCR_MAX_RESULTS,
         }
       );
       setCapturedDetections(nextDetections);
@@ -719,22 +814,144 @@ export default function OcrScannerScreen(): React.JSX.Element {
     });
   }, [alignment.box, capturedStreamDims, viewportDims]);
 
+  const reviewGuideTarget = useMemo<DocumentGuideTarget>(() => {
+    if (isReviewingCapturedPhoto && !isAnalyzingPhoto) {
+      return {
+        ...documentGuide,
+        statusText: undefined,
+        hintText: undefined,
+      };
+    }
+    return documentGuide;
+  }, [documentGuide, isAnalyzingPhoto, isReviewingCapturedPhoto]);
+
+  const focusPaperBox = useMemo<BoundingBox>(
+    () => computeOcrContentBounds(capturedDetections, alignment.box),
+    [alignment.box, capturedDetections]
+  );
+
+  const fitZoomTransform = useMemo(
+    () => computeFitZoomTransform(focusPaperBox, viewportDims, capturedStreamDims),
+    [capturedStreamDims, focusPaperBox, viewportDims]
+  );
+
+  useEffect(() => {
+    const applyZoom =
+      isReviewingCapturedPhoto && !isAnalyzingPhoto && isPaperZoomEnabled;
+    const nextScale = applyZoom ? fitZoomTransform.scale : 1;
+    const nextTx = applyZoom ? fitZoomTransform.tx : 0;
+    const nextTy = applyZoom ? fitZoomTransform.ty : 0;
+
+    if (reducedMotion) {
+      reviewZoomScale.set(nextScale);
+      reviewZoomTx.set(nextTx);
+      reviewZoomTy.set(nextTy);
+      return;
+    }
+
+    reviewZoomScale.set(
+      withTiming(nextScale, {
+        duration: 240,
+        easing: EASE_OUT,
+        reduceMotion: ReduceMotion?.System,
+      })
+    );
+    reviewZoomTx.set(
+      withTiming(nextTx, {
+        duration: 240,
+        easing: EASE_OUT,
+        reduceMotion: ReduceMotion?.System,
+      })
+    );
+    reviewZoomTy.set(
+      withTiming(nextTy, {
+        duration: 240,
+        easing: EASE_OUT,
+        reduceMotion: ReduceMotion?.System,
+      })
+    );
+  }, [
+    fitZoomTransform.scale,
+    fitZoomTransform.tx,
+    fitZoomTransform.ty,
+    isAnalyzingPhoto,
+    isPaperZoomEnabled,
+    isReviewingCapturedPhoto,
+    reducedMotion,
+    reviewZoomScale,
+    reviewZoomTx,
+    reviewZoomTy,
+  ]);
+
+  const handlePhotoBoxTap = useCallback(
+    (event: GestureResponderEvent) => {
+      const nativeEvt = event?.nativeEvent;
+      if (
+        !nativeEvt ||
+        viewportDims.width <= 0 ||
+        viewportDims.height <= 0 ||
+        capturedDetections.length === 0
+      ) {
+        return;
+      }
+      const { locationX, locationY } = nativeEvt;
+      let hitText: string | null = null;
+      let bestArea = Number.POSITIVE_INFINITY;
+      const hitPad = 8;
+
+      for (let i = 0; i < capturedDetections.length; i++) {
+        const det = capturedDetections[i];
+        const px = transformNormalizedToPixelBox(det.boundingBox, {
+          viewDimensions: viewportDims,
+          streamDimensions: capturedStreamDims,
+          resizeMode: "cover",
+          isMirrored: false,
+          orientation: "portrait",
+        });
+        if (
+          locationX >= px.x - hitPad &&
+          locationX <= px.x + px.width + hitPad &&
+          locationY >= px.y - hitPad &&
+          locationY <= px.y + px.height + hitPad
+        ) {
+          const area = px.width * px.height;
+          if (area < bestArea) {
+            bestArea = area;
+            hitText = det.label;
+          }
+        }
+      }
+
+      setSelectedBoxText(hitText);
+    },
+    [capturedDetections, capturedStreamDims, viewportDims]
+  );
+
+  const highlightFillColor =
+    activePreset.id === "ktp"
+      ? "rgba(34, 197, 94, 0.13)"
+      : activePreset.id === "hud"
+        ? "rgba(56, 189, 248, 0.13)"
+        : "rgba(245, 158, 11, 0.13)";
+
   const overlayTheme = useMemo<OverlayThemeConfig>(
     () => ({
       showBoxes: true,
       boxVariant,
       boxColor: activePreset.accent,
-      boxBorderWidth: 1.8,
-      boxBorderRadius: 6,
-      cornerLength: 14,
-      cornerThickness: 2.5,
-      showLabels: granularity !== "element",
+      boxBackgroundColor: highlightFillColor,
+      boxBorderWidth: 1.4,
+      boxBorderRadius: 4,
+      cornerLength: 9,
+      cornerThickness: 2,
+      showLabels: (showOverlayTags || entityFilter !== "all") && granularity !== "element",
+      avoidLabelOverlap: true,
       showConfidence: false,
       labelPosition: "top-left",
-      labelBackgroundColor: "rgba(5, 22, 30, 0.86)",
+      labelBackgroundColor: "rgba(5, 22, 30, 0.90)",
       labelTextColor: "#f8fafc",
       labelTextStyle: {
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: "700",
       },
       formatLabel: (detection: DetectionResult) => {
@@ -746,7 +963,7 @@ export default function OcrScannerScreen(): React.JSX.Element {
         return `${prefix}${trimmed}`;
       },
     }),
-    [activePreset.accent, boxVariant, granularity]
+    [activePreset.accent, boxVariant, entityFilter, granularity, highlightFillColor, showOverlayTags]
   );
 
   const customRenderDocumentStatus = useCallback(
@@ -916,6 +1133,7 @@ export default function OcrScannerScreen(): React.JSX.Element {
           }
           captureMode={forcePhotoOnlyFallback ? "photo" : "live"}
           enablePhotoCapture={true}
+          photoQualityPrioritization="quality"
           showBoxes={false}
           showLabels={false}
           showLandmarks={false}
@@ -935,43 +1153,52 @@ export default function OcrScannerScreen(): React.JSX.Element {
           style={styles.camera}
         />
 
-        {/* Post-Capture Review: Still Photo + Capture-Triggered Laser Sweep + Bounding Boxes */}
+        {/* Post-Capture Review: Auto-Zoomable Still Photo + Unobstructed OCR Highlights + Laser Sweep */}
         {isReviewingCapturedPhoto && capturedPhoto ? (
           <View style={StyleSheet.absoluteFill}>
-            <Image
-              source={{ uri: capturedPhoto.uri }}
-              style={StyleSheet.absoluteFill}
-              resizeMode="cover"
-              onLoad={handleCapturedImageLoad}
-            />
+            <Animated.View style={[StyleSheet.absoluteFill, reviewZoomAnimatedStyle]}>
+              <Image
+                source={{ uri: capturedPhoto.uri }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+                onLoad={handleCapturedImageLoad}
+              />
 
-            {!isAnalyzingPhoto &&
-            capturedDetections.length > 0 &&
-            viewportDims.width > 0 &&
-            viewportDims.height > 0 ? (
-              <DetectionOverlay
-                detections={capturedDetections}
+              {!isAnalyzingPhoto &&
+              capturedDetections.length > 0 &&
+              viewportDims.width > 0 &&
+              viewportDims.height > 0 ? (
+                <DetectionOverlay
+                  detections={capturedDetections}
+                  viewDimensions={viewportDims}
+                  streamDimensions={capturedStreamDims}
+                  resizeMode="cover"
+                  isMirrored={false}
+                  overlayTheme={overlayTheme}
+                />
+              ) : null}
+
+              <DocumentGuideOverlay
+                guide={reviewGuideTarget}
                 viewDimensions={viewportDims}
                 streamDimensions={capturedStreamDims}
                 resizeMode="cover"
                 isMirrored={false}
-                overlayTheme={overlayTheme}
+                theme={activePreset.guideTheme}
+                renderStatus={
+                  activePreset.useCustomSlots
+                    ? customRenderDocumentStatus
+                    : undefined
+                }
               />
-            ) : null}
 
-            <DocumentGuideOverlay
-              guide={documentGuide}
-              viewDimensions={viewportDims}
-              streamDimensions={capturedStreamDims}
-              resizeMode="cover"
-              isMirrored={false}
-              theme={activePreset.guideTheme}
-              renderStatus={
-                activePreset.useCustomSlots
-                  ? customRenderDocumentStatus
-                  : undefined
-              }
-            />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Inspect Recognized Text Box"
+                onPress={handlePhotoBoxTap}
+                style={StyleSheet.absoluteFill}
+              />
+            </Animated.View>
 
             <ScannerAnimationOverlay
               active={isAnalyzingPhoto}
@@ -991,6 +1218,91 @@ export default function OcrScannerScreen(): React.JSX.Element {
                   : undefined
               }
             />
+
+            {!isAnalyzingPhoto ? (
+              <View style={styles.reviewFloatingControls} pointerEvents="box-none">
+                {selectedBoxText ? (
+                  <View style={styles.selectedBoxBanner}>
+                    <Text style={styles.selectedBoxLabel}>TERPILIH</Text>
+                    <Text style={styles.selectedBoxValue} numberOfLines={2}>
+                      {selectedBoxText}
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Close Selected Text"
+                      onPress={() => setSelectedBoxText(null)}
+                      style={styles.selectedBoxClose}
+                    >
+                      <Text style={styles.selectedBoxCloseText}>Tutup</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+
+                <View style={styles.reviewToolsRow}>
+                  {fitZoomTransform.scale > 1.08 ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Toggle Fit Paper Zoom"
+                      onPress={() => setIsPaperZoomEnabled((v) => !v)}
+                      style={[
+                        styles.reviewToolPill,
+                        isPaperZoomEnabled && styles.reviewToolPillActive,
+                      ]}
+                    >
+                      <Eye size={12} color={isPaperZoomEnabled ? "#05161E" : "#e2e8f0"} />
+                      <Text
+                        style={[
+                          styles.reviewToolText,
+                          isPaperZoomEnabled && styles.reviewToolTextActive,
+                        ]}
+                      >
+                        {isPaperZoomEnabled
+                          ? `Fit ${fitZoomTransform.scale.toFixed(1)}x`
+                          : "1x Full"}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Toggle Overlay Labels"
+                    onPress={() => setShowOverlayTags((v) => !v)}
+                    style={[
+                      styles.reviewToolPill,
+                      showOverlayTags && styles.reviewToolPillActive,
+                    ]}
+                  >
+                    <Sparkles
+                      size={12}
+                      color={showOverlayTags ? "#05161E" : "#e2e8f0"}
+                    />
+                    <Text
+                      style={[
+                        styles.reviewToolText,
+                        showOverlayTags && styles.reviewToolTextActive,
+                      ]}
+                    >
+                      {showOverlayTags ? "Smart Tags" : "Highlight Bersih"}
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Open Full Text Reader"
+                    onPress={() => setIsReaderOpen(true)}
+                    disabled={fullText.trim().length === 0}
+                    style={[
+                      styles.reviewToolPill,
+                      styles.reviewToolPillReader,
+                      fullText.trim().length === 0 && styles.actionButtonDisabled,
+                    ]}
+                  >
+                    <ScanText size={12} color="#fcd34d" />
+                    <Text style={styles.reviewToolTextReader}>Baca Penuh</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -1127,10 +1439,22 @@ export default function OcrScannerScreen(): React.JSX.Element {
                 <Text style={styles.transcriptTitle}>
                   Scan Result ({fullText.trim().length} chars)
                 </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Expand Scan Result Reader"
+                  disabled={fullText.trim().length === 0}
+                  onPress={() => setIsReaderOpen(true)}
+                  style={[
+                    styles.expandReaderBtn,
+                    fullText.trim().length === 0 && styles.actionButtonDisabled,
+                  ]}
+                >
+                  <Text style={styles.expandReaderText}>Lihat Penuh</Text>
+                </Pressable>
               </View>
 
               <ScrollView style={styles.transcriptScroll}>
-                <Text style={styles.transcriptBody}>
+                <Text selectable={true} style={styles.transcriptBody}>
                   {fullText.trim().length > 0
                     ? fullText.trim()
                     : isAnalyzingPhoto
@@ -1216,6 +1540,68 @@ export default function OcrScannerScreen(): React.JSX.Element {
           </Pressable>
         </View>
       </View>
+
+      {/* Full-Screen High-Contrast OCR Reader Sheet for long / far-away captures */}
+      {isReaderOpen ? (
+        <View
+          style={[
+            styles.readerOverlay,
+            {
+              paddingTop: insets.top + 12,
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
+          ]}
+        >
+          <View style={styles.readerHeader}>
+            <View style={styles.readerTitleWrap}>
+              <ScanText size={16} color={activePreset.accent} />
+              <Text style={styles.readerTitle}>
+                Hasil Teks Lengkap ({fullText.trim().length} chars)
+              </Text>
+            </View>
+            <View style={styles.readerHeaderActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Copy or Share Full OCR Text"
+                onPress={() => void handleShareTranscript()}
+                style={[styles.readerActionBtn, { backgroundColor: activePreset.accent }]}
+              >
+                <Share2 size={13} color="#05161E" />
+                <Text style={styles.readerActionDarkText}>Export</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close Full Text Reader"
+                onPress={() => setIsReaderOpen(false)}
+                style={styles.readerCloseBtn}
+              >
+                <Text style={styles.readerCloseText}>Tutup</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          <ScrollView style={styles.readerScroll} contentContainerStyle={styles.readerScrollContent}>
+            <Text selectable={true} style={styles.readerFullText}>
+              {fullText.trim()}
+            </Text>
+
+            {capturedDetections.length > 0 ? (
+              <View style={styles.readerLinesSection}>
+                <Text style={styles.readerSectionHeading}>
+                  AREA TERDETEKSI ({capturedDetections.length})
+                </Text>
+                {capturedDetections.map((det) => (
+                  <View key={det.id} style={styles.readerLineRow}>
+                    <Text selectable={true} style={styles.readerLineText}>
+                      {det.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </ScrollView>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1511,7 +1897,200 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   transcriptScroll: {
-    maxHeight: 82,
+    maxHeight: 96,
+  },
+  expandReaderBtn: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(245, 158, 11, 0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.45)",
+  },
+  expandReaderText: {
+    color: "#fcd34d",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  reviewFloatingControls: {
+    position: "absolute",
+    left: 10,
+    right: 10,
+    bottom: 10,
+    gap: 8,
+  },
+  selectedBoxBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(5, 22, 30, 0.94)",
+    borderWidth: 1,
+    borderColor: AMBER_ACCENT,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  selectedBoxLabel: {
+    color: AMBER_ACCENT,
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  selectedBoxValue: {
+    flex: 1,
+    color: "#f8fafc",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  selectedBoxClose: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: "rgba(148, 163, 184, 0.2)",
+  },
+  selectedBoxCloseText: {
+    color: "#e2e8f0",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  reviewToolsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    justifyContent: "flex-end",
+  },
+  reviewToolPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(5, 22, 30, 0.88)",
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.45)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  reviewToolPillActive: {
+    backgroundColor: EMERALD_ACCENT,
+    borderColor: "#86efac",
+  },
+  reviewToolPillReader: {
+    borderColor: "rgba(245, 158, 11, 0.55)",
+    backgroundColor: "rgba(5, 22, 30, 0.92)",
+  },
+  reviewToolText: {
+    color: "#e2e8f0",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  reviewToolTextActive: {
+    color: "#05161E",
+  },
+  reviewToolTextReader: {
+    color: "#fcd34d",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  readerOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#05161E",
+    paddingHorizontal: 16,
+    zIndex: 50,
+    gap: 12,
+  },
+  readerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(148, 163, 184, 0.2)",
+  },
+  readerTitleWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  readerTitle: {
+    color: "#f8fafc",
+    fontSize: 14,
+    fontWeight: "800",
+    flexShrink: 1,
+  },
+  readerHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  readerActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  readerActionDarkText: {
+    color: "#05161E",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  readerCloseBtn: {
+    backgroundColor: "#0B202A",
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.35)",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  readerCloseText: {
+    color: "#f8fafc",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  readerScroll: {
+    flex: 1,
+  },
+  readerScrollContent: {
+    gap: 16,
+    paddingBottom: 24,
+  },
+  readerFullText: {
+    color: "#f8fafc",
+    fontSize: 15,
+    lineHeight: 23,
+    backgroundColor: "#0B202A",
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.22)",
+  },
+  readerLinesSection: {
+    gap: 6,
+  },
+  readerSectionHeading: {
+    color: "#94a3b8",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+  },
+  readerLineRow: {
+    backgroundColor: "#0B202A",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.14)",
+  },
+  readerLineText: {
+    color: "#e2e8f0",
+    fontSize: 13,
+    lineHeight: 19,
   },
   transcriptBody: {
     color: "#e2e8f0",

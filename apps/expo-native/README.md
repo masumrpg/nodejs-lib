@@ -1,8 +1,8 @@
 # Expo Native Camera AI Playground (`apps/expo-native`)
 
-Interactive on-device computer vision playground and native development build testing suite for `@masumdev/rn-camera-ai` and `@masumdev/rn-camera-ai-tflite`.
+Interactive on-device computer vision playground and native development build testing suite for `@masumdev/rn-camera-ai`, `@masumdev/rn-camera-ai-tflite`, and `@masumdev/rn-camera-ai-mlkit`.
 
-Built with **Expo Development Builds** (`expo-dev-client`), **React Native Vision Camera v5** (Nitro C++), **React Native Fast-TFLite**, and **React Native Reanimated**.
+Built with **Expo Development Builds** (`expo-dev-client`), **React Native Vision Camera v5** (Nitro C++), **React Native Fast-TFLite**, **Google ML Kit v2**, and **React Native Reanimated**.
 
 ---
 
@@ -16,7 +16,7 @@ apps/expo-native/
 │   ├── object-detection.tsx   # MobileNet SSD object detection & live styling
 │   ├── face-recognition.tsx   # 468 Face Mesh + MobileFaceNet face recognition
 │   ├── liveness-detection.tsx # Hybrid Active + Passive Liveness & e-KYC Wizard
-│   └── ocr-scanner.tsx        # Google ML Kit v2 Live OCR & Structured Entity Extraction
+│   └── ocr-scanner.tsx        # Single-Capture Smart Document OCR & Entity Extraction
 └── assets/
     └── models/                # Bundled local TFLite neural network models
 ```
@@ -57,10 +57,9 @@ apps/expo-native/
 - **Interactive 4-Step e-KYC Challenge Wizard**:
   - Step-by-step interactive challenge verifying passive 3D depth, eye blink, head turn, and mouth expression.
 
-### 5. Text Recognition & OCR Scanner (`/ocr-scanner`)
-- Powered by `@masumdev/rn-camera-ai-mlkit` and Google ML Kit v2 (`react-native-vision-camera-mlkit`) with zero-copy `YUV_420_888` frame streaming.
-- **Live Granularity Switcher**: Switch dynamically between `Line`, `Block`, and `Word` (`element`) bounding boxes.
-- **Smart Entity Filters & Transcript Panel**: Auto-detects & filters `NIK / KTP`, `Phone`, `Email`, `URL`, and `Rp / Currency`, displaying extracted chips alongside a live scrollable transcript with 1-tap Share / Export.
+### 5. Single-Capture Smart Document & OCR Scanner (`/ocr-scanner`)
+- Uses zero-OCR background YUV paper corner detection (`createDocumentAlignmentProcessor`) with live 4-corner `DocumentQuad` tracking and capture optimality scoring, running Google ML Kit v2 (`@masumdev/rn-camera-ai-mlkit`) once after capture during Reanimated 4 laser animation.
+- Post-capture review provides automatic **Fit Paper Zoom** (`Fit Zoom` / `1x Full`), clean non-obscuring text highlights (or collision-free `Smart Tags` via `avoidLabelOverlap`), tap-to-inspect selected box banners, an expandable **Full Text Reader (`Baca Penuh`)**, live **Granularity** switching (`Line`, `Block`, `Word`), `Studio` / `Emerald` / custom UI theme presets, and structured extraction chips (`NIK / KTP`, `Phone`, `Email`, `URL`, `Rp / Currency`) with 1-tap Share / Export.
 
 ---
 
@@ -143,7 +142,7 @@ eas build --platform android --profile development --local
 
 ## Monorepo Script Reference
 
-- `bun run build`: Builds monorepo dependencies (`@masumdev/rn-camera-ai`, `@masumdev/rn-camera-ai-tflite`).
+- `bun run build`: Builds monorepo dependencies (`@masumdev/rn-camera-ai`, `@masumdev/rn-camera-ai-tflite`, `@masumdev/rn-camera-ai-mlkit`).
 - `bun run audit`: Runs codebase verification (ensures zero `any`, zero unused imports/variables).
 - `bun test`: Executes monorepo test suites including E2E integration tests.
 

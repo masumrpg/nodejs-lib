@@ -1021,8 +1021,27 @@ describe("Tier 4: apps/expo-native Scaffold, Bundled Model & Detector Integratio
       const analyzedTexts = collectTexts(ocrRenderer.container);
       expect(analyzedTexts).toContain("Retake Photo");
       expect(analyzedTexts).toContain("Export / Copy");
+      expect(analyzedTexts).toContain("Highlight Bersih");
+      expect(analyzedTexts).toContain("Baca Penuh");
       expect(analyzedTexts.join(" ")).toContain("3273011505990001");
       expect(analyzedTexts.join(" ")).toContain("masum@example.com");
+
+      // Expand Full Text Reader for long / far-away document inspection
+      const readFullBtn = findButtonByText(ocrRenderer.container, "Baca Penuh");
+      expect(readFullBtn).toBeDefined();
+      React.act(() => {
+        const onPress = readFullBtn?.props?.onPress as (() => void) | undefined;
+        onPress?.();
+      });
+      const readerTexts = collectTexts(ocrRenderer.container);
+      expect(readerTexts.join(" ")).toContain("Hasil Teks Lengkap");
+      expect(readerTexts.join(" ")).toContain("AREA TERDETEKSI");
+      const closeReaderBtn = findButtonByText(ocrRenderer.container, "Tutup");
+      expect(closeReaderBtn).toBeDefined();
+      React.act(() => {
+        const onPress = closeReaderBtn?.props?.onPress as (() => void) | undefined;
+        onPress?.();
+      });
 
       // Switch UI customization preset (Studio -> Emerald -> Custom)
       const themeButton = findButtonByText(ocrRenderer.container, "Studio");

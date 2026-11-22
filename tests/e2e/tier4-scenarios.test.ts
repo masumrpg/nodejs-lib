@@ -240,6 +240,7 @@ describe("Tier 4: Real-World Multi-Feature Application Scenarios", () => {
       const entries = fs.readdirSync(packagesDir);
       expect(entries).toContain("rn-camera-ai");
       expect(entries).toContain("rn-camera-ai-tflite");
+      expect(entries).toContain("rn-camera-ai-mlkit");
     }
   });
 });

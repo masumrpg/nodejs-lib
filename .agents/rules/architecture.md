@@ -12,10 +12,14 @@ Welcome to the **Masum Dev** Open Source Monorepo Workspace. This project is str
 │   ├── markforge/             # Multi-format document publishing engine & CLI (PDF, DOCX, HTML, TXT)
 │   ├── tscheck/               # TypeScript & AST code auditing engine & interactive CLI
 │   ├── rn-ui/                 # Typed flat UI kit (63+ components, design tokens, light/dark mode)
+│   ├── rn-camera-ai/          # Zero-JS-thread VisionCamera v5 AI preview & overlay engine
+│   ├── rn-camera-ai-tflite/   # Optional Fast-TFLite GPU adapter (Object Detection, Face & Liveness)
+│   ├── rn-camera-ai-mlkit/    # Optional Google ML Kit v2 adapter (OCR & Document Framing)
 │   ├── rn-tajweed-verse/      # Tajweed Quranic verse parser & renderer with interactive tooltips
 │   └── rn-qr-code/            # SVG QR code generator with custom eye shapes & presets
 ├── apps/
 │   ├── expo-go/               # Interactive Expo Go playground app (iOS / Android / Web)
+│   ├── expo-native/           # Expo Development Build playground for VisionCamera AI packages
 │   ├── cli/                   # CLI playgrounds and compilation testing
 │   └── docs/                  # Astro 5 + Starlight documentation portal (https://lib.masumdev.id)
 ├── scripts/                   # Workspace maintenance & audit scripts (e.g. audit-codebase.ts)

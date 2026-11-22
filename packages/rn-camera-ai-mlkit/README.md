@@ -64,19 +64,37 @@ Configure selective Google ML Kit models in `app.json` (enable only Latin by def
 
 ---
 
-## Quick Start (Real-Time Live OCR)
+## Quick Start (Capture-First Smart Document OCR)
+
+Use `@masumdev/rn-camera-ai`'s zero-OCR `createDocumentAlignmentProcessor` for buttery preview corner tracking and run `recognizeImage` **once** after tapping Capture (recommended for battery & smooth FPS; you can also bind `ocrProcessor` directly for continuous live OCR):
 
 ```tsx
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
-import { CameraAI, type DetectionResult } from '@masumdev/rn-camera-ai';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  CameraAI,
+  createDocumentAlignmentProcessor,
+  type CameraAIRef,
+  type DocumentGuideTarget,
+} from '@masumdev/rn-camera-ai';
 import {
   createMLKitTextRecognizer,
   type MLKitTextRecognizer,
 } from '@masumdev/rn-camera-ai-mlkit';
 
 export function OcrScannerScreen() {
+  const cameraRef = useRef<CameraAIRef | null>(null);
+  const alignmentProcessor = useMemo(
+    () => createDocumentAlignmentProcessor({ targetFps: 5 }),
+    []
+  );
   const [ocrProcessor, setOcrProcessor] = useState<MLKitTextRecognizer | null>(null);
+  const [guide, setGuide] = useState<DocumentGuideTarget>({
+    box: { x: 0.08, y: 0.14, width: 0.84, height: 0.64 },
+    readiness: 'searching',
+    optimalityScore: 0,
+    statusText: 'Arahkan kertas ke dalam bingkai',
+  });
   const [transcript, setTranscript] = useState('');
 
   useEffect(() => {
@@ -88,7 +106,6 @@ export function OcrScannerScreen() {
         language: 'LATIN',
         granularity: 'line',
         entityFilter: 'all',
-        targetFps: 10,
         minTextLength: 2,
       });
 
@@ -104,27 +121,46 @@ export function OcrScannerScreen() {
 
     return () => {
       active = false;
+      alignmentProcessor.dispose?.();
       instance?.dispose?.();
     };
-  }, []);
+  }, [alignmentProcessor]);
 
-  if (!ocrProcessor) return null;
+  const handleCapture = async () => {
+    const photo = await cameraRef.current?.capturePhoto({ flashMode: 'off' });
+    if (!photo || !ocrProcessor) return;
+    const result = await ocrProcessor.recognizeImage(photo.uri);
+    setTranscript(result?.text ?? '');
+  };
 
   return (
     <View style={styles.container}>
       <CameraAI
-        processor={ocrProcessor}
-        cameraPosition="back"
-        resizeMode="cover"
-        boxVariant="corners"
-        boxColor="#f59e0b"
-        onDetections={(results: DetectionResult[]) => {
-          const fullText = results[0]?.ocr?.fullText ?? '';
-          setTranscript(fullText);
+        ref={cameraRef}
+        processor={alignmentProcessor}
+        enablePhotoCapture={true}
+        showBoxes={false}
+        showLabels={false}
+        showLandmarks={false}
+        documentGuide={guide}
+        onDetections={(results) => {
+          const align = results[0]?.documentAlignment;
+          if (!align) return;
+          setGuide({
+            box: results[0].boundingBox,
+            corners: align.corners,
+            readiness: align.isOptimal ? 'optimal' : align.hasDocument ? 'adjusting' : 'searching',
+            optimalityScore: align.optimalityScore,
+            statusText: align.headline,
+            hintText: align.hint,
+          });
         }}
       />
       <View style={styles.transcriptBox}>
-        <Text style={styles.transcriptText}>{transcript || 'Point at text...'}</Text>
+        <Text style={styles.transcriptText}>{transcript || guide.statusText}</Text>
+        <Pressable onPress={handleCapture} style={styles.captureBtn}>
+          <Text style={styles.captureText}>Capture Document</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -137,11 +173,19 @@ const styles = StyleSheet.create({
     bottom: 24,
     left: 16,
     right: 16,
-    backgroundColor: 'rgba(5, 22, 30, 0.85)',
+    backgroundColor: 'rgba(5, 22, 30, 0.88)',
     padding: 14,
     borderRadius: 12,
+    gap: 10,
   },
   transcriptText: { color: '#f8fafc', fontSize: 13 },
+  captureBtn: {
+    backgroundColor: '#f59e0b',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  captureText: { color: '#05161E', fontWeight: '700' },
 });
 ```
 

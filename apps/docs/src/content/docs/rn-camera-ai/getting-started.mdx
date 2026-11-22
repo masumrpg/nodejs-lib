@@ -12,9 +12,29 @@ This guide walks you through installing `@masumdev/rn-camera-ai` and `@masumdev/
 
 ---
 
-## 1. Package Installation
+## 1. Modular Package Installation
 
-Install both the core library and the TFLite adapter using your package manager of choice:
+Always install the core `@masumdev/rn-camera-ai` package, then choose only the optional adapter package(s) required for your screen:
+
+<Tabs syncKey="adapter">
+  <TabItem label="TFLite (Object / Face)">
+    ```bash
+    bun add @masumdev/rn-camera-ai @masumdev/rn-camera-ai-tflite react-native-fast-tflite
+    ```
+  </TabItem>
+  <TabItem label="ML Kit (OCR)">
+    ```bash
+    bun add @masumdev/rn-camera-ai @masumdev/rn-camera-ai-mlkit react-native-vision-camera-mlkit
+    ```
+  </TabItem>
+  <TabItem label="Core Only (Custom / Doc)">
+    ```bash
+    bun add @masumdev/rn-camera-ai
+    ```
+  </TabItem>
+</Tabs>
+
+Or via `npm`:
 
 <Tabs syncKey="pkg">
   <TabItem label="bun" icon="bun">

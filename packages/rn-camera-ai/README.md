@@ -98,6 +98,8 @@ The central coordinator component that renders native camera capture, executes f
 | `processor` | `CameraProcessor` | `undefined` | Pluggable vision engine (e.g. `TFLiteObjectDetector`, `TFLiteFaceRecognizer`, or `MLKitTextRecognizer`). |
 | `captureMode` | `'live' \| 'photo'` | `'live'` | Hardware output pipeline: `'live'` streams frames to `processor`, `'photo'` binds still `PhotoOutput` for `capturePhoto()`. |
 | `enablePhotoCapture` | `boolean` | `false` | Optional flag to keep `PhotoOutput` active alongside `frameOutput` during `'live'` mode. |
+| `photoResolution` | `StreamDimensions` | `{ width: 1440, height: 1920 }` | Target `PhotoOutput` dimensions (kept at 2.76 MP 4:3 for <=4 MP static OCR compatibility). |
+| `photoQualityPrioritization` | `'speed' \| 'balanced' \| 'quality'` | `'balanced'` | Capture quality vs speed priority for `usePhotoOutput`. |
 | `scanAnimation` | `boolean \| ScannerAnimationConfig` | `false` | Enables Reanimated 4 UI-thread laser sweep & capture flash (`ScannerAnimationOverlay`) with customizable slots. |
 | `flashTrigger` | `number` | `0` | Incrementing pulse counter triggering a 160ms hardware-composited shutter flash on `ScannerAnimationOverlay`. |
 | `documentGuide` | `DocumentGuideTarget` | `undefined` | Normalized paper rectangle & scan optimality state rendered via animated `<DocumentGuideOverlay />`. |
@@ -121,7 +123,7 @@ The central coordinator component that renders native camera capture, executes f
 | `showLandmarks` | `boolean` | `true` | Renders facial keypoints or 468-point 3D Face Mesh when present. |
 | `showMeshLines` | `boolean` | `true` | Renders connected anatomical contour polylines in 468-point Face Mesh mode. |
 | `showTesselation`| `boolean` | `true` | Renders interior triangle tesselation web in 468-point Face Mesh mode. |
-| `overlayTheme` | `OverlayThemeConfig` | `undefined` | Unified declarative theme object for granular styling. |
+| `overlayTheme` | `OverlayThemeConfig` | `undefined` | Unified declarative theme object for granular styling (including `avoidLabelOverlap` collision suppression). |
 | `renderBox` | `(params: RenderBoxParams) => React.ReactNode` | `undefined` | Custom slot renderer for bounding boxes. |
 | `renderLabel` | `(params: RenderLabelParams) => React.ReactNode` | `undefined` | Custom slot renderer for label badges. |
 | `renderLandmarkDot` | `(params: RenderLandmarkDotParams) => React.ReactNode` | `undefined` | Custom slot renderer for individual landmark vertices. |

@@ -71,6 +71,8 @@ export const CameraAI: React.FC<CameraAIProps> = ({
   processor,
   captureMode = 'live',
   enablePhotoCapture = false,
+  photoResolution,
+  photoQualityPrioritization,
   scanAnimation = false,
   flashTrigger: flashTriggerProp = 0,
   cameraPosition = 'back',
@@ -467,8 +469,8 @@ export const CameraAI: React.FC<CameraAIProps> = ({
   const photoOutput =
     typeof usePhotoOutput === 'function'
       ? usePhotoOutput({
-          targetResolution: { width: 1440, height: 1920 },
-          qualityPrioritization: 'balanced',
+          targetResolution: photoResolution ?? { width: 1440, height: 1920 },
+          qualityPrioritization: photoQualityPrioritization ?? 'balanced',
         })
       : undefined;
 

@@ -38,6 +38,8 @@ import { CameraAI } from '@masumdev/rn-camera-ai';
 | `processor` | `CameraProcessor` | `undefined` | Pluggable AI inference engine implementing the `CameraProcessor` interface. |
 | `captureMode` | `'live' \| 'photo'` | `'live'` | Determines active hardware output pipeline: `'live'` runs continuous worklet frames; `'photo'` binds `PhotoOutput` (`1440×1920`) for `capturePhoto()`. |
 | `enablePhotoCapture` | `boolean` | `false` | Keeps `PhotoOutput` enabled during `'live'` mode for dual-output hardware (keep `false` on Camera2 `LIMITED` devices). |
+| `photoResolution` | `StreamDimensions` | `{ width: 1440, height: 1920 }` | Target still-photo resolution used by `usePhotoOutput` (default stays safely under Google ML Kit's 4 MP static limit). |
+| `photoQualityPrioritization` | `'speed' \| 'balanced' \| 'quality'` | `'balanced'` | Capture pipeline priority passed to `usePhotoOutput` (`'quality'` recommended for distant document OCR). |
 | `scanAnimation` | `boolean \| ScannerAnimationConfig` | `false` | Enables the Reanimated 4 laser sweep & shutter flash overlay (`ScannerAnimationOverlay`) with full custom slot support. |
 | `flashTrigger` | `number` | `0` | Incrementing pulse counter that triggers a 160ms shutter flash veil inside `ScannerAnimationOverlay`. |
 | `documentGuide` | `DocumentGuideTarget` | `undefined` | Displays dynamic UI-thread `<DocumentGuideOverlay />` corners snapped onto detected document/paper bounds with readiness status. |
@@ -61,7 +63,7 @@ import { CameraAI } from '@masumdev/rn-camera-ai';
 | `showLandmarks` | `boolean` | `true` | Renders 6-point facial keypoints or 468-point 3D Face Mesh when present on detections. |
 | `showMeshLines` | `boolean` | `true` | Renders connected anatomical contour polylines (eyes, brows, lips, nose, oval) in 468-point Face Mesh mode. |
 | `showTesselation` | `boolean` | `true` | Renders interior facial triangle tesselation grid in 468-point Face Mesh mode. |
-| `overlayTheme` | `OverlayThemeConfig` | `undefined` | Unified declarative theme object controlling bounding box geometry, label position, and granular `FaceMeshStyleConfig` colors/radii. |
+| `overlayTheme` | `OverlayThemeConfig` | `undefined` | Unified declarative theme object controlling bounding box geometry, label position, `avoidLabelOverlap` collision suppression, and granular `FaceMeshStyleConfig` colors/radii. |
 | `formatLabel` | `(detection: DetectionResult) => string` | `undefined` | Custom label text formatter function. |
 | `renderBox` | `(params: RenderBoxParams) => React.ReactNode` | `undefined` | Custom per-detection bounding box renderer with pre-projected pixel coordinates. |
 | `renderLabel` | `(params: RenderLabelParams) => React.ReactNode` | `undefined` | Custom per-detection label badge renderer with pre-projected pixel coordinates. |

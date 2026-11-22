@@ -464,6 +464,8 @@ export interface OverlayThemeConfig {
   boxStyle?: StyleProp<ViewStyle>;
   /** Whether to render class/identity label badges (default: true) */
   showLabels?: boolean;
+  /** Suppress overlapping label badges in dense text/object scenes so text stays unobstructed (default: false) */
+  avoidLabelOverlap?: boolean;
   /** Whether to render confidence percentage inside default label badge (default: true) */
   showConfidence?: boolean;
   /** Anchor position of the label badge relative to the bounding box (default: 'top-left') */
@@ -785,6 +787,10 @@ export interface CameraAIProps {
   captureMode?: CameraCaptureMode;
   /** Keep PhotoOutput bound alongside frame processor during live mode (default: false for max device compatibility) */
   enablePhotoCapture?: boolean;
+  /** Target still-photo resolution when capturePhoto() is enabled (default: { width: 1440, height: 1920 } 4:3, <=4 MP for ML Kit compatibility) */
+  photoResolution?: StreamDimensions;
+  /** Photo quality vs speed prioritization for PhotoOutput captures (default: 'balanced') */
+  photoQualityPrioritization?: 'speed' | 'balanced' | 'quality';
   /** Enable built-in GPU-composited laser scanner overlay or pass granular ScannerAnimationConfig */
   scanAnimation?: boolean | ScannerAnimationConfig;
   /** Incrementing shutter flash trigger pulse synchronized with ScannerAnimationOverlay */
