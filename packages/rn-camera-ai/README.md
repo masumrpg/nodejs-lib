@@ -95,7 +95,18 @@ The central coordinator component that renders native camera capture, executes f
 
 | Prop | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `processor` | `CameraProcessor` | `undefined` | Pluggable vision engine (e.g. `TFLiteObjectDetector` or `TFLiteFaceRecognizer`). |
+| `processor` | `CameraProcessor` | `undefined` | Pluggable vision engine (e.g. `TFLiteObjectDetector`, `TFLiteFaceRecognizer`, or `MLKitTextRecognizer`). |
+| `captureMode` | `'live' \| 'photo'` | `'live'` | Hardware output pipeline: `'live'` streams frames to `processor`, `'photo'` binds still `PhotoOutput` for `capturePhoto()`. |
+| `enablePhotoCapture` | `boolean` | `false` | Optional flag to keep `PhotoOutput` active alongside `frameOutput` during `'live'` mode. |
+| `scanAnimation` | `boolean \| ScannerAnimationConfig` | `false` | Enables Reanimated 4 UI-thread laser sweep & capture flash (`ScannerAnimationOverlay`) with customizable slots. |
+| `flashTrigger` | `number` | `0` | Incrementing pulse counter triggering a 160ms hardware-composited shutter flash on `ScannerAnimationOverlay`. |
+| `documentGuide` | `DocumentGuideTarget` | `undefined` | Normalized paper rectangle & scan optimality state rendered via animated `<DocumentGuideOverlay />`. |
+| `documentGuideTheme` | `DocumentGuideThemeConfig` | `undefined` | Declarative theme customization for corners, vignette mask, readiness colors, and status pill position. |
+| `renderDocumentGuide` | `(params: RenderDocumentGuideParams) => React.ReactNode` | `undefined` | Headless full-canvas custom renderer replacing `<DocumentGuideOverlay />`. |
+| `renderDocumentCorner` | `(params: RenderDocumentCornerParams) => React.ReactNode` | `undefined` | Custom per-corner bracket renderer receiving fitted screen pixel bounds and readiness tone. |
+| `renderDocumentStatus` | `(params: RenderDocumentStatusParams) => React.ReactNode` | `undefined` | Custom readiness & optimality percentage status pill renderer. |
+| `renderAnimationOverlay` | `(params: RenderScannerOverlayParams) => React.ReactNode` | `undefined` | Headless full-canvas custom renderer replacing `<ScannerAnimationOverlay />`. |
+| `ref` | `React.Ref<CameraAIRef>` | `undefined` | Imperative handle exposing `capturePhoto(options?) => Promise<CapturedPhotoResult \| null>`. |
 | `cameraPosition` | `'back' \| 'front'` | `'back'` | Camera facing sensor. Automatically handles horizontal mirroring for front-facing selfie mode. |
 | `resizeMode` | `'cover' \| 'contain'` | `'cover'` | Stream scaling mode within view bounds. `cover` crops edges to fill; `contain` letterboxes. |
 | `isActive` | `boolean` | `true` | Pauses/resumes camera streaming and processing without unmounting native resources. |
@@ -264,22 +275,82 @@ const pixelBox = transformNormalizedToPixelBox(
 
 ---
 
-## Standalone `<DetectionOverlay />`
+## Standalone `<DocumentGuideOverlay />` & `<ScannerAnimationOverlay />`
 
-`<DetectionOverlay />` can also be used standalone over any video stream, canvas, or animated image:
+Use `<DocumentGuideOverlay />` for dynamic 4-point tilted paper-corner tracking (`DocumentQuad` + `createDocumentAlignmentProcessor` YUV flood-fill) + readiness feedback before capture, and mount `<ScannerAnimationOverlay scanRegion={...} />` to animate the Reanimated 4 laser sweep strictly inside the snapped paper bounds once **Capture** is tapped. Both components support declarative theming and headless slot renderers (`renderGuide`, `renderCorner`, `renderStatus`, `renderOverlay`, `renderLaser`, `renderStatusBadge`):
 
 ```tsx
-import { DetectionOverlay } from '@masumdev/rn-camera-ai';
+import React, { useRef, useState } from 'react';
+import { Image, StyleSheet, View } from 'react-native';
+import {
+  CameraAI,
+  DetectionOverlay,
+  DocumentGuideOverlay,
+  ScannerAnimationOverlay,
+  type CameraAIRef,
+  type CapturedPhotoResult,
+  type DocumentGuideTarget,
+} from '@masumdev/rn-camera-ai';
 
-<DetectionOverlay
-  detections={detections} // Array or Reanimated SharedValue
-  viewDimensions={{ width: 390, height: 844 }}
-  streamDimensions={{ width: 1280, height: 720 }}
-  resizeMode="cover"
-  isMirrored={false}
-  boxVariant="corners"
-  boxColor="#3da441"
-/>
+export function CaptureFirstScanner() {
+  const cameraRef = useRef<CameraAIRef | null>(null);
+  const [photo, setPhoto] = useState<CapturedPhotoResult | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [guide, setGuide] = useState<DocumentGuideTarget>({
+    box: { x: 0.08, y: 0.14, width: 0.84, height: 0.64 },
+    readiness: 'searching',
+    optimalityScore: 0,
+    statusText: 'Align paper corners inside brackets',
+  });
+
+  const handleCapture = async () => {
+    const captured = await cameraRef.current?.capturePhoto();
+    if (captured) {
+      setPhoto(captured);
+      setAnalyzing(true);
+      // Laser animation starts ONLY after Capture is pressed
+    }
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      <CameraAI
+        ref={cameraRef}
+        processor={alignmentProcessor}
+        enablePhotoCapture={true}
+        showBoxes={false}
+        showLabels={false}
+        showLandmarks={false}
+        scanAnimation={false}
+        documentGuide={guide}
+        documentGuideTheme={{
+          cornerLength: 28,
+          cornerThickness: 3.5,
+          optimalColor: '#22c55e',
+          adjustingColor: '#f59e0b',
+        }}
+        isActive={!photo}
+      />
+      {photo && (
+        <View style={StyleSheet.absoluteFill}>
+          <Image source={{ uri: photo.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <ScannerAnimationOverlay
+            active={analyzing}
+            state={analyzing ? 'analyzing' : 'complete'}
+            showLaser={analyzing}
+            statusLabel={analyzing ? 'Scanning captured paper...' : undefined}
+          />
+          <DetectionOverlay
+            detections={[]}
+            viewDimensions={{ width: 390, height: 844 }}
+            streamDimensions={{ width: photo.uprightWidth, height: photo.uprightHeight }}
+            resizeMode="cover"
+          />
+        </View>
+      )}
+    </View>
+  );
+}
 ```
 
 ---

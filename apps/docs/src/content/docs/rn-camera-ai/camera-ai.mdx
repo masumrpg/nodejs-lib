@@ -36,6 +36,18 @@ import { CameraAI } from '@masumdev/rn-camera-ai';
 | Prop | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `processor` | `CameraProcessor` | `undefined` | Pluggable AI inference engine implementing the `CameraProcessor` interface. |
+| `captureMode` | `'live' \| 'photo'` | `'live'` | Determines active hardware output pipeline: `'live'` runs continuous worklet frames; `'photo'` binds `PhotoOutput` (`1440×1920`) for `capturePhoto()`. |
+| `enablePhotoCapture` | `boolean` | `false` | Keeps `PhotoOutput` enabled during `'live'` mode for dual-output hardware (keep `false` on Camera2 `LIMITED` devices). |
+| `scanAnimation` | `boolean \| ScannerAnimationConfig` | `false` | Enables the Reanimated 4 laser sweep & shutter flash overlay (`ScannerAnimationOverlay`) with full custom slot support. |
+| `flashTrigger` | `number` | `0` | Incrementing pulse counter that triggers a 160ms shutter flash veil inside `ScannerAnimationOverlay`. |
+| `documentGuide` | `DocumentGuideTarget` | `undefined` | Displays dynamic UI-thread `<DocumentGuideOverlay />` corners snapped onto detected document/paper bounds with readiness status. |
+| `documentGuideTheme` | `DocumentGuideThemeConfig` | `undefined` | Declarative styling config for `DocumentGuideOverlay` (corner length, radius, mask color, readiness colors, pill position). |
+| `renderDocumentGuide` | `(params: RenderDocumentGuideParams) => React.ReactNode` | `undefined` | Headless full-canvas custom renderer replacing `<DocumentGuideOverlay />`. |
+| `renderDocumentCorner` | `(params: RenderDocumentCornerParams) => React.ReactNode` | `undefined` | Custom per-corner bracket renderer receiving fitted pixel box and tone color. |
+| `renderDocumentStatus` | `(params: RenderDocumentStatusParams) => React.ReactNode` | `undefined` | Custom readiness & optimality status pill renderer. |
+| `renderDocumentCenter` | `(params: RenderDocumentCenterParams) => React.ReactNode` | `undefined` | Custom overlay slot centered directly inside the fitted paper box. |
+| `renderAnimationOverlay` | `(params: RenderScannerOverlayParams) => React.ReactNode` | `undefined` | Headless full-canvas custom renderer replacing `<ScannerAnimationOverlay />`. |
+| `ref` | `React.Ref<CameraAIRef>` | `undefined` | Imperative ref handle exposing `capturePhoto(options?)`. |
 | `cameraPosition` | `'back' \| 'front'` | `'back'` | Physical camera facing. Automatically flips bounding box coordinates when set to `'front'` to match mirrored selfie preview. |
 | `resizeMode` | `'cover' \| 'contain'` | `'cover'` | Stream aspect ratio scaling mode within the container view. See [Resize Modes](#resize-modes-cover-vs-contain). |
 | `isActive` | `boolean` | `true` | Pauses or resumes camera streaming and frame processor execution without unmounting native resources. |
@@ -372,3 +384,65 @@ const styles = StyleSheet.create({
   },
 });
 ```
+
+---
+
+## Smart Document Capture, `<DocumentGuideOverlay />` & `<ScannerAnimationOverlay />`
+
+For paper-fitting capture scanners, combine `documentGuide` (with `<DocumentGuideOverlay />` animating all 4 independent corner vertices and rotated edge arms smoothly via Reanimated 4 GPU transforms, including tilted/trapezoid quads via `guide.corners: DocumentQuad`) and capture-triggered `<ScannerAnimationOverlay scanRegion={...} />`:
+
+- **Declarative Theming**: Customize every state color (`searchingColor`, `adjustingColor`, `optimalColor`, `analyzingColor`, `completeColor`), corner stroke/radius (`cornerLength`, `cornerThickness`, `cornerRadius`), outer mask (`showMask`, `maskColor`), status badge position (`'top' | 'bottom'`), and laser bar via `documentGuideTheme` and `scanAnimation`.
+- **Full Custom Headless UI**: Override any piece individually via `renderDocumentGuide`, `renderDocumentCorner`, `renderDocumentStatus`, `renderDocumentCenter`, `renderAnimationOverlay`, `renderLaser`, or `renderStatusBadge`.
+
+```tsx
+import React, { useRef, useState } from 'react';
+import {
+  CameraAI,
+  type CameraAIRef,
+  type CapturedPhotoResult,
+  type DocumentGuideTarget,
+} from '@masumdev/rn-camera-ai';
+
+export function DocumentCaptureCamera() {
+  const cameraRef = useRef<CameraAIRef | null>(null);
+  const [captured, setCaptured] = useState<CapturedPhotoResult | null>(null);
+  const [guide, setGuide] = useState<DocumentGuideTarget>({
+    box: { x: 0.08, y: 0.14, width: 0.84, height: 0.64 },
+    readiness: 'searching',
+    optimalityScore: 0,
+    statusText: 'Arahkan kertas ke dalam sudut bingkai',
+  });
+
+  const captureStill = async () => {
+    const photo = await cameraRef.current?.capturePhoto({
+      flashMode: 'off',
+      enableShutterSound: false,
+    });
+    if (photo) {
+      setCaptured(photo);
+    }
+  };
+
+  return (
+    <CameraAI
+      ref={cameraRef}
+      processor={alignmentProcessor}
+      enablePhotoCapture={true}
+      showBoxes={false}
+      showLabels={false}
+      showLandmarks={false}
+      isActive={!captured}
+      documentGuide={guide}
+      documentGuideTheme={{
+        cornerLength: 28,
+        cornerRadius: 14,
+        optimalColor: '#22c55e',
+        adjustingColor: '#f59e0b',
+      }}
+      scanAnimation={false}
+    />
+  );
+}
+```
+
+`<ScannerAnimationOverlay />` runs entirely on the Reanimated 4 UI thread (`transform` + `opacity` only), uses zero-bounce quint/cubic curves (`Easing.bezier(0.23, 1, 0.32, 1)` & `Easing.bezier(0.77, 0, 0.175, 1)`), and automatically degrades to stationary corner reticles when OS `ReduceMotion.System` is enabled.

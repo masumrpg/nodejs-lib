@@ -59,3 +59,20 @@ export type {
   TFLiteObjectDetector,
   ParseDetectionOptions,
 } from "@masumdev/rn-camera-ai-tflite";
+
+// Re-export ML Kit OCR adapter factory, parser, and types from packages/rn-camera-ai-mlkit
+export {
+  createMLKitTextRecognizer,
+  parseMLKitTextResult,
+  classifyOcrEntity,
+  extractStructuredOcrData,
+  recognizeTextFromUri,
+} from "@masumdev/rn-camera-ai-mlkit";
+
+export type {
+  MLKitTextRecognizer,
+  MLKitTextRecognizerConfig,
+  MLKitTextRecognitionResult,
+  OcrEntityFilter,
+  StructuredOcrEntities,
+} from "@masumdev/rn-camera-ai-mlkit";

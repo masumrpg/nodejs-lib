@@ -146,12 +146,125 @@ export interface FaceIdentityMatch {
 }
 
 /**
+ * Preferred camera buffer pixel format requested by a CameraProcessor.
+ */
+export type CameraPixelFormatPreference = 'rgb' | 'yuv' | 'native';
+
+/**
+ * Granularity level for OCR text detection results.
+ */
+export type OcrGranularity = 'block' | 'line' | 'element';
+
+/**
+ * Semantic category classified from recognized OCR text.
+ */
+export type OcrEntityCategory =
+  | 'text'
+  | 'nik'
+  | 'email'
+  | 'phone'
+  | 'url'
+  | 'currency'
+  | 'number';
+
+/**
+ * Normalized 2D polygon corner point in [0..1] coordinate space.
+ */
+export interface OcrPoint {
+  x: number;
+  y: number;
+}
+
+/**
+ * Structured OCR metadata attached to DetectionResult items emitted by text processors.
+ */
+export interface OcrDetectionMetadata {
+  /** Recognized text content for this block, line, or word element */
+  text: string;
+  /** Hierarchy level emitted by the OCR parser */
+  granularity: OcrGranularity;
+  /** Semantic entity classification inferred from recognized text */
+  category: OcrEntityCategory;
+  /** ISO-639 / BCP-47 language codes detected on this segment */
+  languages: string[];
+  /** ML Kit confidence score in range [0, 1] when available */
+  confidence?: number;
+  /** Text baseline rotation angle in degrees when available */
+  angle?: number;
+  /** Normalized 4-point polygon corners [0, 1] */
+  corners?: OcrPoint[];
+  /** Full recognized text across the current camera frame */
+  fullText?: string;
+}
+
+/**
+ * 2D normalized or screen-pixel point coordinate.
+ */
+export interface Point2D {
+  x: number;
+  y: number;
+}
+
+/**
+ * 4-corner quadrilateral representing a potentially rotated or perspective-tilted paper sheet.
+ */
+export interface DocumentQuad {
+  topLeft: Point2D;
+  topRight: Point2D;
+  bottomRight: Point2D;
+  bottomLeft: Point2D;
+}
+
+/**
+ * Classification status reported by lightweight background worklet document alignment.
+ */
+export type DocumentAlignmentStatus =
+  | 'searching'
+  | 'low_light'
+  | 'glare'
+  | 'blurry'
+  | 'clipped'
+  | 'too_far'
+  | 'too_close'
+  | 'off_center'
+  | 'optimal';
+
+/**
+ * Compact numeric/status telemetry computed on the background Camera Worklet thread
+ * without invoking heavy text OCR inference during camera preview.
+ */
+export interface DocumentAlignmentMetrics {
+  /** Alignment & quality status classification */
+  status: DocumentAlignmentStatus;
+  /** Estimated OCR capture optimality percentage in range [0, 100] */
+  optimalityScore: number;
+  /** True when status === 'optimal' and framing + focus + light are ready for capture */
+  isOptimal: boolean;
+  /** True when a distinct document/paper region was found */
+  hasDocument: boolean;
+  /** Concise status headline */
+  headline: string;
+  /** Actionable alignment hint */
+  hint: string;
+  /** Average YUV luminance [0, 255] across the frame */
+  meanBrightness: number;
+  /** Edge sharpness / focus energy score */
+  focusSharpness: number;
+  /** Viewport area fraction covered by the fitted document quad [0, 1] */
+  coverageRatio: number;
+  /** Independent normalized [0..1] 4 corners allowing skewed/perspective tracking */
+  corners?: DocumentQuad;
+  /** Estimated sheet baseline tilt angle in degrees */
+  skewAngleDeg?: number;
+}
+
+/**
  * Standard detection result returned by a camera processor.
  */
 export interface DetectionResult {
   /** Unique identifier for keying rendering elements */
   id: string;
-  /** Human-readable class label (e.g. 'person', 'Masum', 'Unknown Face') */
+  /** Human-readable class label (e.g. 'person', 'Masum', 'Unknown Face', recognized OCR text) */
   label: string;
   /** Detection confidence score in range [0, 1] */
   confidence: number;
@@ -165,6 +278,10 @@ export interface DetectionResult {
   identity?: FaceIdentityMatch;
   /** Optional hybrid active + passive face liveness & anti-spoofing telemetry */
   liveness?: FaceLivenessMetrics;
+  /** Optional OCR text recognition metadata */
+  ocr?: OcrDetectionMetadata;
+  /** Optional background worklet document alignment & framing metrics */
+  documentAlignment?: DocumentAlignmentMetrics;
   /** Optional raw vendor inference data */
   raw?: unknown;
 }
@@ -194,6 +311,8 @@ export interface CameraProcessor {
   readonly status: ModelStatus;
   /** Optional target frame rate limit */
   readonly targetFps?: number;
+  /** Optional preferred VisionCamera buffer pixel format (defaults to 'rgb') */
+  readonly preferredPixelFormat?: CameraPixelFormatPreference;
   /** Optional worklet-shared flag indicating whether the last processFrame call was throttled/skipped */
   readonly wasThrottledSync?: WorkletBoolSync;
   /** Frame processor callback executing synchronously or worklet-safe */
@@ -399,11 +518,277 @@ export interface RenderLandmarkDotParams {
 }
 
 /**
+ * Visual phase for the camera scanning animation overlay.
+ */
+export type ScannerAnimationState = 'idle' | 'scanning' | 'analyzing' | 'complete';
+
+/**
+ * Semantic readiness state of the smart document alignment guide.
+ */
+export type DocumentReadinessState =
+  | 'searching'
+  | 'adjusting'
+  | 'optimal'
+  | 'analyzing'
+  | 'complete';
+
+/**
+ * Corner identifier for customizable document framing brackets.
+ */
+export type DocumentCornerPosition =
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-right';
+
+/**
+ * Target normalized paper rectangle / 4-corner quad and readiness telemetry rendered by DocumentGuideOverlay.
+ */
+export interface DocumentGuideTarget {
+  /** Normalized [0..1] axis-aligned fallback rectangle fitted to document bounds */
+  box: BoundingBox;
+  /** Optional independent normalized [0..1] 4 corners enabling angled/trapezoid paper tracking */
+  corners?: DocumentQuad;
+  /** Semantic readiness state determining corner color & status chrome */
+  readiness: DocumentReadinessState;
+  /** Optional 0..100 estimated OCR optimality percentage */
+  optimalityScore?: number;
+  /** Primary alignment status label */
+  statusText?: string;
+  /** Actionable alignment hint displayed below statusText */
+  hintText?: string;
+}
+
+/**
+ * Declarative visual theme and timing configuration for DocumentGuideOverlay.
+ */
+export interface DocumentGuideThemeConfig {
+  /** Corner arm length in pixels (default: 28) */
+  cornerLength?: number;
+  /** Corner border thickness in pixels (default: 3.5) */
+  cornerThickness?: number;
+  /** Corner border radius in pixels (default: 14) */
+  cornerRadius?: number;
+  /** Translucent mask color outside the fitted paper region (default: 'rgba(5, 22, 30, 0.50)') */
+  maskColor?: string;
+  /** Whether to dim the area outside the paper rectangle (default: true) */
+  showMask?: boolean;
+  /** Whether to draw a subtle hairline connecting the 4 corners (default: true) */
+  showGuideOutline?: boolean;
+  /** Opacity of the connecting hairline outline (default: 0.28) */
+  outlineOpacity?: number;
+  /** Accent color when searching for document (default: '#94a3b8') */
+  searchingColor?: string;
+  /** Accent color when document needs repositioning (default: '#f59e0b') */
+  adjustingColor?: string;
+  /** Accent color when document alignment & clarity are optimal (default: '#22c55e') */
+  optimalColor?: string;
+  /** Accent color during post-capture AI analysis (default: '#38bdf8') */
+  analyzingColor?: string;
+  /** Accent color when capture analysis completes (default: '#22c55e') */
+  completeColor?: string;
+  /** Whether to render the default readiness & optimality status pill (default: true) */
+  showStatusPill?: boolean;
+  /** Position of the status pill relative to the paper frame (default: 'top') */
+  statusPosition?: 'top' | 'bottom';
+  /** Custom style applied to the default status pill container */
+  statusContainerStyle?: StyleProp<ViewStyle>;
+  /** Custom style applied to the default status headline text */
+  statusTextStyle?: StyleProp<TextStyle>;
+  /** Custom style applied to the default alignment hint text */
+  hintTextStyle?: StyleProp<TextStyle>;
+  /** Reanimated corner snap timing duration in milliseconds (default: 180) */
+  snapDurationMs?: number;
+}
+
+/**
+ * Parameters passed to custom corner bracket slot renderers.
+ */
+export interface RenderDocumentCornerParams {
+  corner: DocumentCornerPosition;
+  readiness: DocumentReadinessState;
+  color: string;
+  point: Point2D;
+  corners: DocumentQuad;
+  pixelBox: PixelBoundingBox;
+  angleHorizontalRad: number;
+  angleVerticalRad: number;
+  cornerLength: number;
+  cornerThickness: number;
+  cornerRadius: number;
+}
+
+/**
+ * Parameters passed to custom document readiness status pill renderers.
+ */
+export interface RenderDocumentStatusParams {
+  readiness: DocumentReadinessState;
+  color: string;
+  optimalityScore?: number;
+  statusText?: string;
+  hintText?: string;
+  pixelBox: PixelBoundingBox;
+}
+
+/**
+ * Parameters passed to custom centered content renderers inside the fitted document box.
+ */
+export interface RenderDocumentCenterParams {
+  pixelBox: PixelBoundingBox;
+  readiness: DocumentReadinessState;
+}
+
+/**
+ * Parameters passed to headless full-canvas document guide renderers.
+ */
+export interface RenderDocumentGuideParams {
+  readiness: DocumentReadinessState;
+  color: string;
+  optimalityScore?: number;
+  statusText?: string;
+  hintText?: string;
+  corners: DocumentQuad;
+  pixelBox: PixelBoundingBox;
+  viewDimensions: ViewDimensions;
+}
+
+/**
+ * Parameters passed to custom laser bar renderers inside ScannerAnimationOverlay.
+ */
+export interface RenderScannerLaserParams {
+  accentColor: string;
+  state: ScannerAnimationState;
+  regionWidth: number;
+}
+
+/**
+ * Parameters passed to custom scanner status pill renderers.
+ */
+export interface RenderScannerStatusParams {
+  statusLabel?: string;
+  state: ScannerAnimationState;
+  accentColor: string;
+}
+
+/**
+ * Parameters passed to headless full-canvas ScannerAnimationOverlay renderers.
+ */
+export interface RenderScannerOverlayParams {
+  active: boolean;
+  state: ScannerAnimationState;
+  accentColor: string;
+  statusLabel?: string;
+  region?: PixelBoundingBox;
+}
+
+/**
+ * Configuration options for CameraAI's built-in animated scanner sweep overlay.
+ */
+export interface ScannerAnimationConfig {
+  /** Whether the scanner animation is enabled (default: true when object is passed) */
+  enabled?: boolean;
+  /** Current visual state controlling sweep cadence and veil (default: 'scanning') */
+  state?: ScannerAnimationState;
+  /** Primary laser beam and reticle corner accent color (default: '#f59e0b') */
+  accentColor?: string;
+  /** Whether to draw viewfinder reticle corner brackets around the active zone (default: true) */
+  showGridCorners?: boolean;
+  /** Corner arm length in pixels (default: 24) */
+  cornerLength?: number;
+  /** Corner border thickness in pixels (default: 2.5) */
+  cornerThickness?: number;
+  /** Corner radius in pixels (default: 10) */
+  cornerRadius?: number;
+  /** Whether to draw the animated horizontal laser beam (default: true) */
+  showLaser?: boolean;
+  /** Optional explicit screen pixel region constraining the laser & reticle */
+  scanRegion?: PixelBoundingBox;
+  /** Translucent backdrop veil color active during 'analyzing' (default: 'rgba(5, 22, 30, 0.34)') */
+  veilColor?: string;
+  /** Optional status caption pill rendered inside the reticle zone */
+  statusLabel?: string;
+  /** Custom status pill container style */
+  statusContainerStyle?: StyleProp<ViewStyle>;
+  /** Custom status pill text style */
+  statusTextStyle?: StyleProp<TextStyle>;
+  /** Duration in milliseconds for one vertical sweep pass in 'scanning' state (default: 1700) */
+  sweepDurationMs?: number;
+  /** Headless full-canvas custom scanner animation renderer */
+  renderOverlay?: (params: RenderScannerOverlayParams) => React.ReactNode;
+  /** Custom laser beam renderer inside the Reanimated track */
+  renderLaser?: (params: RenderScannerLaserParams) => React.ReactNode;
+  /** Custom scanner status badge renderer */
+  renderStatusBadge?: (params: RenderScannerStatusParams) => React.ReactNode;
+}
+
+/**
+ * Camera capture mode determining active VisionCamera hardware outputs.
+ * - 'live': Binds frame processor stream output for real-time per-frame AI.
+ * - 'photo': Binds high-resolution PhotoOutput for capture-first-then-analyze workflows.
+ */
+export type CameraCaptureMode = 'live' | 'photo';
+
+/**
+ * Options passed to CameraAIRef.capturePhoto().
+ */
+export interface CapturePhotoOptions {
+  /** Camera flash mode during photo capture (default: 'off') */
+  flashMode?: 'off' | 'on' | 'auto';
+  /** Whether to play the native hardware shutter sound (default: false) */
+  enableShutterSound?: boolean;
+}
+
+/**
+ * Metadata returned by CameraAIRef.capturePhoto().
+ */
+export interface CapturedPhotoResult {
+  /** Normalized file:// URI ready for <Image source={{ uri }} /> and static OCR/AI analyzers */
+  uri: string;
+  /** Raw local filesystem path returned by VisionCamera PhotoOutput */
+  filePath: string;
+  /** Raw photo buffer width in pixels */
+  width: number;
+  /** Raw photo buffer height in pixels */
+  height: number;
+  /** Upright width in pixels after accounting for 90/270-degree orientation */
+  uprightWidth: number;
+  /** Upright height in pixels after accounting for 90/270-degree orientation */
+  uprightHeight: number;
+  /** Photo orientation string reported by VisionCamera */
+  orientation: string;
+  /** Whether the captured image buffer is horizontally mirrored */
+  isMirrored: boolean;
+}
+
+/**
+ * Imperative ref handle exposed by <CameraAI ref={...} />.
+ */
+export interface CameraAIRef {
+  /**
+   * Captures a high-resolution still photo using VisionCamera PhotoOutput.
+   * Requires captureMode="photo" or enablePhotoCapture={true}.
+   */
+  capturePhoto: (options?: CapturePhotoOptions) => Promise<CapturedPhotoResult | null>;
+}
+
+/**
  * Props for the CameraAI component.
  */
 export interface CameraAIProps {
+  /** Imperative ref handle (React 19) exposing capturePhoto() */
+  ref?: React.Ref<CameraAIRef>;
+  /** Alternate imperative ref prop for React 18 environments without ref-as-prop support */
+  cameraRef?: React.Ref<CameraAIRef>;
   /** Pluggable AI inference processor */
   processor?: CameraProcessor;
+  /** Capture pipeline mode: 'live' for real-time frame processing or 'photo' for still photo capture (default: 'live') */
+  captureMode?: CameraCaptureMode;
+  /** Keep PhotoOutput bound alongside frame processor during live mode (default: false for max device compatibility) */
+  enablePhotoCapture?: boolean;
+  /** Enable built-in GPU-composited laser scanner overlay or pass granular ScannerAnimationConfig */
+  scanAnimation?: boolean | ScannerAnimationConfig;
+  /** Incrementing shutter flash trigger pulse synchronized with ScannerAnimationOverlay */
+  flashTrigger?: number;
   /** Desired camera facing position (default: 'back') */
   cameraPosition?: CameraFacing;
   /** Video scaling mode inside container (default: 'cover') */
@@ -442,6 +827,20 @@ export interface CameraAIProps {
   renderLandmarkDot?: (params: RenderLandmarkDotParams) => React.ReactNode;
   /** Full-canvas custom overlay renderer receiving detections and measured view dimensions */
   renderOverlay?: (detections: DetectionResult[], viewDimensions: ViewDimensions) => React.ReactNode;
+  /** Optional smart document corner guide target (renders DocumentGuideOverlay automatically) */
+  documentGuide?: DocumentGuideTarget;
+  /** Declarative theme customization for DocumentGuideOverlay */
+  documentGuideTheme?: DocumentGuideThemeConfig;
+  /** Headless full-canvas custom renderer replacing DocumentGuideOverlay */
+  renderDocumentGuide?: (params: RenderDocumentGuideParams) => React.ReactNode;
+  /** Custom per-corner bracket renderer for DocumentGuideOverlay */
+  renderDocumentCorner?: (params: RenderDocumentCornerParams) => React.ReactNode;
+  /** Custom readiness & optimality status pill renderer for DocumentGuideOverlay */
+  renderDocumentStatus?: (params: RenderDocumentStatusParams) => React.ReactNode;
+  /** Custom center content renderer inside the fitted document area */
+  renderDocumentCenter?: (params: RenderDocumentCenterParams) => React.ReactNode;
+  /** Headless full-canvas custom renderer replacing ScannerAnimationOverlay */
+  renderAnimationOverlay?: (params: RenderScannerOverlayParams) => React.ReactNode;
   /** Worklet callback invoked directly on the FrameOutput worklet thread with 0 JS thread hops */
   onDetectionsWorklet?: (detections: DetectionResult[]) => void;
   /** Callback emitted on the JS thread when new detections arrive */

@@ -3,7 +3,14 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CameraAI } from '../src/components/CameraAI';
 import { DetectionOverlay } from '../src/components/DetectionOverlay';
-import type { CameraProcessor, DetectionResult, FaceLandmark } from '../src/types/contracts';
+import { DocumentGuideOverlay } from '../src/components/DocumentGuideOverlay';
+import { ScannerAnimationOverlay } from '../src/components/ScannerAnimationOverlay';
+import type {
+  CameraAIRef,
+  CameraProcessor,
+  DetectionResult,
+  FaceLandmark,
+} from '../src/types/contracts';
 import type { CameraAIError } from '../src/types/errors';
 import { mockCameraState } from '../../../tests/e2e/setup/mock-native';
 
@@ -440,5 +447,171 @@ describe('CameraAI React Lifecycle & Callback Refs', () => {
       })
     );
     expect(uiThreadHtml).toContain('Masum 96%');
+  });
+
+  it('supports captureMode="photo", exposes capturePhoto() via ref with EXIF upright dimensions, and guards live mode', async () => {
+    const cameraRef = React.createRef<CameraAIRef>();
+    const processor: CameraProcessor = {
+      id: 'photo-test-proc',
+      name: 'PhotoTestProc',
+      status: 'ready',
+      initialize: async () => {},
+      dispose: () => {},
+      processFrame: () => [],
+    };
+
+    const renderer = createTestRenderer();
+
+    // 1. Default live mode binds frameOutput and rejects capturePhoto() cleanly
+    renderer.mount(
+      React.createElement(CameraAI, {
+        ref: cameraRef,
+        processor,
+        captureMode: 'live',
+      })
+    );
+
+    const liveOutputs = mockCameraState.lastCameraProps?.outputs as
+      | Array<Record<string, unknown>>
+      | undefined;
+    expect(liveOutputs?.length).toBe(1);
+    expect(liveOutputs?.[0]?.__mockFrameOutput).toBe(true);
+    expect(typeof mockCameraState.lastFrameOutputOptions?.onFrame).toBe('function');
+
+    const blockedCapture = await cameraRef.current?.capturePhoto();
+    expect(blockedCapture).toBeNull();
+    expect(mockCameraState.capturePhotoCallCount).toBe(0);
+
+    // 2. Switching to captureMode="photo" swaps VisionCamera outputs to photoOutput & detaches frameOutput
+    renderer.mount(
+      React.createElement(CameraAI, {
+        ref: cameraRef,
+        processor,
+        captureMode: 'photo',
+        scanAnimation: {
+          state: 'scanning',
+          accentColor: '#f59e0b',
+          statusLabel: 'Align document & tap Capture',
+        },
+      })
+    );
+
+    const photoOutputs = mockCameraState.lastCameraProps?.outputs as
+      | Array<Record<string, unknown>>
+      | undefined;
+    expect(photoOutputs?.length).toBe(1);
+    expect(photoOutputs?.[0]?.__mockPhotoOutput).toBe(true);
+    expect(mockCameraState.lastFrameOutputOptions?.onFrame).toBeUndefined();
+
+    // capturePhoto() returns normalized file:// URI & swaps 90-deg oriented dimensions cleanly
+    let captured: Awaited<ReturnType<CameraAIRef['capturePhoto']>> = null;
+    await React.act(async () => {
+      captured = (await cameraRef.current?.capturePhoto({ flashMode: 'off' })) ?? null;
+    });
+
+    expect(mockCameraState.capturePhotoCallCount).toBe(1);
+    expect(captured).not.toBeNull();
+    expect(captured?.uri).toBe('file:///data/user/0/app/cache/mock_capture.jpg');
+    expect(captured?.width).toBe(1920);
+    expect(captured?.height).toBe(1440);
+    expect(captured?.uprightWidth).toBe(1440);
+    expect(captured?.uprightHeight).toBe(1920);
+
+    renderer.unmount();
+  });
+
+  it('renders ScannerAnimationOverlay across scanning/analyzing/complete states and honors reducedMotion', () => {
+    const scanningHtml = renderToStaticMarkup(
+      React.createElement(ScannerAnimationOverlay, {
+        active: true,
+        state: 'analyzing',
+        accentColor: '#f59e0b',
+        statusLabel: 'Analyzing photo with Google ML Kit...',
+        flashTrigger: 1,
+      })
+    );
+    expect(scanningHtml).toContain('Analyzing photo with Google ML Kit...');
+
+    mockCameraState.reducedMotion = true;
+    const reducedHtml = renderToStaticMarkup(
+      React.createElement(ScannerAnimationOverlay, {
+        active: true,
+        state: 'scanning',
+        statusLabel: 'Reduced Motion Ready',
+      })
+    );
+    expect(reducedHtml).toContain('Reduced Motion Ready');
+
+    const hiddenHtml = renderToStaticMarkup(
+      React.createElement(ScannerAnimationOverlay, {
+        active: false,
+        flashTrigger: 0,
+      })
+    );
+    expect(hiddenHtml).toBe('');
+
+    const customScannerHtml = renderToStaticMarkup(
+      React.createElement(ScannerAnimationOverlay, {
+        active: true,
+        state: 'analyzing',
+        scanRegion: { x: 24, y: 80, width: 340, height: 420 },
+        renderLaser: ({ accentColor, regionWidth }) =>
+          React.createElement('div', { 'data-laser': `${accentColor}:${regionWidth}` }),
+        renderStatusBadge: ({ statusLabel }) =>
+          React.createElement('span', {}, `CUSTOM_STATUS:${statusLabel ?? ''}`),
+        statusLabel: 'Scanning Sheet',
+      })
+    );
+    expect(customScannerHtml).toContain('CUSTOM_STATUS:Scanning Sheet');
+    expect(customScannerHtml).toContain('#f59e0b:340');
+  });
+
+  it('renders customizable DocumentGuideOverlay supporting paper bounds and custom slot renderers', () => {
+    const defaultGuideHtml = renderToStaticMarkup(
+      React.createElement(DocumentGuideOverlay, {
+        guide: {
+          box: { x: 0.12, y: 0.18, width: 0.76, height: 0.56 },
+          readiness: 'optimal',
+          optimalityScore: 92,
+          statusText: 'Sudut Pas',
+          hintText: 'Tekan Capture',
+        },
+        viewDimensions: { width: 400, height: 800 },
+        streamDimensions: { width: 768, height: 1024 },
+      })
+    );
+    expect(defaultGuideHtml).toContain('Sudut Pas');
+    expect(defaultGuideHtml).toContain('92%');
+    expect(defaultGuideHtml).toContain('Tekan Capture');
+
+    let cornerCalls = 0;
+    const seenAngles: number[] = [];
+    const customSlotsGuideHtml = renderToStaticMarkup(
+      React.createElement(DocumentGuideOverlay, {
+        guide: {
+          box: { x: 0.1, y: 0.2, width: 0.72, height: 0.56 },
+          corners: {
+            topLeft: { x: 0.14, y: 0.20 },
+            topRight: { x: 0.80, y: 0.27 },
+            bottomRight: { x: 0.75, y: 0.76 },
+            bottomLeft: { x: 0.10, y: 0.69 },
+          },
+          readiness: 'adjusting',
+          optimalityScore: 64,
+          statusText: 'Dokumen Miring',
+        },
+        viewDimensions: { width: 400, height: 800 },
+        renderCorner: ({ corner, color, angleHorizontalRad }) => {
+          cornerCalls += 1;
+          seenAngles.push(angleHorizontalRad);
+          return React.createElement('div', { 'data-corner': `${corner}:${color}` });
+        },
+        renderStatus: ({ optimalityScore, statusText }) =>
+          React.createElement('div', {}, `SLOT:${statusText}:${optimalityScore}`),
+      })
+    );
+    expect(cornerCalls).toBe(4);
+    expect(seenAngles.some((ang) => Math.abs(ang) > 0.05)).toBe(true);
+    expect(customSlotsGuideHtml).toContain('SLOT:Dokumen Miring:64');
   });
 });

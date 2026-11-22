@@ -7,11 +7,23 @@ export interface MockCameraDevice {
   name: string;
 }
 
+export interface MockPhotoFileSpec {
+  filePath: string;
+  width: number;
+  height: number;
+  orientation: string;
+  isMirrored: boolean;
+}
+
 export interface MockCameraState {
   hasPermission: boolean;
   devices: Record<string, MockCameraDevice | undefined>;
   lastCameraProps: Record<string, unknown> | null;
   lastFrameOutputOptions: Record<string, unknown> | null;
+  lastPhotoOutputOptions: Record<string, unknown> | null;
+  capturePhotoCallCount: number;
+  mockNextPhotoFile: MockPhotoFileSpec;
+  reducedMotion: boolean;
   convertedImageCount: number;
   disposedImageCount: number;
   requestPermissionCallCount: number;
@@ -27,6 +39,16 @@ export const mockCameraState: MockCameraState = {
   },
   lastCameraProps: null,
   lastFrameOutputOptions: null,
+  lastPhotoOutputOptions: null,
+  capturePhotoCallCount: 0,
+  mockNextPhotoFile: {
+    filePath: "/data/user/0/app/cache/mock_capture.jpg",
+    width: 1920,
+    height: 1440,
+    orientation: "right",
+    isMirrored: false,
+  },
+  reducedMotion: false,
   convertedImageCount: 0,
   disposedImageCount: 0,
   requestPermissionCallCount: 0,
@@ -39,6 +61,16 @@ export const mockCameraState: MockCameraState = {
     };
     this.lastCameraProps = null;
     this.lastFrameOutputOptions = null;
+    this.lastPhotoOutputOptions = null;
+    this.capturePhotoCallCount = 0;
+    this.mockNextPhotoFile = {
+      filePath: "/data/user/0/app/cache/mock_capture.jpg",
+      width: 1920,
+      height: 1440,
+      orientation: "right",
+      isMirrored: false,
+    };
+    this.reducedMotion = false;
     this.convertedImageCount = 0;
     this.disposedImageCount = 0;
     this.requestPermissionCallCount = 0;
@@ -80,6 +112,8 @@ mock.module("react-native", () => ({
     ),
   TextInput: (props: Record<string, unknown>) =>
     React.createElement("input", cleanProps(props)),
+  Image: (props: Record<string, unknown>) =>
+    React.createElement("img", cleanProps(props)),
   Text: (props: Record<string, unknown>) =>
     React.createElement(
       "span",
@@ -105,6 +139,9 @@ mock.module("react-native", () => ({
     openSettings: async () => {
       mockCameraState.openSettingsCallCount += 1;
     },
+  },
+  Share: {
+    share: async () => ({ action: "sharedAction" }),
   },
   StyleSheet: {
     create: <T extends Record<string, unknown>>(styles: T): T => styles,
@@ -136,10 +173,45 @@ mock.module("react-native-reanimated", () => ({
       ),
   },
   useSharedValue: <T>(v: T) => {
-    const ref = React.useRef<{ value: T }>({ value: v });
-    return ref.current;
+    const storeRef = React.useRef<{ value: T }>({ value: v });
+    const wrapperRef = React.useRef<{
+      value: T;
+      get(): T;
+      set(next: T): void;
+    } | null>(null);
+    if (!wrapperRef.current) {
+      wrapperRef.current = {
+        get value() {
+          return storeRef.current.value;
+        },
+        set value(next: T) {
+          storeRef.current.value = next;
+        },
+        get: () => storeRef.current.value,
+        set: (next: T) => {
+          storeRef.current.value = next;
+        },
+      };
+    }
+    return wrapperRef.current;
   },
   useAnimatedStyle: (fn: () => unknown) => fn(),
+  useReducedMotion: () => mockCameraState.reducedMotion,
+  withTiming: <T>(toValue: T) => toValue,
+  withRepeat: <T>(animation: T) => animation,
+  withSequence: <T>(...animations: T[]) => animations[animations.length - 1],
+  cancelAnimation: () => {},
+  ReduceMotion: {
+    System: "system",
+    Always: "always",
+    Never: "never",
+  },
+  Easing: {
+    bezier: () => (t: number) => t,
+    linear: (t: number) => t,
+    ease: (t: number) => t,
+  },
+  cubicBezier: () => "cubic-bezier(0.23, 1, 0.32, 1)",
 }));
 
 // 3. Mock react-native-vision-camera (v5)
@@ -169,6 +241,24 @@ mock.module("react-native-vision-camera", () => ({
       thread: {},
       dispose: () => {},
       setOnFrameDroppedCallback: () => {},
+    };
+  },
+  usePhotoOutput: (options: Record<string, unknown> = {}) => {
+    mockCameraState.lastPhotoOutputOptions = options;
+    return {
+      __mockPhotoOutput: true,
+      ...options,
+      capturePhotoToFile: async () => {
+        mockCameraState.capturePhotoCallCount += 1;
+        return {
+          ...mockCameraState.mockNextPhotoFile,
+          timestamp: Date.now(),
+          isRawPhoto: false,
+          containerFormat: "jpeg",
+          dispose: () => {},
+        };
+      },
+      dispose: () => {},
     };
   },
   HybridFrameConverter: {
@@ -306,4 +396,47 @@ mock.module("react-native-fast-tflite", () => ({
           : [],
     };
   },
+}));
+
+// 8. Mock react-native-vision-camera-mlkit
+const createMockMLKitTextResult = () => ({
+  text: "Masum Dev\nmasum@example.com\n3273011505990001",
+  blocks: [
+    {
+      text: "Masum Dev\nmasum@example.com",
+      bounds: { x: 300, y: 200, width: 320, height: 90, left: 140, top: 155 },
+      languages: ["en"],
+      lines: [
+        {
+          text: "Masum Dev",
+          bounds: { x: 250, y: 175, width: 200, height: 32, left: 150, top: 159 },
+          confidence: 0.95,
+          angle: 0,
+          languages: ["en"],
+          elements: [],
+        },
+      ],
+    },
+  ],
+});
+
+mock.module("react-native-vision-camera-mlkit", () => ({
+  isFeatureAvailable: () => true,
+  PluginFactory: {
+    isFeatureAvailable: () => true,
+    initPlugin: () => ({
+      recognize: () => createMockMLKitTextResult(),
+      recognizeImage: async () => createMockMLKitTextResult(),
+      dispose: () => {},
+    }),
+  },
+  VisionCameraMLKit: {
+    isFeatureAvailable: () => true,
+    createTextRecognizer: () => ({
+      recognize: () => createMockMLKitTextResult(),
+      recognizeImage: async () => createMockMLKitTextResult(),
+      dispose: () => {},
+    }),
+  },
+  processImageTextRecognition: async () => createMockMLKitTextResult(),
 }));

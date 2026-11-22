@@ -28,6 +28,14 @@ export const releases = [
       },
       {
         type: 'feat',
+        text: 'Published new <code>@masumdev/rn-camera-ai-mlkit</code> Google ML Kit v2 OCR adapter (<code>createMLKitTextRecognizer</code>, <code>parseMLKitTextResult</code>, <code>evaluateDocumentFraming</code>, <code>recognizeTextFromUri</code>, <code>classifyOcrEntity</code>) and single-capture Smart Document Scanner (<code>/ocr-scanner</code>).',
+      },
+      {
+        type: 'feat',
+        text: 'Added paper-fitting 4-point quad <code>&lt;DocumentGuideOverlay /&gt;</code> (with seeded YUV flood-fill paper detector <code>createDocumentAlignmentProcessor</code> and independent skewed corners <code>DocumentQuad</code>) plus capture-triggered Reanimated 4 <code>&lt;ScannerAnimationOverlay /&gt;</code> with <code>ReduceMotion.System</code> support, full UI theme presets, and headless custom slot renderers (<code>renderDocumentGuide</code>, <code>renderDocumentCorner</code>, <code>renderDocumentStatus</code>, <code>renderLaser</code>).',
+      },
+      {
+        type: 'feat',
         text: 'Added Hybrid Active + Passive Face Liveness &amp; Anti-Spoofing engine (<code>computeFaceLivenessMetrics</code>, <code>FaceLivenessMetrics</code>): Eye Aspect Ratio (EAR) blink detection, Mouth Aspect Ratio (MAR) &amp; smile detection, 3D Head Pose (Yaw/Pitch/Roll), 3D Z-depth relief verification, anti-Moiré/glare texture analysis, and 4-step e-KYC challenge screen (<code>/liveness-detection</code>).',
       },
       {

@@ -20,6 +20,7 @@ Welcome to the **Masum Dev** monorepo. This workspace houses high-performance op
 │   ├── rn-ui/                 # Typed flat UI kit for React Native & Expo (63+ components, design tokens)
 │   ├── rn-camera-ai/          # Zero-JS-thread VisionCamera v5 AI preview, 468 Face Mesh & overlay engine
 │   ├── rn-camera-ai-tflite/   # Fast-TFLite GPU adapter (Object Detection, Face Recognition & e-KYC Liveness)
+│   ├── rn-camera-ai-mlkit/    # Google ML Kit v2 adapter (Zero-copy YUV OCR & Structured Entity Extraction)
 │   ├── rn-tajweed-verse/      # Quranic verse Tajweed parser & interactive renderer
 │   └── rn-qr-code/            # High-performance SVG QR code generator with presets & async mode
 ├── apps/

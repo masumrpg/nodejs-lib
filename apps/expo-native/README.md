@@ -15,7 +15,8 @@ apps/expo-native/
 │   ├── index.tsx              # Feature Menu Hub (dashboard & status)
 │   ├── object-detection.tsx   # MobileNet SSD object detection & live styling
 │   ├── face-recognition.tsx   # 468 Face Mesh + MobileFaceNet face recognition
-│   └── liveness-detection.tsx # Hybrid Active + Passive Liveness & e-KYC Wizard
+│   ├── liveness-detection.tsx # Hybrid Active + Passive Liveness & e-KYC Wizard
+│   └── ocr-scanner.tsx        # Google ML Kit v2 Live OCR & Structured Entity Extraction
 └── assets/
     └── models/                # Bundled local TFLite neural network models
 ```
@@ -55,6 +56,11 @@ apps/expo-native/
   - **Mouth & Smile Detection (MAR)**: Real-time Mouth Aspect Ratio for `MOUTH OPEN` and `SMILING`.
 - **Interactive 4-Step e-KYC Challenge Wizard**:
   - Step-by-step interactive challenge verifying passive 3D depth, eye blink, head turn, and mouth expression.
+
+### 5. Text Recognition & OCR Scanner (`/ocr-scanner`)
+- Powered by `@masumdev/rn-camera-ai-mlkit` and Google ML Kit v2 (`react-native-vision-camera-mlkit`) with zero-copy `YUV_420_888` frame streaming.
+- **Live Granularity Switcher**: Switch dynamically between `Line`, `Block`, and `Word` (`element`) bounding boxes.
+- **Smart Entity Filters & Transcript Panel**: Auto-detects & filters `NIK / KTP`, `Phone`, `Email`, `URL`, and `Rp / Currency`, displaying extracted chips alongside a live scrollable transcript with 1-tap Share / Export.
 
 ---
 

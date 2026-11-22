@@ -49,6 +49,17 @@
         {
           "enableAndroidGpuLibraries": true
         }
+      ],
+      [
+        "react-native-vision-camera-mlkit",
+        {
+          "textRecognition": true,
+          "textRecognitionChinese": false,
+          "textRecognitionDevanagari": false,
+          "textRecognitionJapanese": false,
+          "textRecognitionKorean": false,
+          "barcodeScanning": false
+        }
       ]
     ],
     "extra": {

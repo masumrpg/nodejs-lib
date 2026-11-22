@@ -159,7 +159,10 @@ On Android, GPU delegates can fail on budget chipsets or corrupted vendor driver
     Core camera preview component, permission handling, zero-JS overlay renderer, lifecycle hooks, and projection math engine.
   </Card>
   <Card title="@masumdev/rn-camera-ai-tflite" icon="rocket">
-    TensorFlow Lite object detection adapter, model asset loaders, GPU/CPU delegate fallback, and 4-tensor output parser.
+    TensorFlow Lite adapter: Object Detection, 192-D Face Recognition, 468-Point 3D Face Mesh, and Hybrid Liveness Detection.
+  </Card>
+  <Card title="@masumdev/rn-camera-ai-mlkit" icon="document">
+    Google ML Kit v2 on-device OCR adapter supporting zero-copy YUV frames, Block/Line/Word granularity, and NIK/Email/Phone/URL extraction.
   </Card>
 </CardGrid>
 
@@ -187,6 +190,11 @@ On Android, GPU delegates can fail on budget chipsets or corrupted vendor driver
     title="Face Recognition, 468 Mesh & Liveness (e-KYC)"
     href="/rn-camera-ai/face-mesh-and-liveness/"
     description="3-model cooperative Face Recognition, 468-point 3D Face Mesh wireframe customization, and Hybrid Active + Passive e-KYC Liveness Detection."
+  />
+  <LinkCard
+    title="ML Kit OCR & Text Recognition Adapter"
+    href="/rn-camera-ai/mlkit-ocr/"
+    description="On-device Google ML Kit v2 OCR adapter with zero-copy YUV frames, live granularity switching, and structured entity parsing."
   />
   <LinkCard
     title="Writing Custom Processors"

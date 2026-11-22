@@ -1,0 +1,144 @@
+---
+title: ML Kit OCR & Text Recognition Adapter
+sidebar:
+  label: ML Kit OCR Adapter
+  order: 6
+description: Real-time on-device Google ML Kit Text Recognition v2 (OCR) adapter for @masumdev/rn-camera-ai with zero-copy YUV frames, Block/Line/Word granularity, and smart NIK/Email/Phone/URL extraction.
+---
+
+import { Tabs, TabItem, Card, CardGrid, Badge } from '@astrojs/starlight/components';
+
+`@masumdev/rn-camera-ai-mlkit` adapts Google ML Kit Text Recognition v2 into `@masumdev/rn-camera-ai`'s universal `CameraProcessor` contract. Powered natively by Nitro Modules (`react-native-vision-camera-mlkit`), it streams zero-copy `YUV_420_888` frames directly into Google ML Kit with zero JS-thread coordinate overhead.
+
+---
+
+## 1. Architecture: Zero-Copy YUV Pipeline
+
+Unlike neural network pixel classifiers that expect packed RGB tensors, Google ML Kit natively ingests Android `android.media.Image` (`ImageFormat.YUV_420_888`) and iOS `CMSampleBuffer` directly via `InputImage.fromMediaImage`.
+
+When you pass an `MLKitTextRecognizer` to `<CameraAI />`:
+1. `<CameraAI />` inspects `processor.preferredPixelFormat` (`'yuv'`) and configures `useFrameOutput({ pixelFormat: 'yuv', enablePhysicalBufferRotation: true })`.
+2. Each frame runs `activeRecognizer.recognize(frame)` inside VisionCamera's background frame thread.
+3. `parseMLKitTextResult` (`'worklet'`) converts ML Kit's `bounds.left/top/width/height` pixel coordinates into normalized `[0..1]` `@masumdev/rn-camera-ai` bounding boxes and classifies semantic entities (`nik`, `email`, `phone`, `url`, `currency`, `number`).
+4. `projectDetectionsWorklet` computes final overlay pixel boxes without running math on the JS thread.
+
+---
+
+## 2. Installation & Selective Expo Config
+
+<Tabs syncKey="pkg">
+  <TabItem label="bun" icon="bun">
+    ```bash
+    bun add @masumdev/rn-camera-ai @masumdev/rn-camera-ai-mlkit react-native-vision-camera-mlkit
+    ```
+  </TabItem>
+  <TabItem label="npm" icon="seti:npm">
+    ```bash
+    npm install @masumdev/rn-camera-ai @masumdev/rn-camera-ai-mlkit react-native-vision-camera-mlkit
+    ```
+  </TabItem>
+</Tabs>
+
+### Selective Expo Plugin (`app.json`)
+
+Enable only the text scripts your application requires so APK / IPA size stays minimal:
+
+```json
+{
+  "expo": {
+    "plugins": [
+      [
+        "react-native-vision-camera-mlkit",
+        {
+          "textRecognition": true,
+          "textRecognitionChinese": false,
+          "textRecognitionDevanagari": false,
+          "textRecognitionJapanese": false,
+          "textRecognitionKorean": false,
+          "barcodeScanning": false
+        }
+      ]
+    ]
+  }
+}
+```
+
+> Rebuild native binaries (`npx expo prebuild` + `npx expo run:android` / EAS Build) after adding `react-native-vision-camera-mlkit`.
+
+---
+
+## 3. Configuration & Live Controls
+
+```tsx
+import { CameraAI, type DetectionResult } from '@masumdev/rn-camera-ai';
+import { createMLKitTextRecognizer } from '@masumdev/rn-camera-ai-mlkit';
+
+const ocrProcessor = await createMLKitTextRecognizer({
+  language: 'LATIN',        // 'LATIN' | 'CHINESE' | 'DEVANAGARI' | 'JAPANESE' | 'KOREAN'
+  granularity: 'line',      // 'block' | 'line' | 'element'
+  entityFilter: 'all',      // 'all' | 'nik' | 'email' | 'phone' | 'url' | 'currency' | 'number'
+  targetFps: 10,            // Smooth FPS cap while retaining boxes on throttled frames
+  minTextLength: 2,         // Skip 1-char punctuation artifacts
+  invertColors: false,      // Toggle true for white-on-black terminal screens
+  preferredPixelFormat: 'yuv',
+});
+
+// Switch granularity live without restarting camera:
+ocrProcessor.setGranularity('block');
+
+// Switch to filter only 16-digit Indonesian NIKs:
+ocrProcessor.setEntityFilter('nik');
+
+// Read extracted entities from most recent frame:
+const entities = ocrProcessor.getLastStructuredEntities();
+// { niks: ['327301...'], emails: [...], phones: [...], urls: [...], currencies: [...] }
+```
+
+---
+
+## 4. `OcrDetectionMetadata` & Smart Entity Extraction
+
+Every `DetectionResult` emitted by `MLKitTextRecognizer` includes `detection.ocr`:
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `text` | `string` | Trimmed text value of the block, line, or word element. |
+| `granularity` | `'block' \| 'line' \| 'element'` | Current hierarchy level. |
+| `category` | `'text' \| 'nik' \| 'email' \| 'phone' \| 'url' \| 'currency' \| 'number'` | Automatic semantic entity tag. |
+| `languages` | `string[]` | ISO-639 / BCP-47 language codes reported by ML Kit. |
+| `confidence` | `number \| undefined` | Android line/element confidence `[0, 1]`. |
+| `angle` | `number \| undefined` | Baseline text rotation angle in degrees. |
+| `corners` | `OcrPoint[] \| undefined` | Normalized 4-point corner polygon `[0..1]`. |
+| `fullText` | `string \| undefined` | Complete multi-line transcript detected on the frame. |
+
+### Zero-OCR Background Preview Framing (`createDocumentAlignmentProcessor` + `recognizeImage`)
+
+Running heavy text OCR on every live preview frame burns battery and stalls low-end phones. Instead, use `@masumdev/rn-camera-ai`'s ultra-lightweight `createDocumentAlignmentProcessor({ targetFps: 5 })` (pure YUV luma paper-edge, bottom-shadow, focus & brightness worklet taking `< 0.5 ms` with **0 live ML Kit calls**), keep preview overlays disabled (`showBoxes={false} showLabels={false} showLandmarks={false}`), and run `ocrProcessor.recognizeImage(photo.uri, ...)` **once** when Capture is pressed!
+
+```tsx
+import { createDocumentAlignmentProcessor } from '@masumdev/rn-camera-ai';
+
+// Lightweight 0.4ms YUV Luma background alignment worklet (0 live OCR frames)
+const alignmentProcessor = createDocumentAlignmentProcessor({ targetFps: 5 });
+
+// Inside CameraAI onDetections(results):
+const alignment = results[0]?.documentAlignment;
+const fittedQuad = alignment?.corners; // Independent 4 corners [TL, TR, BR, BL] tracking tilted sheets
+const fittedBox = results[0]?.boundingBox; // Enclosing bounding box
+```
+
+> **Static Image Resolution Tip**: Google ML Kit Nitro caps static image analysis at **4 MP / 4,096 px**. `CameraAI`'s `usePhotoOutput` defaults to `1440×1920` (`2.76 MP`) while `enablePhotoCapture` configures preview alignment frames at `768×1024` (`4:3`) so paper corners match captured photos `1:1`.
+
+```typescript
+import { recognizeTextFromUri } from '@masumdev/rn-camera-ai-mlkit';
+
+const doc = await recognizeTextFromUri('file:///path/to/ktp.jpg', {
+  language: 'LATIN',
+  granularity: 'line',
+  imageWidth: 1080,
+  imageHeight: 1920,
+});
+
+console.log(doc.fullText);
+console.log(doc.entities.niks);
+```

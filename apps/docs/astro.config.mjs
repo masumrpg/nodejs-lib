@@ -72,6 +72,7 @@ export default defineConfig({
             { label: 'CameraAI Component', slug: 'rn-camera-ai/camera-ai' },
             { label: 'TFLite Adapter', slug: 'rn-camera-ai/tflite-adapter' },
             { label: 'Face Mesh & Liveness (e-KYC)', slug: 'rn-camera-ai/face-mesh-and-liveness' },
+            { label: 'ML Kit OCR Adapter', slug: 'rn-camera-ai/mlkit-ocr' },
             { label: 'Custom Processors', slug: 'rn-camera-ai/custom-processors' },
             { label: 'Coordinate Math & Overlays', slug: 'rn-camera-ai/coordinate-math' },
             { label: 'Changelog', slug: 'rn-camera-ai/changelog' },

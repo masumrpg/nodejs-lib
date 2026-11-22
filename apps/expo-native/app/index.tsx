@@ -8,6 +8,7 @@ import {
   Cpu,
   Eye,
   ScanFace,
+  ScanText,
   ShieldCheck,
   Sparkles,
   Zap,
@@ -16,6 +17,7 @@ import {
 const EMERALD_ACCENT = "#3da441";
 const CYAN_ACCENT = "#38bdf8";
 const VIOLET_ACCENT = "#a855f7";
+const AMBER_ACCENT = "#f59e0b";
 
 export default function CameraAIFeatureMenuScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
@@ -31,6 +33,10 @@ export default function CameraAIFeatureMenuScreen(): React.JSX.Element {
 
   const handleOpenLivenessDetection = () => {
     router.push("/liveness-detection");
+  };
+
+  const handleOpenOcrScanner = () => {
+    router.push("/ocr-scanner");
   };
 
   return (
@@ -228,6 +234,60 @@ export default function CameraAIFeatureMenuScreen(): React.JSX.Element {
             </View>
           </View>
         </Pressable>
+
+        {/* Feature 4: Text Recognition & OCR (Google ML Kit) */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open ML Kit OCR Scanner Camera"
+          onPress={handleOpenOcrScanner}
+          style={({ pressed }) => [
+            styles.featureCard,
+            styles.featureCardAmber,
+            pressed && styles.cardPressed,
+          ]}
+        >
+          <View style={styles.cardHeaderRow}>
+            <View style={[styles.featureIconWrap, styles.iconWrapAmber]}>
+              <ScanText size={22} color={AMBER_ACCENT} />
+            </View>
+            <View style={styles.cardTitleGroup}>
+              <View style={styles.cardTagRow}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.modelTag, { color: AMBER_ACCENT }]}
+                >
+                  GOOGLE ML KIT V2 · TEXT RECOGNITION
+                </Text>
+                <Text style={styles.resolutionTag}>YUV ZERO-COPY</Text>
+              </View>
+              <Text style={styles.cardTitle}>
+                Text Recognition &amp; OCR Scanner
+              </Text>
+            </View>
+            <ChevronRight size={20} color="#94a3b8" />
+          </View>
+
+          <Text style={styles.cardDescription}>
+            Smart Document Capture Scanner dengan corner brackets yang otomatis
+            menyesuaikan sudut kertas, indikator status optimalitas scan, serta
+            animasi laser Reanimated 4 saat capture memakai Google ML Kit v2.
+          </Text>
+
+          <View style={styles.featureBulletsRow}>
+            <View style={styles.bulletChipAmber}>
+              <Text style={styles.bulletChipTextAmber}>Google ML Kit v2</Text>
+            </View>
+            <View style={styles.bulletChipAmber}>
+              <Text style={styles.bulletChipTextAmber}>Paper Corner Fit</Text>
+            </View>
+            <View style={styles.bulletChipAmber}>
+              <Text style={styles.bulletChipTextAmber}>Scan Readiness</Text>
+            </View>
+            <View style={styles.bulletChipAmber}>
+              <Text style={styles.bulletChipTextAmber}>Custom UI Theme</Text>
+            </View>
+          </View>
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -337,6 +397,9 @@ const styles = StyleSheet.create({
   featureCardViolet: {
     borderColor: "rgba(168, 85, 247, 0.45)",
   },
+  featureCardAmber: {
+    borderColor: "rgba(245, 158, 11, 0.45)",
+  },
   cardPressed: {
     opacity: 0.85,
   },
@@ -364,6 +427,10 @@ const styles = StyleSheet.create({
   iconWrapViolet: {
     backgroundColor: "rgba(168, 85, 247, 0.16)",
     borderColor: "rgba(168, 85, 247, 0.45)",
+  },
+  iconWrapAmber: {
+    backgroundColor: "rgba(245, 158, 11, 0.16)",
+    borderColor: "rgba(245, 158, 11, 0.45)",
   },
   cardTitleGroup: {
     flex: 1,
@@ -439,6 +506,19 @@ const styles = StyleSheet.create({
   },
   bulletChipTextViolet: {
     color: "#d8b4fe",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  bulletChipAmber: {
+    backgroundColor: "rgba(245, 158, 11, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.38)",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  bulletChipTextAmber: {
+    color: "#fcd34d",
     fontSize: 11,
     fontWeight: "600",
   },

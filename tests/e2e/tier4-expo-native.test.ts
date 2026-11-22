@@ -81,15 +81,19 @@ mock.module("lucide-react-native", () => ({
   AlertTriangle: createMockIcon("AlertTriangle"),
   ArrowLeft: createMockIcon("ArrowLeft"),
   Box: createMockIcon("Box"),
+  Camera: createMockIcon("Camera"),
   CheckCircle2: createMockIcon("CheckCircle2"),
   ChevronRight: createMockIcon("ChevronRight"),
   Cpu: createMockIcon("Cpu"),
   Eye: createMockIcon("Eye"),
+  Palette: createMockIcon("Palette"),
   Pause: createMockIcon("Pause"),
   Play: createMockIcon("Play"),
   RefreshCw: createMockIcon("RefreshCw"),
   RotateCcw: createMockIcon("RotateCcw"),
   ScanFace: createMockIcon("ScanFace"),
+  ScanText: createMockIcon("ScanText"),
+  Share2: createMockIcon("Share2"),
   ShieldAlert: createMockIcon("ShieldAlert"),
   ShieldCheck: createMockIcon("ShieldCheck"),
   SlidersHorizontal: createMockIcon("SlidersHorizontal"),
@@ -927,7 +931,122 @@ describe("Tier 4: apps/expo-native Scaffold, Bundled Model & Detector Integratio
       expect(menuTexts).toContain("Object Detection");
       expect(menuTexts).toContain("Face Detection & Recognition");
       expect(menuTexts).toContain("Face Liveness & Anti-Spoofing");
+      expect(menuTexts).toContain("Text Recognition & OCR Scanner");
       menuRenderer.unmount();
+
+      const { default: OcrScannerScreen } = await import(
+        "../../apps/expo-native/app/ocr-scanner"
+      );
+      const ocrRenderer = createScreenTestRenderer();
+      ocrRenderer.mount(React.createElement(OcrScannerScreen));
+      await React.act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+      const ocrTexts = collectTexts(ocrRenderer.container);
+      expect(ocrTexts).toContain("Smart Document Capture");
+      expect(ocrTexts).toContain("READY");
+      expect(ocrTexts).toContain("Capture Document");
+      expect(ocrTexts).toContain("Background Framing Active");
+      expect(ocrTexts.join(" ")).not.toContain("Live Scan");
+      expect(mockCameraState.lastFrameOutputOptions?.pixelFormat).toBe("yuv");
+
+      const activeOutputs = mockCameraState.lastCameraProps?.outputs as
+        | Array<Record<string, unknown>>
+        | undefined;
+      expect(activeOutputs?.length).toBe(2);
+      expect(activeOutputs?.[0]?.__mockFrameOutput).toBe(true);
+      expect(activeOutputs?.[1]?.__mockPhotoOutput).toBe(true);
+
+      // Build synthetic YUV planar frame with bright paper [0.12..0.88, 0.14..0.88] on dark background
+      const w = 360;
+      const h = 520;
+      const yPlane = new Uint8Array(w * h);
+      for (let r = 0; r < h; r++) {
+        const ny = r / h;
+        for (let c = 0; c < w; c++) {
+          const nx = c / w;
+          const onPaper = nx >= 0.12 && nx <= 0.88 && ny >= 0.14 && ny <= 0.88;
+          let lum = onPaper ? 225 : 55;
+          if (onPaper && ny < 0.65 && r % 10 < 4 && c % 14 < 7) {
+            lum = 95;
+          }
+          yPlane[r * w + c] = lum;
+        }
+      }
+
+      const onFrame = mockCameraState.lastFrameOutputOptions?.onFrame as
+        | ((frame: Record<string, unknown>) => void)
+        | undefined;
+      expect(typeof onFrame).toBe("function");
+      await React.act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 210));
+        onFrame?.({
+          width: w,
+          height: h,
+          orientation: "up",
+          isMirrored: false,
+          isPlanar: true,
+          isValid: true,
+          getPlanes: () => [
+            {
+              width: w,
+              height: h,
+              bytesPerRow: w,
+              isValid: true,
+              getPixelBuffer: () => yPlane.buffer,
+            },
+          ],
+          dispose: () => {},
+        });
+      });
+
+      const alignedTexts = collectTexts(ocrRenderer.container);
+      expect(alignedTexts.join(" ")).toContain("Optimal Scan:");
+
+      // Trigger Capture & Analyze -> laser animation runs & invokes ML Kit recognizeImage once
+      const shutterButton = findButtonByText(
+        ocrRenderer.container,
+        "Capture",
+      );
+      expect(shutterButton).toBeDefined();
+      await React.act(async () => {
+        const onPress = shutterButton?.props?.onPress as
+          | (() => Promise<void> | void)
+          | undefined;
+        await onPress?.();
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      });
+
+      expect(mockCameraState.capturePhotoCallCount).toBe(1);
+      const analyzedTexts = collectTexts(ocrRenderer.container);
+      expect(analyzedTexts).toContain("Retake Photo");
+      expect(analyzedTexts).toContain("Export / Copy");
+      expect(analyzedTexts.join(" ")).toContain("3273011505990001");
+      expect(analyzedTexts.join(" ")).toContain("masum@example.com");
+
+      // Switch UI customization preset (Studio -> Emerald -> Custom)
+      const themeButton = findButtonByText(ocrRenderer.container, "Studio");
+      expect(themeButton).toBeDefined();
+      React.act(() => {
+        const onPress = themeButton?.props?.onPress as (() => void) | undefined;
+        onPress?.();
+      });
+      expect(collectTexts(ocrRenderer.container)).toContain("Emerald");
+
+      // Retake returns cleanly to document alignment viewfinder
+      const retakeButton = findButtonByText(
+        ocrRenderer.container,
+        "Retake Photo",
+      );
+      expect(retakeButton).toBeDefined();
+      React.act(() => {
+        const onPress = retakeButton?.props?.onPress as
+          | (() => void)
+          | undefined;
+        onPress?.();
+      });
+      expect(collectTexts(ocrRenderer.container)).toContain("Capture Document");
+      ocrRenderer.unmount();
 
       const { default: FaceLivenessScreen } = await import(
         "../../apps/expo-native/app/liveness-detection"

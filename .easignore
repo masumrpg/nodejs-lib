@@ -86,5 +86,5 @@ packages/rn-tajweed-verse/*
 packages/rn-ui/*
 !packages/rn-ui/package.json
 
-# Note: packages/rn-camera-ai and packages/rn-camera-ai-tflite (including their lib/ and src/)
-# are intentionally NOT ignored so EAS can bundle them directly.
+# Note: packages/rn-camera-ai, packages/rn-camera-ai-tflite, and packages/rn-camera-ai-mlkit
+# (including their lib/ and src/) are intentionally NOT ignored so EAS can bundle them directly.

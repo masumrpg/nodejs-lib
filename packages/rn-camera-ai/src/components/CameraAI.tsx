@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useImperativeHandle, useState } from 'react';
 import {
   LayoutChangeEvent,
   StyleSheet,
@@ -7,11 +7,13 @@ import {
 } from 'react-native';
 import {
   Camera,
+  type CameraOutput,
   type Constraint,
   type Frame,
   useCameraDevice,
   useCameraPermission,
   useFrameOutput,
+  usePhotoOutput,
 } from 'react-native-vision-camera';
 import {
   createSynchronizable,
@@ -21,8 +23,11 @@ import {
 import type {
   CameraAIProps,
   CameraFacing,
+  CapturePhotoOptions,
+  CapturedPhotoResult,
   DetectionResult,
   FaceMeshStyleConfig,
+  ScannerAnimationConfig,
   StreamDimensions,
   ViewDimensions,
   WorkletBoolSync,
@@ -34,7 +39,9 @@ import {
   type ProjectedDetectionItem,
   type WorkletOverlayConfig,
 } from './DetectionOverlay';
+import { DocumentGuideOverlay } from './DocumentGuideOverlay';
 import { PermissionFallbackView } from './PermissionFallbackView';
+import { ScannerAnimationOverlay } from './ScannerAnimationOverlay';
 
 function createBoolSync(initial: boolean): WorkletBoolSync {
   try {
@@ -59,7 +66,13 @@ function createBoolSync(initial: boolean): WorkletBoolSync {
  * projections directly on the Background Camera Worklet Thread (0 JS coordinate math).
  */
 export const CameraAI: React.FC<CameraAIProps> = ({
+  ref,
+  cameraRef,
   processor,
+  captureMode = 'live',
+  enablePhotoCapture = false,
+  scanAnimation = false,
+  flashTrigger: flashTriggerProp = 0,
   cameraPosition = 'back',
   resizeMode = 'cover',
   isActive = true,
@@ -79,6 +92,13 @@ export const CameraAI: React.FC<CameraAIProps> = ({
   renderLabel,
   renderLandmarkDot,
   renderOverlay,
+  documentGuide,
+  documentGuideTheme,
+  renderDocumentGuide,
+  renderDocumentCorner,
+  renderDocumentStatus,
+  renderDocumentCenter,
+  renderAnimationOverlay,
   onDetectionsWorklet,
   onDetections,
   onError,
@@ -93,10 +113,40 @@ export const CameraAI: React.FC<CameraAIProps> = ({
   const device = useCameraDevice(resolvedFacing);
 
   const [viewDimensions, setViewDimensions] = useState<ViewDimensions>({ width: 0, height: 0 });
+  const [streamDimensions, setStreamDimensions] = useState<StreamDimensions | undefined>(
+    undefined
+  );
   const [detections, setDetections] = useState<DetectionResult[]>([]);
   const [projectedDetections, setProjectedDetections] = useState<
     ProjectedDetectionItem[] | undefined
   >(undefined);
+  const [internalFlashTrigger, setInternalFlashTrigger] = useState<number>(0);
+
+  const effectiveFlashTrigger = flashTriggerProp + internalFlashTrigger;
+
+  const resolvedShowBoxes = showBoxes ?? overlayTheme?.showBoxes ?? true;
+  const resolvedShowLabels = showLabels ?? overlayTheme?.showLabels ?? true;
+  const needsInternalOverlay =
+    resolvedShowBoxes ||
+    resolvedShowLabels ||
+    showLandmarks ||
+    Boolean(renderBox) ||
+    Boolean(renderLabel) ||
+    Boolean(renderLandmarkDot) ||
+    Boolean(renderOverlay);
+
+  const resolvedScanAnimation = React.useMemo<ScannerAnimationConfig | null>(() => {
+    if (!scanAnimation) {
+      return null;
+    }
+    if (scanAnimation === true) {
+      return { enabled: true };
+    }
+    return {
+      ...scanAnimation,
+      enabled: scanAnimation.enabled ?? true,
+    };
+  }, [scanAnimation]);
 
   const onErrorRef = React.useRef(onError);
   onErrorRef.current = onError;
@@ -214,12 +264,30 @@ export const CameraAI: React.FC<CameraAIProps> = ({
   }, [processor]);
 
   const handleDetections = React.useCallback(
-    (results: DetectionResult[], projected?: ProjectedDetectionItem[]) => {
-      setDetections(results);
-      setProjectedDetections(projected);
+    (
+      results: DetectionResult[],
+      projected?: ProjectedDetectionItem[],
+      nextStreamDims?: StreamDimensions
+    ) => {
+      if (nextStreamDims && nextStreamDims.width > 0 && nextStreamDims.height > 0) {
+        setStreamDimensions((prev) =>
+          prev &&
+          prev.width === nextStreamDims.width &&
+          prev.height === nextStreamDims.height
+            ? prev
+            : nextStreamDims
+        );
+      }
+      if (needsInternalOverlay) {
+        setDetections(results);
+        setProjectedDetections(projected);
+      } else {
+        setDetections((prev) => (prev.length === 0 ? prev : []));
+        setProjectedDetections((prev) => (prev === undefined ? prev : undefined));
+      }
       onDetectionsRef.current?.(results);
     },
-    []
+    [needsInternalOverlay]
   );
 
   const handleWorkletError = React.useCallback((error: unknown) => {
@@ -270,7 +338,9 @@ export const CameraAI: React.FC<CameraAIProps> = ({
           return;
         }
         const projected =
-          viewDimensions.width > 0 && viewDimensions.height > 0
+          needsInternalOverlay &&
+          viewDimensions.width > 0 &&
+          viewDimensions.height > 0
             ? projectDetectionsWorklet(
                 results,
                 {
@@ -283,7 +353,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                 workletOverlayConfig
               )
             : undefined;
-        handleDetections(results, projected);
+        handleDetections(results, projected, streamDims);
       } catch (err) {
         handleWorkletError(err);
       } finally {
@@ -296,6 +366,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
     [
       processor,
       wasThrottledSync,
+      needsInternalOverlay,
       viewDimensions,
       resizeMode,
       resolvedFacing,
@@ -334,9 +405,11 @@ export const CameraAI: React.FC<CameraAIProps> = ({
           }
 
           // Pre-compute all 468-Point Face Mesh contour/tesselation geometry & pixel boxes
-          // directly on the Background Camera Worklet Thread (0 JS coordinate math!)
+          // directly on the Background Camera Worklet Thread only when internal overlay rendering is enabled
           const projected =
-            viewDimensions.width > 0 && viewDimensions.height > 0
+            needsInternalOverlay &&
+            viewDimensions.width > 0 &&
+            viewDimensions.height > 0
               ? projectDetectionsWorklet(
                   results,
                   {
@@ -350,7 +423,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                 )
               : undefined;
 
-          scheduleOnRN(handleDetections, results, projected);
+          scheduleOnRN(handleDetections, results, projected, streamDims);
         } catch (err) {
           scheduleOnRN(handleWorkletError, err);
         } finally {
@@ -376,6 +449,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
       workletProcessFn,
       wasThrottledSync,
       onDetectionsWorklet,
+      needsInternalOverlay,
       viewDimensions,
       resizeMode,
       resolvedFacing,
@@ -387,17 +461,100 @@ export const CameraAI: React.FC<CameraAIProps> = ({
     ]
   );
 
+  const resolvedPixelFormat = processor?.preferredPixelFormat ?? 'rgb';
+  const isLiveMode = captureMode !== 'photo';
+
+  const photoOutput =
+    typeof usePhotoOutput === 'function'
+      ? usePhotoOutput({
+          targetResolution: { width: 1440, height: 1920 },
+          qualityPrioritization: 'balanced',
+        })
+      : undefined;
+
   const frameOutput = useFrameOutput({
-    pixelFormat: 'rgb',
+    pixelFormat: resolvedPixelFormat,
+    ...(enablePhotoCapture && isLiveMode
+      ? { targetResolution: { width: 768, height: 1024 } }
+      : {}),
     dropFramesWhileBusy: true,
     enablePhysicalBufferRotation: true,
     enablePreviewSizedOutputBuffers: true,
-    onFrame: processor ? onFrame : undefined,
+    onFrame: isLiveMode && processor ? onFrame : undefined,
   });
 
-  const cameraOutputs = React.useMemo(
-    () => (processor ? [frameOutput] : []),
-    [processor, frameOutput]
+  const cameraOutputs = React.useMemo<CameraOutput[]>(() => {
+    if (captureMode === 'photo') {
+      return photoOutput ? [photoOutput] : [];
+    }
+    const outputs: CameraOutput[] = [];
+    if (processor) {
+      outputs.push(frameOutput);
+    }
+    if (enablePhotoCapture && photoOutput) {
+      outputs.push(photoOutput);
+    }
+    return outputs;
+  }, [captureMode, enablePhotoCapture, frameOutput, photoOutput, processor]);
+
+  useEffect(() => {
+    if (captureMode === 'photo') {
+      setDetections([]);
+      setProjectedDetections(undefined);
+    }
+  }, [captureMode]);
+
+  useImperativeHandle(
+    ref ?? cameraRef,
+    () => ({
+      capturePhoto: async (
+        options?: CapturePhotoOptions
+      ): Promise<CapturedPhotoResult | null> => {
+        if (!photoOutput || (captureMode !== 'photo' && !enablePhotoCapture)) {
+          return null;
+        }
+
+        try {
+          setInternalFlashTrigger((prev) => prev + 1);
+          const photoFile = await photoOutput.capturePhotoToFile(
+            {
+              flashMode: options?.flashMode ?? 'off',
+              enableShutterSound: options?.enableShutterSound ?? false,
+            },
+            {}
+          );
+
+          const rawPath = photoFile.filePath;
+          const normalizedUri = rawPath.startsWith('file://')
+            ? rawPath
+            : `file://${rawPath}`;
+          const rawW = photoFile.width;
+          const rawH = photoFile.height;
+          const rotated90 =
+            photoFile.orientation === 'left' ||
+            photoFile.orientation === 'right';
+          const uprightWidth = rotated90 ? rawH : rawW;
+          const uprightHeight = rotated90 ? rawW : rawH;
+
+          return {
+            uri: normalizedUri,
+            filePath: rawPath,
+            width: rawW,
+            height: rawH,
+            uprightWidth,
+            uprightHeight,
+            orientation: photoFile.orientation,
+            isMirrored: photoFile.isMirrored,
+          };
+        } catch (err: unknown) {
+          const message =
+            err instanceof Error ? err.message : 'Failed to capture photo';
+          onErrorRef.current?.(new CameraError(message, 'CAPTURE_FAILED', err));
+          return null;
+        }
+      },
+    }),
+    [captureMode, enablePhotoCapture, photoOutput]
   );
 
   const cameraConstraints = React.useMemo<Constraint[] | undefined>(
@@ -485,8 +642,63 @@ export const CameraAI: React.FC<CameraAIProps> = ({
         onError={handleCameraError}
         style={StyleSheet.absoluteFill}
       />
+      {resolvedScanAnimation?.enabled || renderAnimationOverlay ? (
+        <ScannerAnimationOverlay
+          active={isActive}
+          state={resolvedScanAnimation?.state}
+          accentColor={resolvedScanAnimation?.accentColor}
+          showGridCorners={resolvedScanAnimation?.showGridCorners}
+          cornerLength={resolvedScanAnimation?.cornerLength}
+          cornerThickness={resolvedScanAnimation?.cornerThickness}
+          cornerRadius={resolvedScanAnimation?.cornerRadius}
+          showLaser={resolvedScanAnimation?.showLaser}
+          scanRegion={resolvedScanAnimation?.scanRegion}
+          veilColor={resolvedScanAnimation?.veilColor}
+          statusLabel={resolvedScanAnimation?.statusLabel}
+          statusContainerStyle={resolvedScanAnimation?.statusContainerStyle}
+          statusTextStyle={resolvedScanAnimation?.statusTextStyle}
+          flashTrigger={effectiveFlashTrigger}
+          sweepDurationMs={resolvedScanAnimation?.sweepDurationMs}
+          renderOverlay={
+            renderAnimationOverlay ?? resolvedScanAnimation?.renderOverlay
+          }
+          renderLaser={resolvedScanAnimation?.renderLaser}
+          renderStatusBadge={resolvedScanAnimation?.renderStatusBadge}
+        />
+      ) : effectiveFlashTrigger > 0 ? (
+        <ScannerAnimationOverlay
+          active={false}
+          showGridCorners={false}
+          showLaser={false}
+          flashTrigger={effectiveFlashTrigger}
+        />
+      ) : null}
 
-      {viewDimensions.width > 0 && viewDimensions.height > 0 && (
+      {viewDimensions.width > 0 &&
+      viewDimensions.height > 0 &&
+      (documentGuide || renderDocumentGuide) ? (
+        <DocumentGuideOverlay
+          guide={
+            documentGuide ?? {
+              box: { x: 0.08, y: 0.14, width: 0.84, height: 0.64 },
+              readiness: 'searching',
+            }
+          }
+          viewDimensions={viewDimensions}
+          streamDimensions={streamDimensions}
+          resizeMode={resizeMode}
+          isMirrored={resolvedFacing === 'front'}
+          theme={documentGuideTheme}
+          renderGuide={renderDocumentGuide}
+          renderCorner={renderDocumentCorner}
+          renderStatus={renderDocumentStatus}
+          renderCenterOverlay={renderDocumentCenter}
+        />
+      ) : null}
+
+      {needsInternalOverlay &&
+      viewDimensions.width > 0 &&
+      viewDimensions.height > 0 && (
         <>
           {renderOverlay ? (
             renderOverlay(detections, viewDimensions)
@@ -518,6 +730,8 @@ export const CameraAI: React.FC<CameraAIProps> = ({
     </View>
   );
 };
+
+CameraAI.displayName = 'CameraAI';
 
 const styles = StyleSheet.create({
   container: {
