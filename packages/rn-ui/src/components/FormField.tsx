@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  StyleSheet,
   View,
   type StyleProp,
   type TextStyle,
@@ -7,7 +8,9 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated, {
+  cancelAnimation,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withSequence,
   withTiming,
@@ -17,7 +20,11 @@ import { useTheme } from "../theme";
 import { triggerHaptic } from "../utils/haptics";
 import { Label, type LabelProps } from "./Label";
 import { Text } from "./Text";
-import { renderIcon, type RenderIcon, type BaseGlassProps } from "./types";
+import {
+  renderIcon,
+  type BaseHapticProps,
+  type RenderIcon,
+} from "./types";
 
 export interface FormFieldContextValue {
   invalid: boolean;
@@ -34,7 +41,7 @@ export function useFormField() {
   return React.useContext(FormFieldContext);
 }
 
-export interface FormFieldProps extends ViewProps, BaseGlassProps {
+export interface FormFieldProps extends ViewProps, BaseHapticProps {
   invalid?: boolean;
   disabled?: boolean;
   required?: boolean;
@@ -43,38 +50,65 @@ export interface FormFieldProps extends ViewProps, BaseGlassProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function FormField({
+export const FormField = React.memo(function FormField({
   invalid: explicitInvalid,
   disabled = false,
   required = false,
   error,
   shakeOnError = true,
+  haptic = true,
   style,
   ...props
 }: FormFieldProps) {
   const { spacing } = useTheme();
+  const reducedMotion = useReducedMotion();
   const shakeX = useSharedValue(0);
 
   const invalid = explicitInvalid ?? Boolean(error);
+  const hasMountedRef = React.useRef(false);
+  const prevInvalidRef = React.useRef(invalid);
+  const prevErrorRef = React.useRef(error);
 
   React.useEffect(() => {
-    if (invalid && shakeOnError) {
-      triggerHaptic("error");
-      shakeX.value = withSequence(
-        withTiming(8, { duration: 50 }),
-        withTiming(-8, { duration: 50 }),
-        withTiming(6, { duration: 50 }),
-        withTiming(-6, { duration: 50 }),
-        withTiming(0, { duration: 50 }),
-      );
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      prevInvalidRef.current = invalid;
+      prevErrorRef.current = error;
+      return;
     }
-  }, [invalid, shakeOnError, shakeX]);
+
+    const becameInvalid = invalid && !prevInvalidRef.current;
+    const errorMessageChanged =
+      invalid && Boolean(error) && error !== prevErrorRef.current;
+
+    prevInvalidRef.current = invalid;
+    prevErrorRef.current = error;
+
+    if ((becameInvalid || errorMessageChanged) && shakeOnError) {
+      if (haptic) triggerHaptic("error");
+      if (!reducedMotion) {
+        shakeX.value = withSequence(
+          withTiming(8, { duration: 45 }),
+          withTiming(-8, { duration: 45 }),
+          withTiming(6, { duration: 45 }),
+          withTiming(-6, { duration: 45 }),
+          withTiming(0, { duration: 45 }),
+        );
+      }
+    }
+  }, [error, haptic, invalid, reducedMotion, shakeOnError, shakeX]);
+
+  React.useEffect(() => {
+    return () => {
+      cancelAnimation(shakeX);
+    };
+  }, [shakeX]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shakeX.value }],
   }));
 
-  const value = React.useMemo(
+  const value = React.useMemo<FormFieldContextValue>(
     () => ({ invalid, disabled, required, error }),
     [disabled, invalid, required, error],
   );
@@ -83,10 +117,8 @@ export function FormField({
     <FormFieldContext.Provider value={value}>
       <Animated.View
         style={[
-          {
-            width: "100%",
-            gap: spacing.xs,
-          },
+          styles.field,
+          { gap: spacing.xs },
           animatedStyle,
           style,
         ]}
@@ -94,11 +126,11 @@ export function FormField({
       />
     </FormFieldContext.Provider>
   );
-}
+});
 
 export interface FormLabelProps extends LabelProps {}
 
-export function FormLabel(props: FormLabelProps) {
+export const FormLabel = React.memo(function FormLabel(props: FormLabelProps) {
   const field = useFormField();
 
   return (
@@ -109,38 +141,34 @@ export function FormLabel(props: FormLabelProps) {
       {...props}
     />
   );
-}
+});
 
 export interface FormControlProps extends ViewProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function FormControl({ style, ...props }: FormControlProps) {
-  return (
-    <View
-      style={[
-        {
-          width: "100%",
-        },
-        style,
-      ]}
-      {...props}
-    />
-  );
-}
+export const FormControl = React.memo(function FormControl({
+  style,
+  ...props
+}: FormControlProps) {
+  return <View style={[styles.control, style]} {...props} />;
+});
 
 export interface FormDescriptionProps {
   children?: React.ReactNode;
   style?: StyleProp<TextStyle>;
 }
 
-export function FormDescription({ children, style }: FormDescriptionProps) {
+export const FormDescription = React.memo(function FormDescription({
+  children,
+  style,
+}: FormDescriptionProps) {
   return (
     <Text variant="bodySmall" color="textMuted" style={style}>
       {children}
     </Text>
   );
-}
+});
 
 export interface FormErrorProps {
   children?: React.ReactNode;
@@ -148,26 +176,50 @@ export interface FormErrorProps {
   style?: StyleProp<TextStyle>;
 }
 
-export function FormError({ children, icon, style }: FormErrorProps) {
-  const { colors } = useTheme();
+export const FormError = React.memo(function FormError({
+  children,
+  icon,
+  style,
+}: FormErrorProps) {
+  const { colors, spacing } = useTheme();
   const field = useFormField();
   const content = children ?? field?.error;
 
   if (!content) return null;
 
+  const isErrorState = field ? field.invalid : true;
+  const foregroundColor = isErrorState ? colors.danger : colors.textMuted;
+
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-      {icon ? renderIcon(icon, colors.danger, 14) : null}
+    <View
+      accessibilityRole="alert"
+      accessibilityLiveRegion="polite"
+      style={[styles.errorRow, { gap: spacing.xs }]}
+    >
+      {icon ? renderIcon(icon, foregroundColor, 14) : null}
       <Text
         variant="bodySmall"
-        color={field?.invalid ? "danger" : "textMuted"}
-        style={style}
+        color={isErrorState ? "danger" : "textMuted"}
+        style={[styles.errorText, style]}
       >
         {content}
       </Text>
     </View>
   );
-}
+});
 
-export interface FormMessageProps extends FormErrorProps {}
-export const FormMessage = FormError;
+const styles = StyleSheet.create({
+  field: {
+    width: "100%",
+  },
+  control: {
+    width: "100%",
+  },
+  errorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  errorText: {
+    flexShrink: 1,
+  },
+});

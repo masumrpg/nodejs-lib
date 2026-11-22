@@ -1,22 +1,25 @@
 import React from "react";
-import { View, type StyleProp, type ViewStyle } from "react-native";
+import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { useTheme } from "../theme";
 import { Text } from "./Text";
 import {
   renderIcon,
+  resolveOutlineBorderColor,
+  resolveToneColors,
+  type BaseGlassProps,
+  type ComponentSize,
+  type ComponentTone,
+  type IconSlotsProps,
   type RenderIcon,
+  type SizeProps,
   type ToneProps,
   type VariantProps,
-  type SizeProps,
-  type IconSlotsProps,
-  type BaseGlassProps,
-  type ComponentTone,
 } from "./types";
 
 export type BadgeTone = ComponentTone;
-export type BadgeVariant = "solid" | "soft" | "outline" | "subtle" | "ghost";
-export type BadgeSize = "sm" | "md" | "lg";
+export type BadgeVariant = "filled" | "outline" | "soft" | "ghost";
+export type BadgeSize = ComponentSize;
 
 export interface BadgeProps
   extends ToneProps<BadgeTone>,
@@ -24,54 +27,20 @@ export interface BadgeProps
     SizeProps<BadgeSize>,
     IconSlotsProps,
     BaseGlassProps {
-  children: string;
+  children: React.ReactNode;
   icon?: RenderIcon;
   style?: StyleProp<ViewStyle>;
 }
 
-function getBadgeColors(
-  tone: BadgeTone,
-  colors: ReturnType<typeof useTheme>["colors"],
-) {
-  const map = {
-    primary: {
-      solid: colors.primary,
-      soft: colors.primarySoft,
-      on: colors.onPrimary,
-    },
-    secondary: {
-      solid: colors.secondary,
-      soft: colors.secondarySoft,
-      on: colors.onSecondary,
-    },
-    accent: {
-      solid: colors.accent,
-      soft: colors.accentSoft,
-      on: colors.onAccent,
-    },
-    success: {
-      solid: colors.success,
-      soft: colors.successSoft,
-      on: colors.onSuccess,
-    },
-    warning: {
-      solid: colors.warning,
-      soft: colors.warningSoft,
-      on: colors.onWarning,
-    },
-    danger: {
-      solid: colors.danger,
-      soft: colors.dangerSoft,
-      on: colors.onDanger,
-    },
-    info: { solid: colors.info, soft: colors.infoSoft, on: colors.onInfo },
-    default: { solid: colors.primary, soft: colors.primarySoft, on: colors.onPrimary },
-  };
+const BADGE_ICON_SIZE: Record<BadgeSize, number> = {
+  xs: 10,
+  sm: 11,
+  md: 12,
+  lg: 14,
+  xl: 16,
+};
 
-  return map[tone] ?? map.primary;
-}
-
-export function Badge({
+function BadgeComponent({
   children,
   tone = "primary",
   variant = "soft",
@@ -82,70 +51,126 @@ export function Badge({
   rightIcon,
   style,
 }: BadgeProps) {
-  const { colors, components, radii, spacing, isDark } = useTheme();
-  const toneColors = getBadgeColors(tone, colors);
-  const isSolid = variant === "solid";
-  const isSoft = variant === "soft";
-  const isSubtle = variant === "subtle";
-  const isOutline = variant === "outline";
-  const iconSize = size === "lg" ? 14 : size === "sm" ? 10 : 12;
-  const leadIcon = icon ?? leftIcon;
+  const { colors, components, radii, shadows, spacing, isDark } = useTheme();
+  const toneColors = resolveToneColors(tone, colors);
 
-  const glassBg = isDark
-    ? "rgba(15, 27, 45, 0.60)"
-    : "rgba(255, 255, 255, 0.75)";
+  const isFilled = variant === "filled";
+  const isSoft = variant === "soft";
+  const isOutline = variant === "outline";
+  const isTonalOutline = components.surface.outlineStyle === "tonal";
+  const tonalOutlineBg = isDark ? colors.surfaceRaised : colors.backgroundMuted;
+  const iconSize = BADGE_ICON_SIZE[size];
+  const leadIcon = leftIcon ?? icon;
+  const hasSolidBorder = components.surface.filledBorderColor === "border";
+
+  const nonFilledForeground =
+    tone === "warning" && !isDark ? "#92400E" : toneColors.solid;
 
   const backgroundColor = glass
-    ? glassBg
-    : isSolid
-    ? toneColors.solid
-    : isSoft || isSubtle
-    ? toneColors.soft
-    : colors.transparent;
+    ? colors.glassSurface
+    : isFilled
+      ? toneColors.solid
+      : isSoft
+        ? toneColors.soft
+        : isOutline && isTonalOutline
+          ? tonalOutlineBg
+          : colors.transparent;
 
-  const borderWidth =
-    glass || isOutline || isSubtle ? components.borderWidth.default : 0;
+  const borderWidth = glass
+    ? components.borderWidth.default
+    : isOutline
+      ? isTonalOutline
+        ? 0
+        : components.borderWidth.control
+      : isFilled || isSoft
+        ? components.borderWidth.filled
+        : 0;
 
   const borderColor = glass
-    ? isDark
-      ? "rgba(248, 250, 252, 0.20)"
-      : "rgba(15, 23, 42, 0.14)"
+    ? colors.glassBorder
     : isOutline
-    ? colors.border
-    : isSubtle
-    ? toneColors.solid
-    : colors.transparent;
+      ? resolveOutlineBorderColor(colors, components.surface, toneColors.border)
+      : (isFilled || isSoft) && hasSolidBorder
+        ? colors.border
+        : colors.transparent;
 
-  const textColor = isSolid && !glass ? toneColors.on : toneColors.solid;
+  const textColor = isFilled && !glass ? toneColors.on : nonFilledForeground;
+  const badgeShadow =
+    isFilled || isOutline || glass
+      ? shadows[components.surface.feedbackShadow]
+      : shadows.none;
+
+  const paddingHorizontal =
+    size === "xs"
+      ? spacing.xs
+      : size === "sm"
+        ? spacing.sm
+        : size === "lg" || size === "xl"
+          ? spacing.md
+          : spacing.sm;
+
+  const paddingVertical =
+    size === "xs"
+      ? 1
+      : size === "lg"
+        ? spacing.xs
+        : size === "xl"
+          ? spacing.xs + 2
+          : spacing.xxs;
+
+  const textVariant =
+    size === "xl" || size === "lg" ? "label" : "labelSmall";
 
   return (
     <View
+      accessible
       accessibilityRole="text"
       style={[
+        styles.container,
         {
-          alignSelf: "flex-start",
-          flexDirection: "row",
-          alignItems: "center",
           gap: spacing.xs,
-          paddingHorizontal: size === "lg" ? spacing.md : spacing.sm,
-          paddingVertical: size === "lg" ? spacing.xs : spacing.xxs,
+          paddingHorizontal,
+          paddingVertical,
           borderRadius: radii.full,
           backgroundColor,
           borderWidth,
           borderColor,
         },
+        badgeShadow,
         style,
       ]}
     >
       {leadIcon ? renderIcon(leadIcon, textColor, iconSize) : null}
-      <Text
-        variant="labelSmall"
-        color={isSolid && !glass ? "textInverse" : "text"}
-        style={{ color: textColor }}
-      >
-        {children}
-      </Text>
+      {typeof children === "string" || typeof children === "number" ? (
+        <Text
+          variant={textVariant}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          style={{
+            color: textColor,
+            flexShrink: 1,
+            includeFontPadding: false,
+            ...(size === "xs" ? { fontSize: 10, lineHeight: 14 } : null),
+          }}
+        >
+          {children}
+        </Text>
+      ) : (
+        children
+      )}
       {rightIcon ? renderIcon(rightIcon, textColor, iconSize) : null}
     </View>
   );
 }
+
+export const Badge = React.memo(BadgeComponent);
+
+const styles = StyleSheet.create({
+  container: {
+    alignSelf: "flex-start",
+    maxWidth: "100%",
+    flexShrink: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+});

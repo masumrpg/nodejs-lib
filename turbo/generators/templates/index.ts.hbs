@@ -1,2 +1,7 @@
+{{#if hasUI}}
 export * from './{{pascalCase name}}';
 export type * from './{{pascalCase name}}';
+{{else}}
+export * from './{{camelCase name}}';
+export type * from './{{camelCase name}}';
+{{/if}}

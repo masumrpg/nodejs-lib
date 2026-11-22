@@ -8,8 +8,8 @@ Every contributor and AI coding assistant working on this monorepo **MUST** stri
 
 Whenever a new package (`packages/<name>`) or a new component/API is added or modified, you **MUST** complete all 3 required steps below:
 
-### Rule 1: Native Playground Sample (`apps/native`) 📱
-- Every new component or library **MUST** have a dedicated, interactive showcase inside `apps/native/components/rn-ui/sections/` and registered in `apps/native/components/rn-ui/index.ts` & `apps/native/app/rn-ui/[id].tsx`.
+### Rule 1: Expo Go Playground Sample (`apps/expo-go`) 📱
+- Every new component or library **MUST** have a dedicated, interactive showcase inside `apps/expo-go/components/rn-ui/sections/` and registered in `apps/expo-go/components/rn-ui/index.ts` & `apps/expo-go/app/rn-ui/[id].tsx`.
 - The sample screen must showcase:
   - Component props controls & variant toggles.
   - Interactive callbacks and state updates.

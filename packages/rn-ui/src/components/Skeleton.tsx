@@ -1,7 +1,10 @@
-import React, { createContext, useContext, useEffect, useMemo } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
-  Dimensions,
+  AppState,
   StyleSheet,
+  useWindowDimensions,
+  type AppStateStatus,
+  type LayoutChangeEvent,
   type StyleProp,
   type ViewProps,
   type ViewStyle,
@@ -11,6 +14,7 @@ import Animated, {
   Easing,
   interpolate,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -18,6 +22,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { useTheme } from "../theme";
+import { withAlpha } from "../utils";
 
 export type SkeletonShimmerDirection =
   | "top-left-to-bottom-right"
@@ -30,7 +35,8 @@ export interface SkeletonGroupContextValue {
   animated: boolean;
 }
 
-export const SkeletonContext = createContext<SkeletonGroupContextValue | null>(null);
+export const SkeletonContext =
+  createContext<SkeletonGroupContextValue | null>(null);
 
 export interface SkeletonGroupProps {
   /** Whether the shared shimmer animation is actively running */
@@ -40,20 +46,33 @@ export interface SkeletonGroupProps {
   children: React.ReactNode;
 }
 
-/**
- * SkeletonGroup optimizes multi-skeleton screens by driving all child Skeleton
- * components with a single, shared animation clock on the UI thread.
- * This drastically reduces UI thread worklet overhead, memory footprint, and frame drops.
- */
 export function SkeletonGroup({
   animated = true,
   duration = 1400,
   children,
 }: SkeletonGroupProps) {
+  const reducedMotion = useReducedMotion();
+  const [appActive, setAppActive] = useState(
+    AppState.currentState === "active",
+  );
   const progress = useSharedValue(0);
 
   useEffect(() => {
-    if (!animated) {
+    const subscription = AppState.addEventListener(
+      "change",
+      (next: AppStateStatus) => {
+        setAppActive(next === "active");
+      },
+    );
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const isRunning = animated && !reducedMotion && appActive;
+
+  useEffect(() => {
+    if (!isRunning) {
       cancelAnimation(progress);
       progress.value = 0;
       return;
@@ -72,14 +91,14 @@ export function SkeletonGroup({
     return () => {
       cancelAnimation(progress);
     };
-  }, [animated, duration, progress]);
+  }, [duration, isRunning, progress]);
 
   const value = useMemo(
     () => ({
       progress,
-      animated,
+      animated: animated && !reducedMotion,
     }),
-    [progress, animated],
+    [animated, progress, reducedMotion],
   );
 
   return (
@@ -102,30 +121,51 @@ export interface SkeletonProps extends ViewProps {
   children?: React.ReactNode;
 }
 
-const SCREEN_WIDTH = Dimensions.get("window").width || 380;
-const SWEEP_DISTANCE = SCREEN_WIDTH * 1.5;
-const SHIMMER_BAR_WIDTH = Math.max(60, Math.min(SCREEN_WIDTH * 0.35, 120));
-
 function SkeletonComponent({
   animated = true,
   radius = "md",
   direction = "top-left-to-bottom-right",
   style,
   children,
+  onLayout,
   ...props
 }: SkeletonProps) {
-  const { colors, radii } = useTheme();
+  const { colors, isDark, radii } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
   const groupContext = useContext(SkeletonContext);
 
-  // If inside a SkeletonGroup, inherit the shared UI-thread clock; otherwise use a single local clock.
-  const localProgress = useSharedValue(0);
-  const progress = groupContext ? groupContext.progress : localProgress;
-  const isAnimated = groupContext ? groupContext.animated && animated : animated;
+  const [appActive, setAppActive] = useState(
+    AppState.currentState === "active",
+  );
 
   useEffect(() => {
-    if (groupContext) return; // Managed by SkeletonGroup
+    if (groupContext) return;
+    const subscription = AppState.addEventListener(
+      "change",
+      (next: AppStateStatus) => {
+        setAppActive(next === "active");
+      },
+    );
+    return () => {
+      subscription.remove();
+    };
+  }, [groupContext]);
 
-    if (!isAnimated) {
+  const localProgress = useSharedValue(0);
+  const progress = groupContext ? groupContext.progress : localProgress;
+  const isAnimated = groupContext
+    ? groupContext.animated && animated
+    : animated && !reducedMotion;
+  const shouldRunLocalLoop = isAnimated && !groupContext && appActive;
+
+  const measuredWidth = useSharedValue(Math.max(120, windowWidth));
+  const measuredHeight = useSharedValue(48);
+
+  useEffect(() => {
+    if (groupContext) return;
+
+    if (!shouldRunLocalLoop) {
       cancelAnimation(localProgress);
       localProgress.value = 0;
       return;
@@ -144,52 +184,69 @@ function SkeletonComponent({
     return () => {
       cancelAnimation(localProgress);
     };
-  }, [groupContext, isAnimated, localProgress]);
+  }, [groupContext, localProgress, shouldRunLocalLoop]);
 
-  // Subtle breathing pulse on the container
+  const handleLayout = React.useCallback(
+    (event: LayoutChangeEvent) => {
+      const { width, height } = event.nativeEvent.layout;
+      if (width > 0) measuredWidth.value = width;
+      if (height > 0) measuredHeight.value = height;
+      onLayout?.(event);
+    },
+    [measuredHeight, measuredWidth, onLayout],
+  );
+
   const containerAnimatedStyle = useAnimatedStyle(() => {
     if (!isAnimated) return { opacity: 1 };
-    const opacity = interpolate(progress.value, [0, 0.5, 1], [0.75, 1, 0.75]);
+    const opacity = interpolate(progress.value, [0, 0.5, 1], [0.78, 1, 0.78]);
     return { opacity };
   });
 
-  // Single performant transform worklet for the shimmer wave
+  const isVertical = direction === "top-to-bottom";
+
   const shimmerAnimatedStyle = useAnimatedStyle(() => {
     if (!isAnimated) return { opacity: 0 };
 
-    const startPos = direction === "top-right-to-bottom-left" ? SWEEP_DISTANCE : -SWEEP_DISTANCE;
-    const endPos = direction === "top-right-to-bottom-left" ? -SWEEP_DISTANCE : SWEEP_DISTANCE;
-    const currentTranslate = interpolate(progress.value, [0, 1], [startPos, endPos]);
-
-    switch (direction) {
-      case "top-to-bottom":
-        return {
-          transform: [{ translateY: currentTranslate }],
-        };
-      case "top-right-to-bottom-left":
-        return {
-          transform: [{ translateX: currentTranslate }, { rotate: "-25deg" }],
-        };
-      case "left-to-right":
-        return {
-          transform: [{ translateX: currentTranslate }],
-        };
-      case "top-left-to-bottom-right":
-      default:
-        return {
-          transform: [{ translateX: currentTranslate }, { rotate: "25deg" }],
-        };
+    if (isVertical) {
+      const sweepY = Math.max(80, measuredHeight.value * 1.4);
+      const translateY = interpolate(progress.value, [0, 1], [-sweepY, sweepY]);
+      return {
+        transform: [{ translateY }],
+      };
     }
+
+    const sweepX = Math.max(120, measuredWidth.value * 1.4);
+    const startPos =
+      direction === "top-right-to-bottom-left" ? sweepX : -sweepX;
+    const endPos =
+      direction === "top-right-to-bottom-left" ? -sweepX : sweepX;
+    const translateX = interpolate(progress.value, [0, 1], [startPos, endPos]);
+
+    if (direction === "left-to-right") {
+      return { transform: [{ translateX }] };
+    }
+    const rotate =
+      direction === "top-right-to-bottom-left" ? "-25deg" : "25deg";
+    return {
+      transform: [{ translateX }, { rotate }],
+    };
   });
+
+  const shimmerColor = isDark
+    ? withAlpha("#FFFFFF", 0.14)
+    : withAlpha("#FFFFFF", 0.58);
+  const shimmerBarWidth = Math.max(56, Math.min(windowWidth * 0.3, 110));
 
   return (
     <Animated.View
+      accessibilityRole="progressbar"
+      accessibilityState={{ busy: isAnimated }}
+      onLayout={handleLayout}
       style={[
+        styles.container,
         {
           backgroundColor: colors.backgroundSubtle,
           borderRadius: radii[radius],
-          overflow: "hidden",
-          position: "relative",
         },
         style,
         containerAnimatedStyle,
@@ -198,15 +255,17 @@ function SkeletonComponent({
     >
       {isAnimated && (
         <Animated.View
+          pointerEvents="none"
           style={[
             StyleSheet.absoluteFill,
-            {
-              top: -60,
-              bottom: -60,
-              width: SHIMMER_BAR_WIDTH,
-              backgroundColor: colors.surface,
-              opacity: 0.28,
-            },
+            isVertical
+              ? styles.verticalShimmerBar
+              : {
+                  top: -60,
+                  bottom: -60,
+                  width: shimmerBarWidth,
+                },
+            { backgroundColor: shimmerColor },
             shimmerAnimatedStyle,
           ]}
         />
@@ -217,3 +276,16 @@ function SkeletonComponent({
 }
 
 export const Skeleton = React.memo(SkeletonComponent);
+
+const styles = StyleSheet.create({
+  container: {
+    overflow: "hidden",
+    position: "relative",
+    minHeight: 8,
+  },
+  verticalShimmerBar: {
+    left: 0,
+    right: 0,
+    height: 48,
+  },
+});

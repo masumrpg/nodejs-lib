@@ -39,5 +39,5 @@ bun run audit
 
 Before declaring any task complete, verify typechecking across all packages and apps:
 - `bun run build --filter=@masumdev/rn-ui`
-- `bun --cwd apps/native tsc --noEmit`
+- `bun --cwd apps/expo-go tsc --noEmit`
 - `bun --cwd apps/docs build`

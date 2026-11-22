@@ -1,0 +1,340 @@
+---
+title: Installation & Quickstart
+sidebar:
+  label: Installation & Quickstart
+  order: 2
+description: Step-by-step installation, peer dependency setup, Android/iOS native permissions, and a minimal end-to-end object detection example.
+---
+
+import { Tabs, TabItem, Code, Steps, Card, CardGrid, Badge } from '@astrojs/starlight/components';
+
+This guide walks you through installing `@masumdev/rn-camera-ai` and `@masumdev/rn-camera-ai-tflite`, configuring native device permissions, and building a fully working real-time object detection preview screen in React Native or Expo.
+
+---
+
+## 1. Modular Package Installation
+
+Always install the core `@masumdev/rn-camera-ai` package, then choose only the optional adapter package(s) required for your screen:
+
+<Tabs syncKey="adapter">
+  <TabItem label="TFLite (Object / Face)">
+    ```bash
+    bun add @masumdev/rn-camera-ai @masumdev/rn-camera-ai-tflite react-native-fast-tflite
+    ```
+  </TabItem>
+  <TabItem label="ML Kit (OCR)">
+    ```bash
+    bun add @masumdev/rn-camera-ai @masumdev/rn-camera-ai-mlkit react-native-vision-camera-mlkit
+    ```
+  </TabItem>
+  <TabItem label="Core Only (Custom / Doc)">
+    ```bash
+    bun add @masumdev/rn-camera-ai
+    ```
+  </TabItem>
+</Tabs>
+
+Or via `npm`:
+
+<Tabs syncKey="pkg">
+  <TabItem label="bun" icon="bun">
+    ```bash
+    bun add @masumdev/rn-camera-ai @masumdev/rn-camera-ai-tflite
+    ```
+  </TabItem>
+  <TabItem label="npm" icon="seti:npm">
+    ```bash
+    npm install @masumdev/rn-camera-ai @masumdev/rn-camera-ai-tflite
+    ```
+  </TabItem>
+  <TabItem label="yarn" icon="seti:yarn">
+    ```bash
+    yarn add @masumdev/rn-camera-ai @masumdev/rn-camera-ai-tflite
+    ```
+  </TabItem>
+  <TabItem label="pnpm" icon="pnpm">
+    ```bash
+    pnpm add @masumdev/rn-camera-ai @masumdev/rn-camera-ai-tflite
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## 2. Peer Dependencies
+
+`@masumdev/rn-camera-ai` relies on industry-standard native camera and C++ JSI acceleration libraries. Install the required peer dependencies:
+
+<Tabs syncKey="pkg">
+  <TabItem label="bun" icon="bun">
+    ```bash
+    bun add react-native-vision-camera react-native-vision-camera-worklets react-native-worklets react-native-nitro-modules react-native-nitro-image react-native-fast-tflite react-native-reanimated
+    ```
+  </TabItem>
+  <TabItem label="npm" icon="seti:npm">
+    ```bash
+    npm install react-native-vision-camera react-native-vision-camera-worklets react-native-worklets react-native-nitro-modules react-native-nitro-image react-native-fast-tflite react-native-reanimated
+    ```
+  </TabItem>
+  <TabItem label="yarn" icon="seti:yarn">
+    ```bash
+    yarn add react-native-vision-camera react-native-vision-camera-worklets react-native-worklets react-native-nitro-modules react-native-nitro-image react-native-fast-tflite react-native-reanimated
+    ```
+  </TabItem>
+  <TabItem label="pnpm" icon="pnpm">
+    ```bash
+    pnpm add react-native-vision-camera react-native-vision-camera-worklets react-native-worklets react-native-nitro-modules react-native-nitro-image react-native-fast-tflite react-native-reanimated
+    ```
+  </TabItem>
+</Tabs>
+
+### Expo Managed / Development Builds
+
+For **Expo Development Builds** (`expo prebuild` / `npx expo run:android`), install via Expo CLI:
+
+```bash
+npx expo install expo-dev-client react-native-vision-camera react-native-vision-camera-worklets react-native-worklets react-native-nitro-modules react-native-nitro-image react-native-fast-tflite react-native-reanimated
+```
+
+> **Note**: Because `react-native-fast-tflite` and `react-native-vision-camera` contain custom native C++ code, they require a native build (Expo Development Build, bare React Native, or EAS Build). They **cannot** run inside standard Expo Go.
+
+---
+
+## 3. Native Platform Setup
+
+### Android Permissions & Features
+
+Open `android/app/src/main/AndroidManifest.xml` and ensure camera permissions and hardware features are declared inside `<manifest>`:
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!-- Camera Hardware Permissions -->
+  <uses-permission android:name="android.permission.CAMERA" />
+  
+  <!-- Specify that camera hardware is required (or optional if your app has fallback flows) -->
+  <uses-feature android:name="android.hardware.camera" android:required="true" />
+  <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+  <application ...>
+    ...
+  </application>
+</manifest>
+```
+
+#### ProGuard Configuration (Release Builds)
+
+If ProGuard / R8 minification is enabled in your Android project, add the following rules to `android/app/proguard-rules.pro` to keep TensorFlow Lite JSI entry points intact:
+
+```txt
+-keep class com.margelo.nitro.** { *; }
+-keep class com.tflite.** { *; }
+-keep class org.tensorflow.lite.** { *; }
+```
+
+### iOS Configuration
+
+Open `ios/<YourApp>/Info.plist` and add the `NSCameraUsageDescription` permission string:
+
+```xml
+<key>NSCameraUsageDescription</key>
+<string>$(PRODUCT_NAME) needs camera access to perform real-time AI object detection.</string>
+```
+
+Then install the CocoaPods dependencies:
+
+```bash
+cd ios && pod install && cd ..
+```
+
+### Expo Config Plugins (`app.json`)
+
+If using Expo Prebuild, add the Vision Camera plugin to `app.json`:
+
+```json
+{
+  "expo": {
+    "name": "MyCameraApp",
+    "slug": "my-camera-app",
+    "plugins": [
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "$(PRODUCT_NAME) requires camera access for AI object detection."
+        }
+      ]
+    ]
+  }
+}
+```
+
+---
+
+## 4. Metro Asset Configuration for `.tflite` Models
+
+If you bundle `.tflite` model files directly inside your application assets (e.g. `assets/models/detect.tflite`), Metro bundler must be told to recognize the `.tflite` file extension.
+
+Update `metro.config.js`:
+
+```javascript
+const { getDefaultConfig } = require('expo/metro-config');
+
+const config = getDefaultConfig(__dirname);
+
+// Add 'tflite' to asset extensions
+config.resolver.assetExts.push('tflite');
+
+module.exports = config;
+```
+
+---
+
+## 5. Minimal Quickstart Example
+
+Here is a minimal, production-ready React Native component that initializes an object detector using `@masumdev/rn-camera-ai-tflite` and displays live detections with `@masumdev/rn-camera-ai`:
+
+```tsx
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
+import { CameraAI, type DetectionResult } from '@masumdev/rn-camera-ai';
+import {
+  createTFLiteObjectDetector,
+  type TFLiteObjectDetector,
+} from '@masumdev/rn-camera-ai-tflite';
+
+// Standard 80-class COCO labels list
+const COCO_LABELS = [
+  'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat',
+  'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat',
+  'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack',
+  'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
+  'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
+  'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
+  'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake',
+  'chair', 'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
+  'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink',
+  'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
+];
+
+export default function ObjectDetectionScreen() {
+  const [detector, setDetector] = useState<TFLiteObjectDetector | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    let instance: TFLiteObjectDetector | null = null;
+
+    async function setupDetector() {
+      try {
+        // Initialize detector with pre-trained MobileNet SSD model
+        const created = await createTFLiteObjectDetector({
+          model: require('./assets/models/detect.tflite'),
+          labels: COCO_LABELS,
+          confidenceThreshold: 0.55,
+          maxResults: 5,
+          useGpu: true,
+          onDelegateFallback: (requested, fallback) => {
+            console.warn(`[TFLite] Delegate ${requested} unavailable, fell back to ${fallback}`);
+          },
+        });
+
+        if (isMounted) {
+          instance = created;
+          setDetector(created);
+          setIsLoading(false);
+        } else {
+          created.dispose?.();
+        }
+      } catch (err) {
+        if (isMounted) {
+          setErrorMsg(err instanceof Error ? err.message : 'Model initialization failed');
+          setIsLoading(false);
+        }
+      }
+    }
+
+    setupDetector();
+
+    return () => {
+      isMounted = false;
+      instance?.dispose?.();
+    };
+  }, []);
+
+  if (isLoading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#3da441" />
+        <Text style={styles.loadingText}>Loading Neural Network Model...</Text>
+      </View>
+    );
+  }
+
+  if (errorMsg || !detector) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.errorText}>Error: {errorMsg ?? 'Failed to load model'}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <CameraAI
+        processor={detector}
+        cameraPosition="back"
+        resizeMode="cover"
+        isActive={true}
+        onDetections={(detections: DetectionResult[]) => {
+          // Optional JS-thread callback for business logic (e.g., logging or analytics)
+          if (detections.length > 0) {
+            console.log(`Detected ${detections.length} object(s):`, detections.map((d) => d.label));
+          }
+        }}
+        onError={(error) => {
+          console.error('[CameraAI Error]', error.code, error.message);
+        }}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#121212',
+    padding: 24,
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+});
+```
+
+---
+
+## Next Steps
+
+<CardGrid>
+  <Card title="CameraAI Component & Props" icon="setting">
+    Learn about full props customization, resize modes (`cover` vs `contain`), and lifecycle controls.
+  </Card>
+  <Card title="TFLite Adapter Deep Dive" icon="rocket">
+    Explore model source resolution, GPU hardware delegates, and output tensor parsing.
+  </Card>
+</CardGrid>

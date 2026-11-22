@@ -19,8 +19,10 @@ import {
   ViewStyle,
 } from "react-native";
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
@@ -31,7 +33,11 @@ import { withAlpha } from "../utils/color";
 import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
+  ANIMATION_TIMING,
+  minTouchHitSlop,
   renderIcon,
+  resolveControlRadius,
+  resolveToneColors,
   type BaseAnimatedProps,
   type BaseGlassProps,
   type BaseHapticProps,
@@ -82,330 +88,412 @@ export interface SearchBarRef {
   isFocused: () => boolean;
 }
 
-/**
- * Mobile-optimized SearchBar with built-in debouncing, clear button, loading spinner, and animated cancel transition.
- */
-export const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(function SearchBar(
-  {
-    value,
-    defaultValue = "",
-    onChangeText,
-    onSearchDebounced,
-    debounceMs = 300,
-    onClear,
-    onCancel,
-    onSubmitEditing,
-    placeholder = "Search...",
-    loading = false,
-    showCancelButton = true,
-    cancelLabel = "Cancel",
-    icon,
-    clearIcon,
-    tone = "primary",
-    variant = "filled",
-    size = "md",
-    shape = "rounded",
-    disabled = false,
-    glass = false,
-    haptic = true,
-    animated = true,
-    style,
-    inputStyle,
-    cancelButtonStyle,
-    cancelTextStyle,
-    onFocus,
-    onBlur,
-    ...restProps
-  },
-  ref
-) {
-  const { colors, radii } = useTheme();
-  const inputRef = useRef<TextInputInstance | null>(null);
+const SEARCH_HEIGHTS: Record<ComponentSize, number> = {
+  xs: 32,
+  sm: 36,
+  md: 44,
+  lg: 48,
+  xl: 54,
+};
 
-  const [internalValue, setInternalValue] = useState(defaultValue);
-  const [isFocused, setIsFocused] = useState(false);
+const SEARCH_FONT_SIZES: Record<ComponentSize, number> = {
+  xs: 12,
+  sm: 13,
+  md: 14,
+  lg: 16,
+  xl: 17,
+};
 
-  const currentValue = value !== undefined ? value : internalValue;
-  const hasValue = currentValue.length > 0;
+const SEARCH_ICON_SIZES: Record<ComponentSize, number> = {
+  xs: 14,
+  sm: 16,
+  md: 18,
+  lg: 20,
+  xl: 22,
+};
 
-  // Animated values for cancel button entrance
-  const cancelAnim = useSharedValue(0);
-
-  useEffect(() => {
-    const shouldShowCancel = isFocused || hasValue;
-    if (showCancelButton) {
-      if (animated) {
-        cancelAnim.value = withTiming(shouldShowCancel ? 1 : 0, {
-          duration: 180,
-          easing: Easing.bezier(0.23, 1, 0.32, 1),
-        });
-      } else {
-        cancelAnim.value = shouldShowCancel ? 1 : 0;
-      }
-    } else {
-      cancelAnim.value = 0;
-    }
-  }, [animated, cancelAnim, hasValue, isFocused, showCancelButton]);
-
-  // Debounce handler
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleChangeText = useCallback(
-    (text: string) => {
-      if (value === undefined) {
-        setInternalValue(text);
-      }
-      onChangeText?.(text);
-
-      if (onSearchDebounced) {
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-        }
-        debounceTimerRef.current = setTimeout(() => {
-          onSearchDebounced(text);
-        }, debounceMs);
-      }
+export const SearchBar = React.memo(
+  forwardRef<SearchBarRef, SearchBarProps>(function SearchBar(
+    {
+      value,
+      defaultValue = "",
+      onChangeText,
+      onSearchDebounced,
+      debounceMs = 300,
+      onClear,
+      onCancel,
+      onSubmitEditing,
+      placeholder = "Search...",
+      loading = false,
+      showCancelButton = true,
+      cancelLabel = "Cancel",
+      icon,
+      clearIcon,
+      tone = "primary",
+      variant = "filled",
+      size = "md",
+      shape = "rounded",
+      disabled = false,
+      glass = false,
+      haptic = true,
+      animated = true,
+      style,
+      inputStyle,
+      cancelButtonStyle,
+      cancelTextStyle,
+      onFocus,
+      onBlur,
+      ...restProps
     },
-    [debounceMs, onChangeText, onSearchDebounced, value]
-  );
+    ref,
+  ) {
+    const { colors, components, radii, shadows, spacing } = useTheme();
+    const reducedMotion = useReducedMotion();
+    const shouldAnimate = animated && !reducedMotion;
 
-  useEffect(() => {
-    return () => {
+    const inputRef = useRef<TextInputInstance | null>(null);
+    const [internalValue, setInternalValue] = useState(defaultValue);
+    const [isFocused, setIsFocused] = useState(false);
+
+    const currentValue = value !== undefined ? value : internalValue;
+    const hasValue = currentValue.length > 0;
+    const shouldShowCancel =
+      showCancelButton && !disabled && (isFocused || hasValue);
+
+    const cancelAnim = useSharedValue(shouldShowCancel ? 1 : 0);
+    const cancelMeasuredWidth = useSharedValue(76);
+
+    useEffect(() => {
+      if (!shouldAnimate) {
+        cancelAnimation(cancelAnim);
+        cancelAnim.value = shouldShowCancel ? 1 : 0;
+        return;
+      }
+      cancelAnim.value = withTiming(shouldShowCancel ? 1 : 0, {
+        duration: ANIMATION_TIMING.transition,
+        easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+      });
+    }, [cancelAnim, shouldAnimate, shouldShowCancel]);
+
+    useEffect(() => {
+      return () => {
+        cancelAnimation(cancelAnim);
+      };
+    }, [cancelAnim]);
+
+    const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const clearDebounce = useCallback(() => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
       }
-    };
-  }, []);
+    }, []);
 
-  const handleClear = useCallback(() => {
-    if (haptic) {
-      triggerHaptic("light");
-    }
-    if (value === undefined) {
-      setInternalValue("");
-    }
-    onChangeText?.("");
-    onClear?.();
-    onSearchDebounced?.("");
-    inputRef.current?.focus();
-  }, [haptic, onChangeText, onClear, onSearchDebounced, value]);
+    const handleChangeText = useCallback(
+      (text: string) => {
+        if (disabled) return;
+        if (value === undefined) {
+          setInternalValue(text);
+        }
+        onChangeText?.(text);
 
-  const handleCancel = useCallback(() => {
-    if (haptic) {
-      triggerHaptic("selection");
-    }
-    if (value === undefined) {
-      setInternalValue("");
-    }
-    onChangeText?.("");
-    onClear?.();
-    onSearchDebounced?.("");
-    setIsFocused(false);
-    inputRef.current?.blur();
-    onCancel?.();
-  }, [haptic, onChangeText, onClear, onSearchDebounced, value, onCancel]);
+        if (onSearchDebounced) {
+          clearDebounce();
+          debounceTimerRef.current = setTimeout(() => {
+            debounceTimerRef.current = null;
+            onSearchDebounced(text);
+          }, debounceMs);
+        }
+      },
+      [clearDebounce, debounceMs, disabled, onChangeText, onSearchDebounced, value],
+    );
 
-  const handleFocus: NonNullable<TextInputProps["onFocus"]> = useCallback(
-    (e) => {
-      setIsFocused(true);
-      onFocus?.(e);
-    },
-    [onFocus]
-  );
+    useEffect(() => clearDebounce, [clearDebounce]);
 
-  const handleBlur: NonNullable<TextInputProps["onBlur"]> = useCallback(
-    (e) => {
+    const handleClear = useCallback(() => {
+      if (disabled) return;
+      clearDebounce();
+      if (haptic) {
+        triggerHaptic("light");
+      }
+      if (value === undefined) {
+        setInternalValue("");
+      }
+      onChangeText?.("");
+      onClear?.();
+      onSearchDebounced?.("");
+      inputRef.current?.focus();
+    }, [
+      clearDebounce,
+      disabled,
+      haptic,
+      onChangeText,
+      onClear,
+      onSearchDebounced,
+      value,
+    ]);
+
+    const handleCancel = useCallback(() => {
+      if (disabled) return;
+      clearDebounce();
+      if (haptic) {
+        triggerHaptic("selection");
+      }
+      if (value === undefined) {
+        setInternalValue("");
+      }
+      onChangeText?.("");
+      onClear?.();
+      onSearchDebounced?.("");
       setIsFocused(false);
-      onBlur?.(e);
-    },
-    [onBlur]
-  );
+      inputRef.current?.blur();
+      onCancel?.();
+    }, [
+      clearDebounce,
+      disabled,
+      haptic,
+      onCancel,
+      onChangeText,
+      onClear,
+      onSearchDebounced,
+      value,
+    ]);
 
-  useImperativeHandle(ref, () => ({
-    focus: () => inputRef.current?.focus(),
-    blur: () => inputRef.current?.blur(),
-    clear: handleClear,
-    isFocused: () => isFocused,
-  }));
+    const handleFocus: NonNullable<TextInputProps["onFocus"]> = useCallback(
+      (e) => {
+        setIsFocused(true);
+        onFocus?.(e);
+      },
+      [onFocus],
+    );
 
-  const activeToneColor =
-    tone === "primary"
-      ? colors.primary
-      : tone === "secondary"
-      ? colors.secondary
-      : tone === "accent"
-      ? colors.accent
-      : tone === "success"
-      ? colors.success
-      : tone === "warning"
-      ? colors.warning
-      : tone === "danger"
-      ? colors.danger
-      : colors.info;
+    const handleBlur: NonNullable<TextInputProps["onBlur"]> = useCallback(
+      (e) => {
+        setIsFocused(false);
+        onBlur?.(e);
+      },
+      [onBlur],
+    );
 
-  const height = size === "sm" ? 36 : size === "lg" ? 48 : 42;
-  const fontSize = size === "sm" ? 13 : size === "lg" ? 16 : 14;
-  const iconSize = size === "sm" ? 16 : size === "lg" ? 20 : 18;
+    useImperativeHandle(
+      ref,
+      () => ({
+        focus: () => inputRef.current?.focus(),
+        blur: () => inputRef.current?.blur(),
+        clear: handleClear,
+        isFocused: () => isFocused,
+      }),
+      [handleClear, isFocused],
+    );
 
-  const borderRadius =
-    shape === "pill"
-      ? radii.full
-      : shape === "square"
-      ? 0
-      : radii.lg;
+    const activeToneColor = resolveToneColors(tone, colors).solid;
+    const height = SEARCH_HEIGHTS[size];
+    const fontSize = SEARCH_FONT_SIZES[size];
+    const iconSize = SEARCH_ICON_SIZES[size];
 
-  // Variant styling
-  const backgroundColor =
-    variant === "filled"
-      ? colors.surfaceMuted
-      : variant === "soft"
-      ? withAlpha(activeToneColor, isFocused ? 0.12 : 0.08)
-      : colors.surface;
+    const borderRadius = resolveControlRadius(shape, size, radii);
 
-  const borderColor =
-    variant === "outline"
+    const isTonalOutline = components.surface.outlineStyle === "tonal";
+
+    const backgroundColor =
+      variant === "filled"
+        ? colors.surfaceMuted
+        : variant === "soft"
+          ? withAlpha(activeToneColor, isFocused ? 0.12 : 0.08)
+          : variant === "outline" && isTonalOutline
+            ? colors.input
+            : colors.surface;
+
+    const hasSolidBorder = components.surface.filledBorderColor === "border";
+
+    const borderColor = glass
       ? isFocused
         ? activeToneColor
-        : colors.border
-      : isFocused
-      ? activeToneColor
-      : "transparent";
+        : colors.glassBorder
+      : variant === "outline"
+        ? isFocused
+          ? activeToneColor
+          : colors.border
+        : isFocused
+          ? activeToneColor
+          : hasSolidBorder
+            ? colors.border
+            : colors.transparent;
 
-  const borderWidth = variant === "outline" || isFocused ? 1.5 : 0;
+    const borderWidth = isFocused
+      ? components.borderWidth.focus
+      : glass || variant === "outline"
+        ? components.borderWidth.strong
+        : variant === "filled"
+          ? components.borderWidth.filled
+          : 0;
 
-  const cancelAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: cancelAnim.value,
-    transform: [{ translateX: (1 - cancelAnim.value) * 16 }],
-    maxWidth: cancelAnim.value * 90,
-  }));
+    const containerShadow = !disabled
+      ? shadows[components.surface.inputShadow]
+      : shadows.none;
 
-  return (
-    <View style={[styles.wrapper, style]}>
-      {/* Search Input Box */}
-      <View
-        style={[
-          styles.container,
-          {
-            height,
-            backgroundColor: glass ? withAlpha(backgroundColor, 0.75) : backgroundColor,
-            borderRadius,
-            borderColor,
-            borderWidth,
-            opacity: disabled ? 0.45 : 1,
-          },
-        ]}
-      >
-        {/* Leading Search Icon */}
-        <View style={styles.leadingIcon}>
-          {icon ? (
-            renderIcon(icon, isFocused ? activeToneColor : colors.textMuted, iconSize)
-          ) : (
-            <Svg
-              width={iconSize}
-              height={iconSize}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke={isFocused ? activeToneColor : colors.textMuted}
-              strokeWidth={2.2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <Circle cx={11} cy={11} r={8} />
-              <Line x1={21} y1={21} x2={16.65} y2={16.65} />
-            </Svg>
-          )}
-        </View>
+    const cancelAnimatedStyle = useAnimatedStyle(() => ({
+      opacity: cancelAnim.value,
+      width: cancelAnim.value * cancelMeasuredWidth.value,
+      transform: [{ translateX: (1 - cancelAnim.value) * 12 }],
+    }));
 
-        {/* Text Input Element */}
-        <TextInput
-          ref={inputRef}
-          value={currentValue}
-          onChangeText={handleChangeText}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          onSubmitEditing={onSubmitEditing}
-          placeholder={placeholder}
-          placeholderTextColor={colors.placeholder}
-          editable={!disabled}
-          returnKeyType="search"
-          autoCorrect={false}
+    return (
+      <View style={[styles.wrapper, style]}>
+        <View
           style={[
-            styles.input,
+            styles.container,
             {
-              fontSize,
-              color: colors.text,
+              height,
+              paddingHorizontal: spacing.md,
+              backgroundColor: glass ? colors.glassSurface : backgroundColor,
+              borderRadius,
+              borderColor,
+              borderWidth,
+              opacity: disabled ? 0.45 : 1,
             },
-            inputStyle,
+            containerShadow,
           ]}
-          {...restProps}
-        />
-
-        {/* Loading Spinner */}
-        {loading && (
-          <ActivityIndicator
-            size="small"
-            color={activeToneColor}
-            style={styles.trailingAction}
-          />
-        )}
-
-        {/* Clear Button */}
-        {!loading && hasValue && (
-          <Pressable
-            onPress={handleClear}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel="Clear search text"
-            style={styles.trailingAction}
-          >
-            {clearIcon ? (
-              renderIcon(clearIcon, colors.textMuted, iconSize - 2)
+        >
+          <View style={[styles.leadingIcon, { marginRight: spacing.sm }]}>
+            {icon ? (
+              renderIcon(
+                icon,
+                isFocused ? activeToneColor : colors.textMuted,
+                iconSize,
+              )
             ) : (
               <Svg
-                width={iconSize - 2}
-                height={iconSize - 2}
+                width={iconSize}
+                height={iconSize}
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke={colors.textMuted}
-                strokeWidth={2.4}
+                stroke={isFocused ? activeToneColor : colors.textMuted}
+                strokeWidth={2.2}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <Circle cx={12} cy={12} r={10} fill={colors.borderMuted} stroke="none" />
-                <Path d="M15 9l-6 6M9 9l6 6" stroke={colors.text} />
+                <Circle cx={11} cy={11} r={8} />
+                <Line x1={21} y1={21} x2={16.65} y2={16.65} />
               </Svg>
             )}
-          </Pressable>
-        )}
-      </View>
+          </View>
 
-      {/* Animated Cancel Button (iOS / Material style) */}
-      {showCancelButton && (
-        <Animated.View style={[styles.cancelWrapper, cancelAnimatedStyle]}>
-          <Pressable
-            onPress={handleCancel}
-            accessibilityRole="button"
-            accessibilityLabel="Cancel search"
-            style={[styles.cancelButton, cancelButtonStyle]}
+          <TextInput
+            ref={inputRef}
+            accessibilityRole="search"
+            accessibilityLabel={restProps.accessibilityLabel ?? placeholder}
+            accessibilityState={{ disabled }}
+            value={currentValue}
+            onChangeText={handleChangeText}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            onSubmitEditing={onSubmitEditing}
+            placeholder={placeholder}
+            placeholderTextColor={colors.placeholder}
+            editable={!disabled}
+            returnKeyType="search"
+            autoCorrect={false}
+            hitSlop={minTouchHitSlop(height)}
+            style={[
+              styles.input,
+              {
+                fontSize,
+                color: colors.text,
+              },
+              inputStyle,
+            ]}
+            {...restProps}
+          />
+
+          {loading && (
+            <ActivityIndicator
+              size="small"
+              color={activeToneColor}
+              style={styles.trailingAction}
+            />
+          )}
+
+          {!loading && hasValue && (
+            <Pressable
+              disabled={disabled}
+              onPress={handleClear}
+              hitSlop={minTouchHitSlop(iconSize + 4)}
+              accessibilityRole="button"
+              accessibilityState={{ disabled }}
+              accessibilityLabel="Clear search text"
+              style={styles.trailingAction}
+            >
+              {clearIcon ? (
+                renderIcon(clearIcon, colors.textMuted, iconSize - 2)
+              ) : (
+                <Svg
+                  width={iconSize - 2}
+                  height={iconSize - 2}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={colors.textMuted}
+                  strokeWidth={2.4}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <Circle
+                    cx={12}
+                    cy={12}
+                    r={10}
+                    fill={colors.borderMuted}
+                    stroke="none"
+                  />
+                  <Path d="M15 9l-6 6M9 9l6 6" stroke={colors.text} />
+                </Svg>
+              )}
+            </Pressable>
+          )}
+        </View>
+
+        {showCancelButton && (
+          <Animated.View
+            pointerEvents={shouldShowCancel ? "auto" : "none"}
+            style={[styles.cancelWrapper, cancelAnimatedStyle]}
           >
-            <Text
-              weight="600"
+            <Pressable
+              disabled={!shouldShowCancel}
+              hitSlop={minTouchHitSlop(height)}
+              onLayout={(e) => {
+                const w = e.nativeEvent.layout.width;
+                if (w > 0) cancelMeasuredWidth.value = w;
+              }}
+              onPress={handleCancel}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !shouldShowCancel }}
+              accessibilityLabel="Cancel search"
               style={[
-                {
-                  fontSize,
-                  color: activeToneColor,
-                },
-                cancelTextStyle,
+                styles.cancelButton,
+                { paddingLeft: spacing.md, minHeight: height },
+                cancelButtonStyle,
               ]}
             >
-              {cancelLabel}
-            </Text>
-          </Pressable>
-        </Animated.View>
-      )}
-    </View>
-  );
-});
+              <Text
+                numberOfLines={1}
+                weight="600"
+                style={[
+                  {
+                    fontSize,
+                    color: activeToneColor,
+                  },
+                  cancelTextStyle,
+                ]}
+              >
+                {cancelLabel}
+              </Text>
+            </Pressable>
+          </Animated.View>
+        )}
+      </View>
+    );
+  }),
+);
 
 const styles = StyleSheet.create({
   wrapper: {
@@ -417,10 +505,8 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
   },
   leadingIcon: {
-    marginRight: 8,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -439,7 +525,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   cancelButton: {
-    paddingLeft: 12,
     justifyContent: "center",
     alignItems: "center",
   },

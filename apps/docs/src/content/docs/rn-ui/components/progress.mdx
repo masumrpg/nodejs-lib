@@ -1,6 +1,6 @@
 ---
 title: Progress
-description: Progress bar indicator component with sizes (xs, sm, default, lg, xl), indeterminate loading animation, and SVG CircularProgress rings with rounded line caps.
+description: Progress bar indicator component with sizes (xs, sm, md, lg, xl), indeterminate loading animation, and SVG CircularProgress rings with rounded line caps.
 ---
 
 import { Code } from '@astrojs/starlight/components';
@@ -15,7 +15,7 @@ export function ProgressExample() {
       {/* Sizes Scale */}
       <Progress value={85} size="xs" tone="success" />
       <Progress value={70} size="sm" tone="primary" />
-      <Progress value={55} size="default" tone="warning" />
+      <Progress value={55} size="md" tone="warning" />
       <Progress value={90} size="xl" tone="danger" />
 
       {/* Indeterminate Loading Bar */}
@@ -44,7 +44,7 @@ export function ProgressExample() {
   type={{
     value: { type: 'number', default: '0', description: 'Percentage completion value (0-100).' },
     max: { type: 'number', default: '100', description: 'Maximum total progress value.' },
-    size: { type: "'xs' | 'sm' | 'default' | 'lg' | 'xl'", default: "'default'", description: 'Bar height scale (xs=4px, sm=6px, default=10px, lg=14px, xl=18px).' },
+    size: { type: "'xs' | 'sm' | 'md' | 'lg' | 'xl'", default: "'md'", description: 'Bar height scale (xs=4px, sm=6px, md=10px, lg=14px, xl=18px).' },
     tone: { type: "'primary' | 'secondary' | 'accent' | 'success' | 'warning' | 'danger' | 'info'", default: "'primary'", description: 'Color tone styling.' },
     indeterminate: { type: 'boolean', default: 'false', description: 'Enables continuous infinite loading animation.' },
     animated: { type: 'boolean', default: 'true', description: 'Enables smooth Reanimated fill transitions.' },

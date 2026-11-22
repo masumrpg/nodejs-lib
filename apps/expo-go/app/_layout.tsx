@@ -1,0 +1,178 @@
+import React from "react";
+import { Platform } from "react-native";
+import { Stack } from "expo-router";
+import {
+  Outfit_400Regular,
+  Outfit_500Medium,
+  Outfit_600SemiBold,
+  Outfit_700Bold,
+  useFonts,
+} from "@expo-google-fonts/outfit";
+import * as SecureStore from "expo-secure-store";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import {
+  ThemeProvider,
+  ToastProvider,
+  defaultThemes,
+  minimalThemePreset,
+  neoBrutalismThemePreset,
+  type ColorSchemePreference,
+  type Theme,
+  type ThemePresets,
+  type ThemeStorage,
+} from "@masumdev/rn-ui";
+
+const THEME_STORAGE_KEY = "rn_ui_theme_preference_v1";
+const THEME_NAME_STORAGE_KEY = "rn_ui_theme_preset_v1";
+
+const appFonts = {
+  regular: "OutfitRegular",
+  medium: "OutfitMedium",
+  semibold: "OutfitSemiBold",
+  bold: "OutfitBold",
+};
+
+const customDarkTheme: Theme = {
+  ...defaultThemes.dark,
+  colors: {
+    ...defaultThemes.dark.colors,
+    background: "#05161E",
+    backgroundMuted: "#0B202A",
+    backgroundSubtle: "#122B37",
+    surface: "#0B202A",
+    surfaceRaised: "#122B37",
+    surfaceMuted: "#071B24",
+    border: "rgba(242, 251, 253, 0.16)",
+    borderMuted: "rgba(242, 251, 253, 0.09)",
+    divider: "rgba(242, 251, 253, 0.16)",
+    glassBorder: "rgba(242, 251, 253, 0.16)",
+    input: "#0B202A",
+  },
+};
+
+const appThemePresets: ThemePresets = {
+  default: {
+    light: { ...defaultThemes.light, fonts: appFonts },
+    dark: { ...customDarkTheme, fonts: appFonts },
+  },
+  minimal: {
+    light: { ...minimalThemePreset.light, fonts: appFonts },
+    dark: { ...minimalThemePreset.dark, fonts: appFonts },
+  },
+  brutal: {
+    light: { ...neoBrutalismThemePreset.light, fonts: appFonts },
+    dark: { ...neoBrutalismThemePreset.dark, fonts: appFonts },
+  },
+};
+
+const themeStorage: ThemeStorage = {
+  getItem: (key: string) => {
+    if (Platform.OS === "web") {
+      try {
+        return Promise.resolve(
+          typeof window !== "undefined" ? localStorage.getItem(key) : null,
+        );
+      } catch {
+        return Promise.resolve(null);
+      }
+    }
+    return SecureStore.getItemAsync(key);
+  },
+  setItem: (key: string, value: string) => {
+    if (Platform.OS === "web") {
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.setItem(key, value);
+        }
+        return Promise.resolve();
+      } catch {
+        return Promise.resolve();
+      }
+    }
+    return SecureStore.setItemAsync(key, value);
+  },
+};
+
+const isColorSchemePreference = (
+  value: string | null,
+): value is ColorSchemePreference =>
+  value === "light" || value === "dark" || value === "system";
+
+const AppLayout = () => {
+  const [colorScheme, setColorSchemeState] =
+    React.useState<ColorSchemePreference>("system");
+  const [themeLoaded, setThemeLoaded] = React.useState(false);
+  const [loaded, error] = useFonts({
+    OutfitRegular: Outfit_400Regular,
+    OutfitMedium: Outfit_500Medium,
+    OutfitSemiBold: Outfit_600SemiBold,
+    OutfitBold: Outfit_700Bold,
+  });
+
+  // Hide scrollbars on web (still scrollable via touch/wheel)
+  React.useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const style = document.createElement("style");
+    style.textContent = `
+      *::-webkit-scrollbar { display: none !important; }
+      * { scrollbar-width: none !important; }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    Promise.resolve(themeStorage.getItem(THEME_STORAGE_KEY))
+      .then((saved) => {
+        if (isColorSchemePreference(saved)) {
+          setColorSchemeState(saved);
+        }
+      })
+      .catch((err: unknown) => {
+        console.error("Theme load error:", err);
+      })
+      .finally(() => {
+        setThemeLoaded(true);
+      });
+  }, []);
+
+  const handleColorSchemeChange = React.useCallback(
+    (next: ColorSchemePreference) => {
+      setColorSchemeState(next);
+      Promise.resolve(themeStorage.setItem(THEME_STORAGE_KEY, next)).catch(
+        (err: unknown) => {
+          console.error("Theme save error:", err);
+        },
+      );
+    },
+    [],
+  );
+
+  if ((!loaded && !error) || !themeLoaded) {
+    return null;
+  }
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider
+        colorScheme={colorScheme}
+        defaultColorScheme="system"
+        defaultThemeName="default"
+        presets={appThemePresets}
+        storage={themeStorage}
+        storageKey={THEME_STORAGE_KEY}
+        themeNameStorageKey={THEME_NAME_STORAGE_KEY}
+        waitForStorage={false}
+        onColorSchemeChange={handleColorSchemeChange}
+      >
+        <ToastProvider placement="top" maxToasts={3} duration={4000}>
+          <Stack screenOptions={{ headerShown: false }} />
+        </ToastProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
+  );
+};
+
+export default AppLayout;

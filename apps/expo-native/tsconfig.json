@@ -1,0 +1,14 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@masumdev/rn-camera-ai": ["../../packages/rn-camera-ai/src"],
+      "@masumdev/rn-camera-ai-mlkit": ["../../packages/rn-camera-ai-mlkit/src"],
+      "@masumdev/rn-camera-ai-tflite": ["../../packages/rn-camera-ai-tflite/src"]
+    }
+  },
+  "exclude": ["dist", "build", "node_modules", ".expo", "android", "ios"]
+}

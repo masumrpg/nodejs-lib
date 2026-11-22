@@ -2,6 +2,7 @@ import React from "react";
 import {
   View,
   type StyleProp,
+  type TextProps as RNTextProps,
   type TextStyle,
   type ViewProps,
   type ViewStyle,
@@ -16,20 +17,18 @@ export type EmptyMediaSize = "sm" | "md" | "lg";
 
 export interface EmptyProps extends ViewProps, BaseGlassProps {
   bordered?: boolean;
+  fullHeight?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
-export function Empty({
+export const Empty = React.memo(function Empty({
   bordered = false,
+  fullHeight = false,
   glass = false,
   style,
   ...props
 }: EmptyProps) {
-  const { colors, components, radii, spacing, isDark } = useTheme();
-
-  const glassBg = isDark
-    ? "rgba(15, 27, 45, 0.60)"
-    : "rgba(255, 255, 255, 0.75)";
+  const { colors, components, radii, spacing } = useTheme();
 
   return (
     <View
@@ -37,21 +36,20 @@ export function Empty({
         {
           width: "100%",
           minWidth: 0,
-          flexGrow: 1,
+          flexShrink: 1,
+          ...(fullHeight ? { flexGrow: 1 } : null),
           alignItems: "center",
           justifyContent: "center",
           gap: spacing.lg,
           borderRadius: radii.xl,
-          borderWidth: bordered ? components.borderWidth.strong : 0,
+          borderWidth: glass || bordered ? components.borderWidth.strong : 0,
           borderStyle: bordered ? "dashed" : "solid",
           borderColor: glass
-            ? isDark
-              ? "rgba(248, 250, 252, 0.20)"
-              : "rgba(15, 23, 42, 0.14)"
+            ? colors.glassBorder
             : bordered
               ? colors.border
               : colors.transparent,
-          backgroundColor: glass ? glassBg : colors.transparent,
+          backgroundColor: glass ? colors.glassSurface : colors.transparent,
           padding: spacing.xxl,
         },
         style,
@@ -59,13 +57,16 @@ export function Empty({
       {...props}
     />
   );
-}
+});
 
 export interface EmptyHeaderProps extends ViewProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function EmptyHeader({ style, ...props }: EmptyHeaderProps) {
+export const EmptyHeader = React.memo(function EmptyHeader({
+  style,
+  ...props
+}: EmptyHeaderProps) {
   const { spacing } = useTheme();
 
   return (
@@ -82,7 +83,7 @@ export function EmptyHeader({ style, ...props }: EmptyHeaderProps) {
       {...props}
     />
   );
-}
+});
 
 export interface EmptyMediaProps extends ViewProps, BaseGlassProps {
   variant?: EmptyMediaVariant;
@@ -96,35 +97,32 @@ const iconMediaSizes: Record<EmptyMediaSize, number> = {
   lg: 72,
 };
 
-export function EmptyMedia({
+export const EmptyMedia = React.memo(function EmptyMedia({
   variant = "default",
   size = "md",
   glass = false,
   style,
   ...props
 }: EmptyMediaProps) {
-  const { colors, radii, spacing, isDark } = useTheme();
+  const { colors, components, radii } = useTheme();
   const isIcon = variant === "icon";
   const boxSize = iconMediaSizes[size];
-
-  const glassBg = isDark
-    ? "rgba(15, 27, 45, 0.70)"
-    : "rgba(255, 255, 255, 0.85)";
 
   return (
     <View
       style={[
         {
-          marginBottom: spacing.xs,
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
           width: isIcon ? boxSize : undefined,
           height: isIcon ? boxSize : undefined,
           borderRadius: isIcon ? radii.xl : undefined,
+          borderWidth: isIcon && glass ? components.borderWidth.default : 0,
+          borderColor: glass ? colors.glassBorder : colors.transparent,
           backgroundColor: isIcon
             ? glass
-              ? glassBg
+              ? colors.glassSurfaceStrong
               : colors.primarySoft
             : colors.transparent,
         },
@@ -133,39 +131,63 @@ export function EmptyMedia({
       {...props}
     />
   );
-}
+});
 
-export interface EmptyTitleProps {
+export interface EmptyTitleProps extends Omit<RNTextProps, "style"> {
   children?: React.ReactNode;
   style?: StyleProp<TextStyle>;
 }
 
-export function EmptyTitle({ children, style }: EmptyTitleProps) {
+export const EmptyTitle = React.memo(function EmptyTitle({
+  children,
+  accessibilityRole = "header",
+  style,
+  ...props
+}: EmptyTitleProps) {
   return (
-    <Text variant="title" align="center" style={style}>
+    <Text
+      variant="title"
+      align="center"
+      accessibilityRole={accessibilityRole}
+      style={style}
+      {...props}
+    >
       {children}
     </Text>
   );
-}
+});
 
-export interface EmptyDescriptionProps {
+export interface EmptyDescriptionProps extends Omit<RNTextProps, "style"> {
   children?: React.ReactNode;
   style?: StyleProp<TextStyle>;
 }
 
-export function EmptyDescription({ children, style }: EmptyDescriptionProps) {
+export const EmptyDescription = React.memo(function EmptyDescription({
+  children,
+  style,
+  ...props
+}: EmptyDescriptionProps) {
   return (
-    <Text variant="bodySmall" color="textMuted" align="center" style={style}>
+    <Text
+      variant="bodySmall"
+      color="textMuted"
+      align="center"
+      style={style}
+      {...props}
+    >
       {children}
     </Text>
   );
-}
+});
 
 export interface EmptyContentProps extends ViewProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function EmptyContent({ style, ...props }: EmptyContentProps) {
+export const EmptyContent = React.memo(function EmptyContent({
+  style,
+  ...props
+}: EmptyContentProps) {
   const { spacing } = useTheme();
 
   return (
@@ -183,4 +205,4 @@ export function EmptyContent({ style, ...props }: EmptyContentProps) {
       {...props}
     />
   );
-}
+});

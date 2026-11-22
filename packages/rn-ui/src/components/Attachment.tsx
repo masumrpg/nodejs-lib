@@ -5,15 +5,22 @@ import {
   Pressable,
   StyleSheet,
   View,
+  type PressableProps,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import Svg, { Path } from "react-native-svg";
 
 import { useTheme } from "../theme";
-import { Text } from "./Text";
-import { renderIcon, type RenderIcon, type ThemeColorName } from "./types";
 import { AspectRatio } from "./AspectRatio";
+import { Text } from "./Text";
+import {
+  minTouchHitSlop,
+  renderIcon,
+  type RenderIcon,
+  type ThemeColorName,
+} from "./types";
 
 export type AttachmentLayout = "card" | "row";
 export type AttachmentDescriptionTone =
@@ -23,67 +30,32 @@ export type AttachmentDescriptionTone =
   | "warning"
   | "danger";
 
-export interface AttachmentProps {
-  /**
-   * Layout style of the attachment.
-   * - 'card': A square card layout, ideal for grid-like previews of images.
-   * - 'row': A full-width horizontal row, ideal for document/file listings.
-   * Defaults to 'row'.
-   */
+export interface AttachmentProps
+  extends Omit<PressableProps, "style" | "children"> {
   layout?: AttachmentLayout;
-  /**
-   * Name of the file, e.g., 'workspace.png'.
-   */
   name: string;
-  /**
-   * Description or metadata, e.g., 'PNG • 820 KB' or 'Uploading • 64%'.
-   */
   description?: string;
-  /**
-   * Pluggable icon/thumbnail for the attachment.
-   * Can be a URI string (rendered as Image), a ReactNode, or a RenderIcon function.
-   */
   thumbnail?: string | RenderIcon;
-  /**
-   * Pluggable fallback file icon when no thumbnail is provided.
-   */
   fileIcon?: RenderIcon;
-  /**
-   * Tone for the description text. Use this instead of deriving visual state from copy.
-   */
   descriptionTone?: AttachmentDescriptionTone;
-  /**
-   * If true, shows a loading spinner in the thumbnail slot.
-   */
   loading?: boolean;
-  /**
-   * Callback triggered when the remove button is pressed.
-   * Shows a close button on the right side if defined.
-   */
   onRemove?: () => void;
-  /**
-   * Pluggable close/remove icon.
-   */
   closeIcon?: RenderIcon;
-  /**
-   * Callback triggered when pressing the entire attachment card/row.
-   */
   onPress?: () => void;
-  /**
-   * Style overrides for the root container.
-   */
   style?: StyleProp<ViewStyle>;
-  /**
-   * Style overrides for the name text.
-   */
   nameStyle?: StyleProp<TextStyle>;
-  /**
-   * Style overrides for the description text.
-   */
   descriptionStyle?: StyleProp<TextStyle>;
 }
 
-export function Attachment({
+const DESCRIPTION_TONES: Record<AttachmentDescriptionTone, ThemeColorName> = {
+  default: "textMuted",
+  info: "info",
+  success: "success",
+  warning: "warning",
+  danger: "danger",
+};
+
+export const Attachment = React.memo(function Attachment({
   layout = "row",
   name,
   description,
@@ -99,61 +71,62 @@ export function Attachment({
   descriptionStyle,
   ...props
 }: AttachmentProps) {
-  const { colors, components, radii, spacing } = useTheme();
+  const { colors, components, radii, shadows, spacing } = useTheme();
+  const descColor = colors[DESCRIPTION_TONES[descriptionTone]];
 
-  const descriptionColorByTone: Record<
-    AttachmentDescriptionTone,
-    ThemeColorName
-  > = {
-    default: "textMuted",
-    info: "info",
-    success: "success",
-    warning: "warning",
-    danger: "danger",
-  };
-  const descColor = colors[descriptionColorByTone[descriptionTone]];
-
-  // Render close/remove button
-  const renderRemoveButton = (size: number) => {
+  const renderRemoveButton = (size: number, iconStroke = colors.textMuted) => {
     if (!onRemove) return null;
 
     return (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Remove attachment"
+        accessibilityLabel={`Remove ${name}`}
+        hitSlop={minTouchHitSlop(24)}
         onPress={onRemove}
-        style={({ pressed }) => ({
-          padding: spacing.xxs,
-          opacity: pressed ? 0.6 : 1,
-          justifyContent: "center",
-          alignItems: "center",
-        })}
+        style={({ pressed }) => [
+          styles.removeButton,
+          {
+            padding: spacing.xxs,
+            borderRadius: radii.full,
+            opacity: pressed ? 0.65 : 1,
+          },
+        ]}
       >
         {closeIcon ? (
-          renderIcon(closeIcon, colors.textMuted, size)
+          renderIcon(closeIcon, iconStroke, size)
         ) : (
-          <Text
-            variant="bodySmall"
-            style={{ color: colors.textMuted, fontWeight: "600" }}
+          <Svg
+            width={size}
+            height={size}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={iconStroke}
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            ×
-          </Text>
+            <Path d="M18 6L6 18M6 6l12 12" />
+          </Svg>
         )}
       </Pressable>
     );
   };
 
-  // Render thumbnail content (Image, Icon, or Spinner)
-  const renderThumbnail = (containerSize: number) => {
+  const renderThumbnail = (fixedSize?: number) => {
+    const dimensionStyle =
+      fixedSize !== undefined
+        ? { width: fixedSize, height: fixedSize }
+        : styles.fill;
+    const iconSize = fixedSize !== undefined ? fixedSize * 0.5 : 28;
+
     if (loading) {
       return (
         <View
           style={[
             styles.thumbnailPlaceholder,
+            dimensionStyle,
             {
               backgroundColor: colors.backgroundMuted,
-              width: containerSize,
-              height: containerSize,
               borderRadius: radii.md,
             },
           ]}
@@ -166,12 +139,11 @@ export function Attachment({
     if (typeof thumbnail === "string") {
       return (
         <View
-          style={{
-            width: containerSize,
-            height: containerSize,
-            overflow: "hidden",
-            borderRadius: radii.md,
-          }}
+          style={[
+            styles.imageWrapper,
+            dimensionStyle,
+            { borderRadius: radii.md },
+          ]}
         >
           <Image
             source={{ uri: thumbnail }}
@@ -187,76 +159,94 @@ export function Attachment({
         <View
           style={[
             styles.thumbnailPlaceholder,
+            dimensionStyle,
             {
               backgroundColor: colors.backgroundMuted,
-              width: containerSize,
-              height: containerSize,
               borderRadius: radii.md,
             },
           ]}
         >
-          {renderIcon(thumbnail, colors.textMuted, containerSize * 0.5)}
+          {renderIcon(thumbnail, colors.textMuted, iconSize)}
         </View>
       );
     }
 
-    // Default file icon fallback
     return (
       <View
         style={[
           styles.thumbnailPlaceholder,
+          dimensionStyle,
           {
             backgroundColor: colors.backgroundMuted,
-            width: containerSize,
-            height: containerSize,
             borderRadius: radii.md,
           },
         ]}
       >
         {fileIcon ? (
-          renderIcon(fileIcon, colors.textMuted, containerSize * 0.5)
+          renderIcon(fileIcon, colors.textMuted, iconSize)
         ) : (
-          <View
-            style={{
-              width: containerSize * 0.42,
-              height: containerSize * 0.52,
-              borderWidth: components.borderWidth.focus,
-              borderColor: colors.textMuted,
-              borderRadius: radii.xs,
-            }}
-          />
+          <Svg
+            width={iconSize}
+            height={iconSize}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={colors.textMuted}
+            strokeWidth={1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <Path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <Path d="M14 2v6h6" />
+          </Svg>
         )}
       </View>
     );
   };
 
   if (layout === "card") {
-    // Card Layout (usually fixed width preview, e.g. for grid views)
-    const cardStyle: ViewStyle = {
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-      borderWidth: components.borderWidth.strong,
-      borderRadius: radii.xl,
-      padding: spacing.sm,
-      width: 120,
-      gap: spacing.xs,
-    };
-
     return (
       <Pressable
+        accessibilityRole={onPress ? "button" : "none"}
+        accessibilityLabel={name}
         disabled={!onPress}
         onPress={onPress}
         style={({ pressed }) => [
-          cardStyle,
-          { opacity: pressed ? 0.8 : 1 },
+          styles.card,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            borderWidth: components.borderWidth.default,
+            borderRadius: radii.xl,
+            padding: spacing.sm,
+            gap: spacing.xs,
+            opacity: pressed ? 0.85 : 1,
+          },
+          shadows.sm,
           style,
         ]}
         {...props}
       >
-        {/* AspectRatio 1:1 for the top image preview */}
-        <AspectRatio ratio={1} radius="md">
-          {renderThumbnail(104)}
-        </AspectRatio>
+        <View style={styles.cardMediaWrap}>
+          <AspectRatio ratio={1} radius="md">
+            {renderThumbnail()}
+          </AspectRatio>
+          {onRemove ? (
+            <View
+              style={[
+                styles.cardRemoveBadge,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  borderWidth: components.borderWidth.hairline,
+                  borderRadius: radii.full,
+                },
+                shadows.sm,
+              ]}
+            >
+              {renderRemoveButton(12, colors.text)}
+            </View>
+          ) : null}
+        </View>
 
         <View style={styles.textContainer}>
           <Text
@@ -267,7 +257,7 @@ export function Attachment({
           >
             {name}
           </Text>
-          {description && (
+          {description ? (
             <Text
               variant="caption"
               numberOfLines={1}
@@ -276,38 +266,37 @@ export function Attachment({
             >
               {description}
             </Text>
-          )}
+          ) : null}
         </View>
       </Pressable>
     );
   }
 
-  // Default Row Layout
-  const rowStyle: ViewStyle = {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: components.borderWidth.strong,
-    borderRadius: radii.xl,
-    padding: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  };
-
   return (
     <Pressable
+      accessibilityRole={onPress ? "button" : "none"}
+      accessibilityLabel={name}
       disabled={!onPress}
       onPress={onPress}
       style={({ pressed }) => [
-        rowStyle,
-        { opacity: pressed ? 0.85 : 1 },
+        styles.row,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          borderWidth: components.borderWidth.default,
+          borderRadius: radii.xl,
+          padding: spacing.md,
+          gap: spacing.md,
+          opacity: pressed ? 0.88 : 1,
+        },
+        shadows.sm,
         style,
       ]}
       {...props}
     >
       {renderThumbnail(40)}
 
-      <View style={[styles.textContainer, { flex: 1 }]}>
+      <View style={[styles.textContainer, styles.flexOne]}>
         <Text
           variant="label"
           numberOfLines={1}
@@ -316,7 +305,7 @@ export function Attachment({
         >
           {name}
         </Text>
-        {description && (
+        {description ? (
           <Text
             variant="bodySmall"
             numberOfLines={1}
@@ -325,20 +314,52 @@ export function Attachment({
           >
             {description}
           </Text>
-        )}
+        ) : null}
       </View>
 
       {renderRemoveButton(16)}
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
+  fill: {
+    width: "100%",
+    height: "100%",
+  },
+  imageWrapper: {
+    overflow: "hidden",
+  },
   thumbnailPlaceholder: {
     justifyContent: "center",
     alignItems: "center",
   },
   textContainer: {
     justifyContent: "center",
+  },
+  flexOne: {
+    flex: 1,
+  },
+  card: {
+    width: 120,
+  },
+  cardMediaWrap: {
+    position: "relative",
+    width: "100%",
+  },
+  cardRemoveBadge: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    zIndex: 2,
+  },
+  row: {
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  removeButton: {
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

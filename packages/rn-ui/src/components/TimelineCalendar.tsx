@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useMemo } from "react";
 import {
   CalendarUtils,
   Timeline as WixTimeline,
@@ -9,7 +9,10 @@ import {
   type TimelinePackedEventProps,
   type TimelineProps as WixTimelineProps,
 } from "react-native-calendars";
+
 import { useTheme } from "../theme";
+import { withAlpha } from "../utils/color";
+import { syncCalendarLocale, type LocaleInput } from "../utils/locale";
 
 export {
   CalendarUtils,
@@ -17,36 +20,34 @@ export {
   type TimelinePackedEventProps,
   type TimelineListProps,
   type TimelineListRenderItemInfo,
-  type WixTimelineProps as TimelineCalendarProps,
 };
 
-export function TimelineCalendar({
-  theme,
-  styles,
-  renderEvent,
-  unavailableHoursColor,
-  ...props
-}: WixTimelineProps) {
-  const { colors, isDark, radii } = useTheme();
+export interface TimelineCalendarProps extends WixTimelineProps {
+  locale?: LocaleInput;
+}
 
-  const resolvedUnavailableColor =
-    unavailableHoursColor ||
-    (isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.03)");
+export interface TimelineListWrapperProps extends TimelineListProps {
+  locale?: LocaleInput;
+}
 
-  const customTheme = {
+function buildTimelineTheme(
+  colors: ReturnType<typeof useTheme>["colors"],
+  radii: ReturnType<typeof useTheme>["radii"],
+  resolvedUnavailableColor: string,
+  userTheme?: WixTimelineProps["theme"],
+) {
+  return {
     calendarBackground: colors.surface,
     textSectionTitleColor: colors.textMuted,
     lineColor: colors.border,
     timeLabelColor: colors.textMuted,
     nowIndicatorColor: colors.danger,
-    eventTitleColor: "#FFFFFF",
-    eventSummaryColor: "rgba(255, 255, 255, 0.9)",
-    eventTimesColor: "rgba(255, 255, 255, 0.75)",
     unavailableHoursColor: resolvedUnavailableColor,
     unavailableHoursBlock: {
       backgroundColor: resolvedUnavailableColor,
     },
     event: {
+      backgroundColor: colors.primary,
       borderRadius: radii.lg,
       paddingLeft: 10,
       paddingRight: 10,
@@ -55,116 +56,118 @@ export function TimelineCalendar({
       borderWidth: 0,
     },
     eventTitle: {
-      color: "#FFFFFF",
+      color: colors.onPrimary,
       fontWeight: "700",
       fontSize: 12.5,
     },
     eventSummary: {
-      color: "rgba(255, 255, 255, 0.9)",
+      color: withAlpha(colors.onPrimary, 0.9),
       fontSize: 11,
       marginTop: 2,
     },
     eventTimes: {
-      color: "rgba(255, 255, 255, 0.75)",
+      color: withAlpha(colors.onPrimary, 0.78),
       fontSize: 10,
       fontWeight: "600",
       marginTop: 2,
     },
-    ...theme,
+    ...userTheme,
   };
+}
+
+export const TimelineCalendar = React.memo(function TimelineCalendar({
+  theme,
+  styles,
+  renderEvent,
+  unavailableHoursColor,
+  locale,
+  ...props
+}: TimelineCalendarProps) {
+  const { colors, isDark, radii } = useTheme();
+
+  useMemo(() => {
+    if (locale !== undefined) syncCalendarLocale(locale);
+  }, [locale]);
+
+  const resolvedUnavailableColor =
+    unavailableHoursColor ??
+    (isDark ? withAlpha("#FFFFFF", 0.05) : withAlpha("#000000", 0.03));
+
+  const customTheme = useMemo(
+    () =>
+      buildTimelineTheme(colors, radii, resolvedUnavailableColor, theme),
+    [colors, radii, resolvedUnavailableColor, theme],
+  );
 
   return (
     <WixTimeline
+      {...props}
+      key={`${colors.surface}-${colors.primary}-${colors.text}-${radii.lg}`}
       theme={customTheme}
       styles={styles}
       renderEvent={renderEvent}
       unavailableHoursColor={resolvedUnavailableColor}
-      {...props}
     />
   );
-}
+});
 
-export function TimelineList({
+export const TimelineList = React.memo(function TimelineList({
   timelineProps,
   renderItem,
+  locale,
   ...props
-}: TimelineListProps) {
+}: TimelineListWrapperProps) {
   const { colors, isDark, radii } = useTheme();
 
+  useMemo(() => {
+    if (locale !== undefined) syncCalendarLocale(locale);
+  }, [locale]);
+
   const resolvedUnavailableColor =
-    timelineProps?.unavailableHoursColor ||
-    (isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.03)");
+    timelineProps?.unavailableHoursColor ??
+    (isDark ? withAlpha("#FFFFFF", 0.05) : withAlpha("#000000", 0.03));
 
-  const customTimelineProps = {
-    ...timelineProps,
-    unavailableHoursColor: resolvedUnavailableColor,
-    theme: {
-      calendarBackground: colors.surface,
-      textSectionTitleColor: colors.textMuted,
-      lineColor: colors.border,
-      timeLabelColor: colors.textMuted,
-      nowIndicatorColor: colors.danger,
-      eventTitleColor: "#FFFFFF",
-      eventSummaryColor: "rgba(255, 255, 255, 0.9)",
-      eventTimesColor: "rgba(255, 255, 255, 0.75)",
+  const customTimelineProps = useMemo(
+    () => ({
+      ...timelineProps,
       unavailableHoursColor: resolvedUnavailableColor,
-      unavailableHoursBlock: {
-        backgroundColor: resolvedUnavailableColor,
-      },
-      event: {
-        borderRadius: radii.lg,
-        paddingLeft: 10,
-        paddingRight: 10,
-        paddingTop: 8,
-        paddingBottom: 8,
-        borderWidth: 0,
-      },
-      eventTitle: {
-        color: "#FFFFFF",
-        fontWeight: "700",
-        fontSize: 12.5,
-      },
-      eventSummary: {
-        color: "rgba(255, 255, 255, 0.9)",
-        fontSize: 11,
-        marginTop: 2,
-      },
-      eventTimes: {
-        color: "rgba(255, 255, 255, 0.75)",
-        fontSize: 10,
-        fontWeight: "600",
-        marginTop: 2,
-      },
-      ...timelineProps?.theme,
-    },
-  };
+      theme: buildTimelineTheme(
+        colors,
+        radii,
+        resolvedUnavailableColor,
+        timelineProps?.theme,
+      ),
+    }),
+    [colors, radii, resolvedUnavailableColor, timelineProps],
+  );
 
-  const defaultRenderItem = (
-    itemProps: WixTimelineProps,
-    info: TimelineListRenderItemInfo,
-  ) => {
-    if (renderItem) {
-      return renderItem(itemProps, info);
-    }
-    const { key: _k, ...rest } = (itemProps as unknown || {}) as Record<
-      string,
-      unknown
-    >;
-    return (
-      <TimelineCalendar
-        key={info.item}
-        {...(rest as unknown as WixTimelineProps)}
-      />
-    );
-  };
+  const defaultRenderItem = useCallback(
+    (itemProps: WixTimelineProps, info: TimelineListRenderItemInfo) => {
+      if (renderItem) {
+        return renderItem(itemProps, info);
+      }
+      const { key: _k, ...rest } = (itemProps as unknown || {}) as Record<
+        string,
+        unknown
+      >;
+      return (
+        <TimelineCalendar
+          key={info.item}
+          locale={locale}
+          {...(rest as unknown as TimelineCalendarProps)}
+        />
+      );
+    },
+    [locale, renderItem],
+  );
 
   return (
     <WixTimelineList
+      {...props}
       timelineProps={customTimelineProps}
       renderItem={
         defaultRenderItem as unknown as TimelineListProps["renderItem"]
       }
-      {...props}
     />
   );
-}
+});

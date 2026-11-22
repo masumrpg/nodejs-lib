@@ -1,7 +1,18 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
+{{#if isCLI}}
+  entry: {
+    index: 'src/index.ts',
+    cli: 'src/cli.ts',
+  },
+{{else}}
+{{#if hasUI}}
   entry: ['src/index.tsx'],
+{{else}}
+  entry: ['src/index.ts'],
+{{/if}}
+{{/if}}
   format: ['cjs', 'esm'],
   dts: true,
   clean: true,

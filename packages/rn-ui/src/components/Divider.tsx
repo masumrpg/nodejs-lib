@@ -1,30 +1,50 @@
 import React from "react";
-import { View, type ViewStyle } from "react-native";
+import {
+  View,
+  type StyleProp,
+  type ViewProps,
+  type ViewStyle,
+} from "react-native";
 
 import { useTheme } from "../theme";
 
-export interface DividerProps {
+export interface DividerProps extends Omit<ViewProps, "style"> {
   inset?: number;
   vertical?: boolean;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
 
-export function Divider({ inset = 0, vertical = false, style }: DividerProps) {
-  const { colors } = useTheme();
+function DividerComponent({
+  inset = 0,
+  vertical = false,
+  importantForAccessibility = "no",
+  accessibilityElementsHidden = true,
+  style,
+  ...props
+}: DividerProps) {
+  const { colors, components } = useTheme();
+  const thickness = components.borderWidth.default;
+
+  const dividerStyle = React.useMemo<ViewStyle>(
+    () => ({
+      backgroundColor: colors.divider,
+      marginHorizontal: vertical ? 0 : inset,
+      marginVertical: vertical ? inset : 0,
+      width: vertical ? thickness : undefined,
+      height: vertical ? undefined : thickness,
+      alignSelf: vertical ? "stretch" : undefined,
+    }),
+    [colors.divider, inset, thickness, vertical],
+  );
 
   return (
     <View
-      style={[
-        {
-          backgroundColor: colors.divider,
-          marginHorizontal: vertical ? 0 : inset,
-          marginVertical: vertical ? inset : 0,
-          width: vertical ? 1 : undefined,
-          height: vertical ? undefined : 1,
-          alignSelf: vertical ? "stretch" : undefined,
-        },
-        style,
-      ]}
+      importantForAccessibility={importantForAccessibility}
+      accessibilityElementsHidden={accessibilityElementsHidden}
+      style={[dividerStyle, style]}
+      {...props}
     />
   );
 }
+
+export const Divider = React.memo(DividerComponent);

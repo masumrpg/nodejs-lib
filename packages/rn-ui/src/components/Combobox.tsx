@@ -1,47 +1,50 @@
-import React from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Dimensions,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
-  type ModalProps,
+  useWindowDimensions,
   type StyleProp,
+  type TextInputInstance,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
 import Animated, {
   Easing,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import Svg, { Circle, Line, Path } from "react-native-svg";
 
-import { useTheme, type ThemeColors } from "../theme";
-import { withAlpha } from "../utils";
+import { Portal, usePortalContext, useTheme, type ThemeColors } from "../theme";
+import {
+  computeAnchoredPosition,
+  measureAnchorNode,
+  useDelayedUnmount,
+  withAlpha,
+  type AnchorMeasurement,
+} from "../utils";
 import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
+  ANIMATION_TIMING,
+  minTouchHitSlop,
   renderIcon,
-  type RenderIcon,
+  resolveControlRadius,
+  webDeps,
   type BaseGlassProps,
   type BaseHapticProps,
+  type RenderIcon,
   type SizeProps,
   type VariantProps,
 } from "./types";
 
 export type ComboboxVariant = "outline" | "filled" | "soft";
 export type ComboboxSize = "sm" | "md" | "lg";
-
-export interface ComboboxProps extends BaseGlassProps, BaseHapticProps {
-  value?: string;
-  onValueChange?: (value: string) => void;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  children?: React.ReactNode;
-}
 
 export interface ComboboxContextProps {
   value: string;
@@ -50,14 +53,14 @@ export interface ComboboxContextProps {
   setOpen: (open: boolean) => void;
   inputValue: string;
   setInputValue: (val: string) => void;
+  selectedLabel: string;
+  setSelectedLabel: (label: string) => void;
   triggerRef: React.RefObject<React.ComponentRef<typeof View> | null>;
-  triggerLayout: {
-    pageX: number;
-    pageY: number;
-    width: number;
-    height: number;
-  };
+  anchor: AnchorMeasurement | null;
   measureTrigger: (callback?: () => void) => void;
+  registerItemMatch: (itemValue: string, matched: boolean) => void;
+  unregisterItemMatch: (itemValue: string) => void;
+  visibleCount: number;
   glass: boolean;
   haptic: boolean;
   colors: ThemeColors;
@@ -73,7 +76,15 @@ export function useCombobox() {
   return context;
 }
 
-export function Combobox({
+export interface ComboboxProps extends BaseGlassProps, BaseHapticProps {
+  value?: string;
+  onValueChange?: (value: string) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children?: React.ReactNode;
+}
+
+export const Combobox = React.memo(function Combobox({
   value: controlledValue,
   onValueChange,
   open: controlledOpen,
@@ -83,108 +94,143 @@ export function Combobox({
   children,
 }: ComboboxProps) {
   const { colors } = useTheme();
+  const portalStore = usePortalContext();
+  const [uncontrolledValue, setUncontrolledValue] = useState("");
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const [selectedLabel, setSelectedLabel] = useState("");
+  const [anchor, setAnchor] = useState<AnchorMeasurement | null>(null);
+  const [visibleCount, setVisibleCount] = useState(0);
 
-  const [uncontrolledValue, setUncontrolledValue] = React.useState("");
-  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
-  const [inputValue, setInputValue] = React.useState("");
-  const [triggerLayout, setTriggerLayout] = React.useState({
-    pageX: 0,
-    pageY: 0,
-    width: 0,
-    height: 0,
-  });
+  const matchMapRef = useRef<Map<string, boolean>>(new Map());
+  const triggerRef = useRef<React.ComponentRef<typeof View>>(null);
 
-  const triggerRef = React.useRef<React.ComponentRef<typeof View> | null>(null);
+  const isValueControlled = controlledValue !== undefined;
+  const value = isValueControlled ? controlledValue : uncontrolledValue;
 
-  const value =
-    controlledValue !== undefined ? controlledValue : uncontrolledValue;
-  const open = controlledOpen !== undefined ? controlledOpen : uncontrolledOpen;
+  const isOpenControlled = controlledOpen !== undefined;
+  const open = isOpenControlled ? controlledOpen : uncontrolledOpen;
 
-  const setOpen = React.useCallback(
-    (nextOpen: boolean) => {
-      if (controlledOpen === undefined) {
-        setUncontrolledOpen(nextOpen);
-      }
-      if (onOpenChange) {
-        onOpenChange(nextOpen);
-      }
-    },
-    [controlledOpen, onOpenChange],
-  );
-
-  const handleValueChange = React.useCallback(
-    (nextVal: string) => {
-      if (controlledValue === undefined) {
-        setUncontrolledValue(nextVal);
-      }
-      if (onValueChange) {
-        onValueChange(nextVal);
-      }
-    },
-    [controlledValue, onValueChange],
-  );
-
-  const measureTrigger = React.useCallback((callback?: () => void) => {
-    triggerRef.current?.measureInWindow(
-      (x: number, y: number, width: number, height: number) => {
-        if (width > 0 && height > 0) {
-          setTriggerLayout({ pageX: x, pageY: y, width, height });
-          callback?.();
-        }
-      },
-    );
+  const syncVisibleCount = useCallback(() => {
+    let count = 0;
+    for (const matched of matchMapRef.current.values()) {
+      if (matched) count += 1;
+    }
+    setVisibleCount((prev) => (prev === count ? prev : count));
   }, []);
 
-  return (
-    <ComboboxContext.Provider
-      value={{
-        value,
-        onValueChange: handleValueChange,
-        open,
-        setOpen,
-        inputValue,
-        setInputValue,
+  const registerItemMatch = useCallback(
+    (itemValue: string, matched: boolean) => {
+      if (matchMapRef.current.get(itemValue) === matched) return;
+      matchMapRef.current.set(itemValue, matched);
+      syncVisibleCount();
+    },
+    [syncVisibleCount],
+  );
+
+  const unregisterItemMatch = useCallback(
+    (itemValue: string) => {
+      if (!matchMapRef.current.has(itemValue)) return;
+      matchMapRef.current.delete(itemValue);
+      syncVisibleCount();
+    },
+    [syncVisibleCount],
+  );
+
+  const handleValueChange = useCallback(
+    (nextValue: string) => {
+      if (!isValueControlled) {
+        setUncontrolledValue(nextValue);
+      }
+      onValueChange?.(nextValue);
+    },
+    [isValueControlled, onValueChange],
+  );
+
+  const setOpen = useCallback(
+    (nextOpen: boolean) => {
+      if (!isOpenControlled) {
+        setUncontrolledOpen(nextOpen);
+      }
+      onOpenChange?.(nextOpen);
+    },
+    [isOpenControlled, onOpenChange],
+  );
+
+  const measureTrigger = useCallback(
+    (callback?: () => void) => {
+      let called = false;
+      measureAnchorNode(
         triggerRef,
-        triggerLayout,
-        measureTrigger,
-        glass,
-        haptic,
-        colors,
-      }}
-    >
-      <View style={{ width: "100%" }}>{children}</View>
+        (rect) => {
+          setAnchor(rect);
+          called = true;
+          callback?.();
+        },
+        portalStore?.getHostRef("root"),
+      );
+      if (!called) {
+        callback?.();
+      }
+    },
+    [portalStore],
+  );
+
+  useEffect(() => {
+    if (open) {
+      measureTrigger();
+    } else if (selectedLabel && value) {
+      setInputValue(selectedLabel);
+    }
+  }, [measureTrigger, open, selectedLabel, value]);
+
+  const contextValue = useMemo<ComboboxContextProps>(
+    () => ({
+      value,
+      onValueChange: handleValueChange,
+      open,
+      setOpen,
+      inputValue,
+      setInputValue,
+      selectedLabel,
+      setSelectedLabel,
+      triggerRef,
+      anchor,
+      measureTrigger,
+      registerItemMatch,
+      unregisterItemMatch,
+      visibleCount,
+      glass,
+      haptic,
+      colors,
+    }),
+    [
+      anchor,
+      colors,
+      glass,
+      handleValueChange,
+      haptic,
+      inputValue,
+      measureTrigger,
+      open,
+      registerItemMatch,
+      selectedLabel,
+      setOpen,
+      unregisterItemMatch,
+      value,
+      visibleCount,
+    ],
+  );
+
+  return (
+    <ComboboxContext.Provider value={contextValue}>
+      <View style={styles.root}>{children}</View>
     </ComboboxContext.Provider>
   );
-}
-
-function ChevronDownIcon({ color }: { color: string }) {
-  return (
-    <View
-      style={{
-        width: 8,
-        height: 8,
-        borderRightWidth: 1.5,
-        borderBottomWidth: 1.5,
-        borderColor: color,
-        transform: [{ rotate: "45deg" }],
-        marginTop: -3,
-      }}
-    />
-  );
-}
-
-function ClearIcon({ color }: { color: string }) {
-  return (
-    <Text style={{ color, fontSize: 14, fontWeight: "600", lineHeight: 14 }}>
-      ✕
-    </Text>
-  );
-}
+});
 
 export interface ComboboxInputProps
-  extends BaseGlassProps,
-    BaseHapticProps,
-    VariantProps<ComboboxVariant>,
+  extends VariantProps<ComboboxVariant>,
     SizeProps<ComboboxSize> {
   placeholder?: string;
   style?: StyleProp<ViewStyle>;
@@ -200,12 +246,10 @@ const comboboxHeights: Record<ComboboxSize, number> = {
   lg: 52,
 };
 
-export function ComboboxInput({
-  placeholder = "Select option...",
-  size = "md",
+export const ComboboxInput = React.memo(function ComboboxInput({
+  placeholder = "Search...",
   variant = "outline",
-  glass = false,
-  haptic = true,
+  size = "md",
   style,
   inputStyle,
   disabled = false,
@@ -213,353 +257,551 @@ export function ComboboxInput({
   searchIcon,
 }: ComboboxInputProps) {
   const {
-    inputValue,
-    setInputValue,
     open,
     setOpen,
+    inputValue,
+    setInputValue,
+    onValueChange,
+    setSelectedLabel,
     triggerRef,
     measureTrigger,
+    glass,
+    haptic,
     colors,
   } = useCombobox();
-  const { components, radii, spacing, typography, isDark } = useTheme();
+  const { components, radii, shadows, spacing, typography } = useTheme();
+  const inputRef = useRef<TextInputInstance>(null);
 
-  const handleFocus = () => {
-    if (!disabled) {
-      if (haptic) triggerHaptic("light");
-      measureTrigger(() => setOpen(true));
+  const height = comboboxHeights[size];
+  const triggerShadow = !disabled
+    ? shadows[components.surface.inputShadow]
+    : shadows.none;
+
+  const getColors = () => {
+    if (disabled) {
+      return {
+        bg: withAlpha(colors.disabled, 0.72),
+        border: colors.disabled,
+      };
     }
-  };
-
-  const handlePress = () => {
-    if (!disabled) {
-      if (haptic) triggerHaptic("light");
-      measureTrigger(() => setOpen(!open));
+    if (glass) {
+      return {
+        bg: colors.glassSurface,
+        border: open ? colors.primary : colors.glassBorder,
+      };
     }
+    if (variant === "filled") {
+      return {
+        bg: colors.surfaceMuted,
+        border: open ? colors.primary : colors.surfaceMuted,
+      };
+    }
+    if (variant === "soft") {
+      return {
+        bg: colors.primarySoft,
+        border: open
+          ? colors.primary
+          : components.surface.outlineBorderColor === "border"
+            ? colors.border
+            : withAlpha(colors.primary, 0.25),
+      };
+    }
+    return {
+      bg: colors.input,
+      border: open ? colors.primary : colors.border,
+    };
   };
 
-  const handleClear = () => {
-    if (haptic) triggerHaptic("light");
-    setInputValue("");
-  };
+  const palette = getColors();
 
-  const glassBg = isDark
-    ? "rgba(15, 27, 45, 0.70)"
-    : "rgba(255, 255, 255, 0.85)";
-
-  const triggerBg = disabled
-    ? withAlpha(colors.input, 0.55)
-    : glass
-      ? glassBg
-      : variant === "filled"
-        ? colors.surface
-        : variant === "soft"
-          ? withAlpha(colors.primary, 0.08)
-          : colors.input;
-
-  const borderColor = disabled
-    ? colors.border
-    : open
-      ? colors.primary
-      : glass
-        ? isDark
-          ? "rgba(248, 250, 252, 0.20)"
-          : "rgba(15, 23, 42, 0.14)"
-        : colors.border;
-
-  const containerHeight = comboboxHeights[size];
+  const handleChevronPress = useCallback(() => {
+    if (disabled) return;
+    if (haptic) triggerHaptic("selection");
+    if (open) {
+      setOpen(false);
+    } else {
+      measureTrigger(() => {
+        setOpen(true);
+        inputRef.current?.focus();
+      });
+    }
+  }, [disabled, haptic, measureTrigger, open, setOpen]);
 
   return (
-    <Pressable
-      ref={triggerRef as never}
-      onPress={handlePress}
-      disabled={disabled}
+    <View
+      ref={triggerRef}
+      collapsable={false}
       style={[
+        styles.inputBox,
         {
-          flexDirection: "row",
-          alignItems: "center",
-          height: containerHeight,
+          height,
+          borderRadius: resolveControlRadius("rounded", size, radii),
           borderWidth: open
             ? components.borderWidth.focus
             : components.borderWidth.strong,
-          borderColor,
-          borderRadius: radii.lg,
-          backgroundColor: triggerBg,
+          borderColor: palette.border,
+          backgroundColor: palette.bg,
           paddingHorizontal: spacing.md,
-          width: "100%",
-          gap: spacing.sm,
-          opacity: disabled ? 0.56 : 1,
+          gap: spacing.xs,
+          opacity: disabled ? 0.6 : 1,
         },
+        triggerShadow,
         style,
       ]}
     >
-      {searchIcon ? renderIcon(searchIcon, colors.textMuted, 16) : null}
+      {searchIcon ? (
+        renderIcon(searchIcon, colors.textMuted, 16)
+      ) : (
+        <Svg
+          width={16}
+          height={16}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={colors.textMuted}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <Circle cx={11} cy={11} r={8} />
+          <Line x1={21} y1={21} x2={16.65} y2={16.65} />
+        </Svg>
+      )}
 
       <TextInput
-        editable={!disabled}
+        ref={inputRef}
+        accessibilityRole="search"
+        accessibilityLabel={placeholder}
+        accessibilityState={{ disabled }}
+        value={inputValue}
+        onChangeText={(text) => {
+          setInputValue(text);
+          if (!open) {
+            measureTrigger(() => setOpen(true));
+          }
+        }}
+        onFocus={() => {
+          if (!open && !disabled) {
+            measureTrigger(() => setOpen(true));
+          }
+        }}
         placeholder={placeholder}
         placeholderTextColor={colors.placeholder}
-        value={inputValue}
-        onChangeText={(val) => {
-          setInputValue(val);
-          if (!open) setOpen(true);
-        }}
-        onFocus={handleFocus}
-        pointerEvents={disabled ? "none" : "auto"}
+        editable={!disabled}
         style={[
-          {
-            flex: 1,
-            ...typography.body,
-            fontSize: size === "sm" ? 13 : 15,
-            color: colors.text,
-            padding: 0,
-            height: "100%",
-          },
+          styles.textInput,
+          size === "sm" ? typography.bodySmall : typography.body,
+          { color: colors.text },
           inputStyle,
         ]}
       />
 
-      {!!inputValue && (
-        <Pressable onPress={handleClear} hitSlop={8}>
-          <ClearIcon color={colors.textMuted} />
+      {inputValue.length > 0 && !disabled ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Clear selection"
+          hitSlop={minTouchHitSlop(28)}
+          onPress={() => {
+            if (haptic) triggerHaptic("selection");
+            setInputValue("");
+            setSelectedLabel("");
+            onValueChange("");
+          }}
+          style={styles.iconBtn}
+        >
+          <Svg
+            width={14}
+            height={14}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={colors.textMuted}
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <Path d="M18 6L6 18M6 6l12 12" />
+          </Svg>
         </Pressable>
-      )}
+      ) : null}
 
-      {chevronIcon ? (
-        renderIcon(chevronIcon, colors.textMuted, 16)
-      ) : (
-        <ChevronDownIcon color={colors.textMuted} />
-      )}
-    </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Toggle options"
+        accessibilityState={{ expanded: open, disabled }}
+        disabled={disabled}
+        hitSlop={minTouchHitSlop(28)}
+        onPress={handleChevronPress}
+        style={styles.iconBtn}
+      >
+        {chevronIcon ? (
+          renderIcon(chevronIcon, colors.textMuted, 16)
+        ) : (
+          <Svg
+            width={16}
+            height={16}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={colors.textMuted}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <Path d={open ? "m18 15-6-6-6 6" : "m6 9 6 6 6-6"} />
+          </Svg>
+        )}
+      </Pressable>
+    </View>
   );
-}
+});
 
 export interface ComboboxContentProps {
   children?: React.ReactNode;
+  maxHeight?: number;
   style?: StyleProp<ViewStyle>;
   overlayStyle?: StyleProp<ViewStyle>;
-  modalProps?: Omit<
-    ModalProps,
-    "visible" | "transparent" | "animationType" | "onRequestClose"
-  >;
 }
 
-export function ComboboxContent({
+export const ComboboxContent = React.memo(function ComboboxContent({
   children,
+  maxHeight = 280,
   style,
   overlayStyle,
-  modalProps,
 }: ComboboxContentProps) {
-  const { open, setOpen, triggerLayout, colors, glass } = useCombobox();
-  const { components, radii, spacing, isDark } = useTheme();
+  const comboboxContext = useCombobox();
+  const { open, setOpen, anchor, glass, haptic, colors } = comboboxContext;
+  const { components, radii, shadows, spacing } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+
+  const shouldMount = useDelayedUnmount(
+    open,
+    reducedMotion ? 0 : ANIMATION_TIMING.transition,
+  );
   const progress = useSharedValue(open ? 1 : 0);
 
-  React.useEffect(() => {
-    progress.value = withTiming(open ? 1 : 0, {
-      duration: 150,
-      easing: Easing.bezier(0.23, 1, 0.32, 1),
-    });
-  }, [open, progress]);
+  useEffect(() => {
+    if (open) {
+      progress.value = reducedMotion
+        ? 1
+        : withTiming(1, {
+            duration: ANIMATION_TIMING.transition,
+            easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+          });
+    } else {
+      progress.value = reducedMotion
+        ? 0
+        : withTiming(0, {
+            duration: 120,
+            easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+          });
+    }
+  }, [open, progress, reducedMotion]);
 
-  const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-  const spaceBelow =
-    SCREEN_HEIGHT - (triggerLayout.pageY + triggerLayout.height);
-  const dropdownMaxHeight = 240;
-  const renderAbove = spaceBelow < dropdownMaxHeight + 40;
+  const cardWidth = Math.max(220, anchor?.width ?? windowWidth - spacing.lg * 2);
+  const resolvedAnchor: AnchorMeasurement = anchor ?? {
+    x: spacing.md,
+    y: windowHeight * 0.25,
+    width: cardWidth,
+    height: 44,
+  };
+  const coords = computeAnchoredPosition({
+    anchor: resolvedAnchor,
+    contentWidth: cardWidth,
+    contentHeight: Math.min(maxHeight, 220),
+    windowWidth,
+    windowHeight,
+    preferredPlacement: "bottom",
+    align: "start",
+    offset: 6,
+    viewportPadding: spacing.md,
+  });
 
-  const positionStyle = renderAbove
-    ? { bottom: SCREEN_HEIGHT - triggerLayout.pageY + 6 }
-    : { top: triggerLayout.pageY + triggerLayout.height + 4 };
+  const renderAbove = coords.resolvedPlacement === "top";
+  const animatedStyle = useAnimatedStyle(
+    () => ({
+      opacity: progress.value,
+      transform: [
+        {
+          translateY: renderAbove
+            ? (1 - progress.value) * 6
+            : (1 - progress.value) * -6,
+        },
+        { scale: 0.96 + progress.value * 0.04 },
+      ],
+    }),
+    webDeps([renderAbove]),
+  );
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [{ translateY: (renderAbove ? 6 : -6) * (1 - progress.value) }],
-  }));
-
-  const glassBg = isDark
-    ? "rgba(15, 27, 45, 0.70)"
-    : "rgba(255, 255, 255, 0.85)";
-
-  if (!open || triggerLayout.width === 0) return null;
+  if (!shouldMount && !open) return null;
 
   return (
-    <Modal
-      transparent
-      visible={open}
-      animationType="fade"
-      statusBarTranslucent
-      navigationBarTranslucent
-      hardwareAccelerated
-      onRequestClose={() => setOpen(false)}
-      {...modalProps}
-    >
-      <Pressable
-        style={[StyleSheet.absoluteFill, overlayStyle]}
-        onPress={() => setOpen(false)}
-      />
+    <Portal layer="popover">
+      <ComboboxContext.Provider value={comboboxContext}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss combobox options"
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: withAlpha("#0F172A", 0.14) },
+            overlayStyle,
+          ]}
+          onPress={() => {
+            if (haptic) triggerHaptic("selection");
+            setOpen(false);
+          }}
+        />
 
-      <Animated.View
-        style={[
-          {
-            position: "absolute",
-            left: triggerLayout.pageX,
-            width: triggerLayout.width,
-            backgroundColor: glass ? glassBg : colors.surface,
-            borderWidth: components.borderWidth.strong,
-            borderColor: glass
-              ? isDark
-                ? "rgba(248, 250, 252, 0.20)"
-                : "rgba(15, 23, 42, 0.14)"
-              : colors.border,
-            borderRadius: radii.xl,
-            maxHeight: dropdownMaxHeight,
-            padding: spacing.xs,
-            overflow: "hidden",
-            elevation: 8,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.18,
-            shadowRadius: 12,
-          },
-          animatedStyle,
-          positionStyle,
-          style,
-        ]}
-      >
-        {children}
-      </Animated.View>
-    </Modal>
+        <Animated.View
+          accessibilityRole="menu"
+          style={[
+            styles.contentCard,
+            {
+              top: coords.top,
+              left: coords.left,
+              width: cardWidth,
+              maxHeight,
+              backgroundColor: glass
+                ? colors.glassSurfaceStrong
+                : colors.surfaceRaised,
+              borderWidth: components.borderWidth.default,
+              borderColor: glass ? colors.glassBorder : colors.border,
+              borderRadius: radii.lg,
+            },
+            shadows.lg,
+            animatedStyle,
+            style,
+          ]}
+        >
+          <View
+            style={[
+              styles.contentClip,
+              {
+                borderRadius: Math.max(
+                  0,
+                  radii.lg - components.borderWidth.default,
+                ),
+              },
+            ]}
+          >
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {children}
+            </ScrollView>
+          </View>
+        </Animated.View>
+      </ComboboxContext.Provider>
+    </Portal>
   );
-}
+});
 
 export interface ComboboxListProps {
   children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }
 
-export function ComboboxList({ children, style }: ComboboxListProps) {
-  return (
-    <ScrollView
-      nestedScrollEnabled
-      keyboardShouldPersistTaps="handled"
-      style={[{ flex: 1 }, style]}
-    >
-      <View style={{ gap: 2 }}>{children}</View>
-    </ScrollView>
-  );
-}
+export const ComboboxList = React.memo(function ComboboxList({
+  children,
+  style,
+}: ComboboxListProps) {
+  const { spacing } = useTheme();
+  return <View style={[{ paddingVertical: spacing.xs }, style]}>{children}</View>;
+});
 
 export interface ComboboxItemProps {
   value: string;
   label: string;
   children?: React.ReactNode;
+  disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   checkIcon?: RenderIcon;
 }
 
-function CheckIcon({ color }: { color: string }) {
-  return (
-    <View
-      style={{
-        width: 8,
-        height: 5,
-        borderLeftWidth: 1.75,
-        borderBottomWidth: 1.75,
-        borderColor: color,
-        transform: [{ rotate: "-45deg" }],
-        marginRight: 4,
-      }}
-    />
-  );
-}
-
-export function ComboboxItem({
+export const ComboboxItem = React.memo(function ComboboxItem({
   value,
   label,
   children,
+  disabled = false,
   style,
   checkIcon,
 }: ComboboxItemProps) {
   const {
     value: selectedValue,
     onValueChange,
-    setOpen,
     inputValue,
     setInputValue,
+    selectedLabel,
+    setSelectedLabel,
+    setOpen,
+    registerItemMatch,
+    unregisterItemMatch,
     haptic,
     colors,
   } = useCombobox();
   const { radii, spacing, typography } = useTheme();
 
-  if (inputValue && !label.toLowerCase().includes(inputValue.toLowerCase())) {
-    return null;
-  }
-
   const isSelected = selectedValue === value;
+  const query = inputValue.trim().toLowerCase();
+  const isShowingSelectedLabel =
+    selectedLabel.length > 0 && inputValue === selectedLabel;
+  const matches =
+    query.length === 0 ||
+    isShowingSelectedLabel ||
+    label.toLowerCase().includes(query);
 
-  const handlePress = () => {
+  useEffect(() => {
+    registerItemMatch(value, matches);
+    return () => unregisterItemMatch(value);
+  }, [matches, registerItemMatch, unregisterItemMatch, value]);
+
+  useEffect(() => {
+    if (isSelected && selectedLabel !== label) {
+      setSelectedLabel(label);
+    }
+  }, [isSelected, label, selectedLabel, setSelectedLabel]);
+
+  if (!matches) return null;
+
+  const handleSelect = () => {
+    if (disabled) return;
     if (haptic) triggerHaptic("selection");
     onValueChange(value);
+    setSelectedLabel(label);
     setInputValue(label);
     setOpen(false);
   };
 
   return (
     <Pressable
-      onPress={handlePress}
+      accessibilityRole="menuitem"
+      accessibilityState={{ selected: isSelected, disabled }}
+      disabled={disabled}
+      onPress={handleSelect}
       style={({ pressed }) => [
+        styles.itemRow,
         {
-          minHeight: 40,
-          flexDirection: "row",
-          alignItems: "center",
-          paddingVertical: spacing.xs,
-          paddingHorizontal: spacing.md,
-          borderRadius: radii.lg,
           backgroundColor: isSelected
             ? colors.primarySoft
             : pressed
-              ? colors.backgroundMuted
-              : colors.transparent,
-          justifyContent: "space-between",
+              ? colors.surfaceMuted
+              : "transparent",
+          paddingVertical: spacing.sm,
+          paddingHorizontal: spacing.md,
+          marginHorizontal: spacing.xs,
+          borderRadius: radii.sm,
+          opacity: disabled ? 0.5 : 1,
         },
         style,
       ]}
     >
-      <Text
-        style={{
-          ...typography.body,
-          color: isSelected ? colors.primary : colors.text,
-          fontWeight: isSelected ? "600" : "400",
-        }}
-      >
-        {children || label}
-      </Text>
-      {isSelected &&
-        (checkIcon ? (
-          renderIcon(checkIcon, colors.primary, 16)
-        ) : (
-          <CheckIcon color={colors.primary} />
-        ))}
+      <View style={styles.itemContent}>
+        {children ?? (
+          <Text
+            style={[
+              typography.bodySmall,
+              {
+                color: isSelected ? colors.primary : colors.text,
+                fontWeight: isSelected ? "600" : "400",
+              },
+            ]}
+          >
+            {label}
+          </Text>
+        )}
+      </View>
+
+      {isSelected
+        ? checkIcon
+          ? renderIcon(checkIcon, colors.primary, 16)
+          : (
+              <Svg
+                width={16}
+                height={16}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={colors.primary}
+                strokeWidth={2.2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <Path d="M20 6L9 17l-5-5" />
+              </Svg>
+            )
+        : null}
     </Pressable>
   );
-}
+});
 
 export interface ComboboxEmptyProps {
   children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }
 
-export function ComboboxEmpty({
+export const ComboboxEmpty = React.memo(function ComboboxEmpty({
   children = "No results found.",
   style,
 }: ComboboxEmptyProps) {
-  const { colors } = useCombobox();
+  const { visibleCount, colors } = useCombobox();
   const { spacing, typography } = useTheme();
 
+  if (visibleCount > 0) return null;
+
   return (
-    <View style={[{ padding: spacing.md, alignItems: "center" }, style]}>
-      <Text style={{ ...typography.caption, color: colors.textMuted }}>
-        {children}
-      </Text>
+    <View style={[styles.empty, { padding: spacing.md }, style]}>
+      {typeof children === "string" || typeof children === "number" ? (
+        <Text
+          style={[
+            typography.bodySmall,
+            { color: colors.textMuted, textAlign: "center" },
+          ]}
+        >
+          {children}
+        </Text>
+      ) : (
+        children
+      )}
     </View>
   );
-}
+});
+
+const styles = StyleSheet.create({
+  root: {
+    width: "100%",
+  },
+  inputBox: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  textInput: {
+    flex: 1,
+    paddingVertical: 0,
+  },
+  iconBtn: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  contentCard: {
+    position: "absolute",
+  },
+  contentClip: {
+    overflow: "hidden",
+    width: "100%",
+    flexShrink: 1,
+  },
+  itemRow: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  itemContent: {
+    flex: 1,
+  },
+  empty: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});

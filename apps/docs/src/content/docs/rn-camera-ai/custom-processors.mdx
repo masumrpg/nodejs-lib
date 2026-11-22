@@ -1,0 +1,238 @@
+---
+title: Writing Custom Processors
+sidebar:
+  label: Custom Processors
+  order: 5
+description: Guide to implementing custom camera inference processors via CameraProcessor, worklet execution, and integrating ONNX, MLKit, or custom vision models.
+---
+
+import { Tabs, TabItem, Card, CardGrid, Badge } from '@astrojs/starlight/components';
+
+One of the central strengths of `@masumdev/rn-camera-ai` is its pluggable processor architecture. You are never locked into TensorFlow Lite; you can implement custom processors for QR/barcodes, face landmark tracking, pose estimation, or alternative runtimes like ONNX Runtime, MediaPipe, or MLKit.
+
+---
+
+## The `CameraProcessor` Contract
+
+Every vision processor in the `@masumdev/rn-camera-ai` ecosystem implements the `CameraProcessor` interface:
+
+```typescript
+import type { DetectionResult, ModelStatus } from '@masumdev/rn-camera-ai';
+
+export interface CameraProcessor {
+  /** Optional unique identifier for logging or debugging */
+  readonly id?: string;
+  /** Human-readable processor name */
+  readonly name?: string;
+  /** Current model lifecycle status */
+  readonly status: ModelStatus; // 'idle' | 'loading' | 'ready' | 'error'
+  /** Optional frame rate limit (e.g. 15, 30) */
+  readonly targetFps?: number;
+  /**
+   * Synchronous frame processing function called on the camera worklet thread
+   * or scheduled onto JS if non-worklet.
+   */
+  processFrame(frame: unknown): DetectionResult[];
+  /**
+   * Optional standalone worklet-safe frame processor callback without `this` capture.
+   */
+  readonly processFrameWorklet?: (frame: unknown) => DetectionResult[];
+  /** Optional asynchronous initialization hook */
+  initialize?(): Promise<void> | void;
+  /** Optional cleanup hook called when unmounting or switching processors */
+  dispose?(): void;
+}
+```
+
+### Model Lifecycle States
+
+A processor transitions across 4 standard lifecycle states:
+- `'idle'`: Instantiated but uninitialized.
+- `'loading'`: Reading neural network weights from disk or initializing GPU/NPU delegates.
+- `'ready'`: Fully prepared to execute inference on incoming camera frames.
+- `'error'`: Failed initialization or unrecoverable runtime fault.
+
+---
+
+## Worklet Execution & Zero-Copy Frames
+
+Frame outputs in React Native Vision Camera v5 execute inside a dedicated worklet runtime thread managed by `react-native-vision-camera-worklets` and `react-native-worklets`.
+
+### Rules for Worklet Frame Processors
+
+1. **Avoid Capturing Class `this` Inside Worklets**: `react-native-worklets` cannot serialize ES6 class instances. Expose a standalone `'worklet'` closure on `processFrameWorklet` (backed by `Synchronizable`s) or use a plain object with a `'worklet'` `processFrame` function.
+2. **Synchronous Execution**: Worklet frame callbacks are strictly **synchronous** and receive a `Frame` that `CameraAI` disposes automatically after processing.
+3. **Avoid JS Heap Allocations**: Minimize temporary objects inside the worklet hot path to avoid garbage collection pauses.
+4. **Normalized Coordinates**: Always output bounding box coordinates normalized to `[0, 1]`, regardless of the camera frame's pixel dimensions.
+
+---
+
+## Example 1: Barcode / QR Code Processor
+
+Here is a complete custom processor implementing QR code scanning with normalized bounding box outputs:
+
+```typescript
+import type {
+  CameraProcessor,
+  DetectionResult,
+  ModelStatus,
+} from '@masumdev/rn-camera-ai';
+
+export interface BarcodeScannerConfig {
+  targetFps?: number;
+}
+
+export class BarcodeProcessor implements CameraProcessor {
+  public readonly id = 'barcode-scanner';
+  public readonly name = 'Barcode & QR Scanner';
+  public readonly targetFps: number;
+  private _status: ModelStatus = 'idle';
+
+  constructor(config: BarcodeScannerConfig = {}) {
+    this.targetFps = config.targetFps ?? 10;
+  }
+
+  public get status(): ModelStatus {
+    return this._status;
+  }
+
+  public async initialize(): Promise<void> {
+    this._status = 'loading';
+    try {
+      // Perform any native barcode engine setup here
+      this._status = 'ready';
+    } catch (e) {
+      this._status = 'error';
+      throw e;
+    }
+  }
+
+  public processFrame = (frame: unknown): DetectionResult[] => {
+    if (this._status !== 'ready' || !frame) {
+      return [];
+    }
+
+    const frameDims = frame as { width?: number; height?: number };
+    const frameWidth = frameDims.width || 1920;
+    const frameHeight = frameDims.height || 1080;
+
+    // Example: call barcode scanning routine
+    const mockBarcodes = [
+      {
+        value: 'https://masumdev.id',
+        format: 'QR_CODE',
+        bounds: { left: 480, top: 270, width: 480, height: 480 },
+      },
+    ];
+
+    return mockBarcodes.map((item, index) => {
+      // Normalize pixel coordinates into [0, 1]
+      const normX = item.bounds.left / frameWidth;
+      const normY = item.bounds.top / frameHeight;
+      const normWidth = item.bounds.width / frameWidth;
+      const normHeight = item.bounds.height / frameHeight;
+
+      return {
+        id: `qr-${index}-${item.value}`,
+        label: item.value,
+        confidence: 1.0,
+        boundingBox: {
+          x: Math.max(0, Math.min(1, normX)),
+          y: Math.max(0, Math.min(1, normY)),
+          width: Math.max(0, Math.min(1 - normX, normWidth)),
+          height: Math.max(0, Math.min(1 - normY, normHeight)),
+        },
+      };
+    });
+  };
+
+  public dispose(): void {
+    this._status = 'idle';
+  }
+}
+```
+
+---
+
+## Example 2: Custom ONNX Runtime / MediaPipe Adapter
+
+If you are using **ONNX Runtime for React Native** (`onnxruntime-react-native`) or custom JSI native modules, implement `CameraProcessor` with preprocessing and inference:
+
+```typescript
+import type {
+  CameraProcessor,
+  DetectionResult,
+  ModelStatus,
+} from '@masumdev/rn-camera-ai';
+import { clampBox } from '@masumdev/rn-camera-ai';
+
+export interface OnnxSessionLike {
+  run: (inputs: Record<string, unknown>) => unknown;
+}
+
+export class CustomOnnxDetector implements CameraProcessor {
+  public readonly id = 'onnx-yolo-detector';
+  public readonly name = 'YOLOv8 ONNX Detector';
+  public status: ModelStatus = 'idle';
+  public readonly targetFps = 15;
+
+  private onnxSession: OnnxSessionLike | null = null;
+
+  async initialize(): Promise<void> {
+    this.status = 'loading';
+    try {
+      // Load ONNX model session
+      // this.onnxSession = await InferenceSession.create(modelUri);
+      this.status = 'ready';
+    } catch {
+      this.status = 'error';
+    }
+  }
+
+  processFrame = (_frame: unknown): DetectionResult[] => {
+    if (this.status !== 'ready') return [];
+
+    // 1. Run inference using synchronous C++ JSI or native worklet hook
+    // 2. Decode candidate bounding boxes
+    const results: DetectionResult[] = [
+      {
+        id: 'det-1',
+        label: 'person',
+        confidence: 0.92,
+        boundingBox: clampBox({
+          x: 0.25,
+          y: 0.15,
+          width: 0.50,
+          height: 0.70,
+        }),
+      },
+    ];
+
+    return results;
+  };
+
+  dispose(): void {
+    this.status = 'idle';
+    this.onnxSession = null;
+  }
+}
+```
+
+---
+
+## Best Practices & Performance Tips
+
+<CardGrid>
+  <Card title="Nitro Image Preprocessing" icon="rocket">
+    Use <code>HybridFrameConverter</code> and <code>react-native-nitro-image</code> to convert, resize, and extract raw pixel buffers, calling <code>image.dispose()</code> on intermediate images to prevent memory pressure.
+  </Card>
+  <Card title="Target FPS Throttling" icon="setting">
+    Most mobile AI models cannot run at full 60 FPS without overheating the device. Set <code>targetFps: 15</code> or <code>targetFps: 20</code> to maintain responsiveness and preserve battery life.
+  </Card>
+  <Card title="Always Clamp Coordinates" icon="star">
+    Always pass bounding boxes through <code>clampBox()</code> from <code>@masumdev/rn-camera-ai</code> to guarantee numbers remain within safe <code>[0, 1]</code> limits.
+  </Card>
+  <Card title="Clean Up on Dispose" icon="laptop">
+    Implement <code>dispose()</code> to release C++ tensor buffers, native session handles, or GPU memory when screens unmount.
+  </Card>
+</CardGrid>

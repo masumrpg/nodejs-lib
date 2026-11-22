@@ -41,17 +41,18 @@ export function AlertExample() {
       {/* 3. Warning Glassmorphism Alert */}
       <Alert
         tone="warning"
-        variant="glass"
+        variant="soft"
+        glass
         title="Storage Limit Warning"
         icon={({ color, size }) => <TriangleAlert color={color} size={size} />}
       >
         You are using 88% of your allocated cloud storage. Consider upgrading.
       </Alert>
 
-      {/* 4. Solid Danger Alert */}
+      {/* 4. Filled Danger Alert */}
       <Alert
         tone="danger"
-        variant="solid"
+        variant="filled"
         title="Critical Error Occurred"
         icon={({ color, size }) => <OctagonAlert color={color} size={size} />}
         dismissible
@@ -66,7 +67,7 @@ export function AlertExample() {
 
 ## Usage
 
-<Code code={exampleCode} lang="tsx" title="AlertExample.tsx" mark={['Alert', 'variant="accent"', 'variant="glass"', 'variant="solid"', 'dismissible']} />
+<Code code={exampleCode} lang="tsx" title="AlertExample.tsx" mark={['Alert', 'variant="accent"', 'glass', 'variant="filled"', 'dismissible']} />
 
 ## Props API
 
@@ -74,11 +75,12 @@ export function AlertExample() {
   type={{
     title: { type: 'ReactNode', description: 'Headline title string or component.' },
     children: { type: 'ReactNode', description: 'Body content text or element.' },
-    variant: { type: "'solid' | 'soft' | 'outline' | 'accent' | 'glass'", default: "'soft'", description: 'Visual banner style variant.' },
-    tone: { type: "'primary' | 'secondary' | 'accent' | 'success' | 'warning' | 'danger' | 'info'", default: "'info'", description: 'Color tone styling.' },
+    variant: { type: "'filled' | 'soft' | 'outline' | 'accent'", default: "'soft'", description: 'Visual banner style variant.' },
+    tone: { type: "'default' | 'primary' | 'secondary' | 'accent' | 'success' | 'warning' | 'danger' | 'info'", default: "'info'", description: 'Color tone styling.' },
+    glass: { type: 'boolean', default: 'false', description: 'Enables translucent frosted glassmorphism styling.' },
     icon: { type: 'RenderIcon', description: 'Left status icon render function.' },
     dismissible: { type: 'boolean', default: 'false', description: 'Shows close button to dismiss alert.' },
     action: { type: '{ label: string; onPress: () => void; icon?: RenderIcon }', description: 'Action button config.' },
-    onDismiss: { type: '() => void', description: 'Callback triggered when alert close button is pressed.' },
+    onClose: { type: '() => void', description: 'Callback triggered when alert close button is pressed.' },
   }}
 />

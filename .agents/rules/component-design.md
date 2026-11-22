@@ -112,10 +112,10 @@ import { renderIcon, type RenderIcon } from "./types";
 
 ---
 
-## 6. Backward Compatibility Policy
+## 6. Development & Beta API Policy (No Backward-Compatibility Baggage)
 
-- Existing component props must never be broken or removed in minor updates.
-- If legacy aliases exist, maintain backward compatibility while mapping legacy options to the new `tone` and `variant` architecture.
+- While packages are in active development and beta (`0.x`), do **not** retain deprecated prop aliases, legacy shims, or backward-compatibility wrappers.
+- When refining or extending component APIs, update the canonical interface directly and refactor all callsites, tests, and documentation across the monorepo cleanly.
 
 ---
 

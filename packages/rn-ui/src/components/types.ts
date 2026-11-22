@@ -1,5 +1,97 @@
 import React, { type ReactNode } from "react";
-import type { ThemeColors } from "../theme";
+import {
+  Platform,
+  type GestureResponderEvent,
+  type Insets,
+} from "react-native";
+
+import type { ThemeColors, ThemeRadii, ThemeShadow, ThemeSurfaceStyle } from "../theme";
+import { withAlpha } from "../utils/color";
+
+export const RN_UI_PRESSABLE_TRIGGER = Symbol.for(
+  "@masumdev/rn-ui/pressable-trigger",
+);
+
+export function markAsPressableTrigger<T>(component: T): T {
+  (component as unknown as Record<symbol, boolean>)[RN_UI_PRESSABLE_TRIGGER] =
+    true;
+  return component;
+}
+
+export function isPressableTriggerElement(
+  node: unknown,
+): node is React.ReactElement<{
+  disabled?: boolean;
+  onPress?: (event: GestureResponderEvent) => void;
+  onLongPress?: (event: GestureResponderEvent) => void;
+  onPressOut?: (event: GestureResponderEvent) => void;
+  delayLongPress?: number;
+}> {
+  if (!React.isValidElement(node)) return false;
+  const type = node.type as unknown;
+  if (typeof type === "object" || typeof type === "function") {
+    if ((type as Record<symbol, unknown>)[RN_UI_PRESSABLE_TRIGGER]) {
+      return true;
+    }
+    const named = type as { displayName?: string; name?: string };
+    const name = named.displayName ?? named.name ?? "";
+    if (name === "Pressable" || name.startsWith("Touchable")) {
+      return true;
+    }
+  }
+  const props = node.props as Record<string, unknown> | null;
+  if (
+    props &&
+    (typeof props.onPress === "function" ||
+      typeof props.onLongPress === "function")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function webDeps(deps: Array<unknown>): Array<unknown> | undefined {
+  return Platform.OS === "web" ? deps : undefined;
+}
+
+export function resolveControlRadius(
+  shape: ComponentShape,
+  size: ComponentSize,
+  radii: ThemeRadii,
+): number {
+  if (shape === "pill") return radii.full;
+  if (shape === "square") {
+    return size === "lg" || size === "xl" ? radii.sm : radii.xs;
+  }
+  if (size === "xs") return radii.xs;
+  if (size === "sm") return radii.sm;
+  if (size === "xl") return radii.lg;
+  return radii.md;
+}
+
+export function hasActiveShadow(shadow: ThemeShadow): boolean {
+  return Boolean(
+    shadow.boxShadow || shadow.shadowOpacity > 0 || shadow.elevation > 0,
+  );
+}
+
+export function resolveOutlineBorderColor(
+  colors: ThemeColors,
+  surface: ThemeSurfaceStyle,
+  toneBorderColor?: string,
+): string {
+  if (surface.outlineStyle === "tonal") {
+    return colors.transparent;
+  }
+  if (
+    surface.outlineBorderColor === "tone" &&
+    surface.filledBorderColor !== "border" &&
+    toneBorderColor
+  ) {
+    return withAlpha(toneBorderColor, surface.outlineBorderOpacity);
+  }
+  return colors.border;
+}
 
 export type ThemeColorName = keyof ThemeColors;
 
@@ -7,24 +99,141 @@ export type RenderIcon =
   | ReactNode
   | ((props: { color: string; size: number }) => ReactNode);
 
+export const ANIMATION_TIMING = {
+  pressIn: 90,
+  pressOut: 120,
+  transition: 150,
+  bezier: [0.23, 1, 0.32, 1] as const,
+};
+
+export function minTouchHitSlop(
+  dimension: number,
+  minTarget = 44,
+): Insets | undefined {
+  if (!Number.isFinite(dimension) || dimension >= minTarget) {
+    return undefined;
+  }
+  const pad = Math.ceil((minTarget - dimension) / 2);
+  return { top: pad, bottom: pad, left: pad, right: pad };
+}
+
+export interface ResolvedToneColors {
+  solid: string;
+  soft: string;
+  on: string;
+  border: string;
+}
+
+export function resolveToneColors(
+  tone: ComponentTone | undefined,
+  colors: ThemeColors,
+): ResolvedToneColors {
+  switch (tone) {
+    case "primary":
+      return {
+        solid: colors.primary,
+        soft: colors.primarySoft,
+        on: colors.onPrimary,
+        border: colors.primary,
+      };
+    case "secondary":
+      return {
+        solid: colors.secondary,
+        soft: colors.secondarySoft,
+        on: colors.onSecondary,
+        border: colors.secondary,
+      };
+    case "accent":
+      return {
+        solid: colors.accent,
+        soft: colors.accentSoft,
+        on: colors.onAccent,
+        border: colors.accent,
+      };
+    case "success":
+      return {
+        solid: colors.success,
+        soft: colors.successSoft,
+        on: colors.onSuccess,
+        border: colors.success,
+      };
+    case "warning":
+      return {
+        solid: colors.warning,
+        soft: colors.warningSoft,
+        on: colors.onWarning,
+        border: colors.warning,
+      };
+    case "danger":
+      return {
+        solid: colors.danger,
+        soft: colors.dangerSoft,
+        on: colors.onDanger,
+        border: colors.danger,
+      };
+    case "info":
+      return {
+        solid: colors.info,
+        soft: colors.infoSoft,
+        on: colors.onInfo,
+        border: colors.info,
+      };
+    case "default":
+    default:
+      return {
+        solid: colors.text,
+        soft: colors.backgroundMuted,
+        on: colors.textInverse,
+        border: colors.border,
+      };
+  }
+}
+
 export function renderIcon(
   icon: RenderIcon | React.ComponentType<{ color?: string; size?: number }> | undefined,
   color: string,
   size: number,
 ): ReactNode {
-  if (!icon) return null;
+  if (icon === null || icon === undefined || typeof icon === "boolean") {
+    return null;
+  }
   if (React.isValidElement(icon)) return icon;
   if (typeof icon === "function") {
-    try {
-      const result = (icon as (props: { color: string; size: number }) => ReactNode)({ color, size });
-      if (React.isValidElement(result)) return result;
-    } catch {
-      const Component = icon as React.ComponentType<{ color?: string; size?: number }>;
+    const fn = icon as { prototype?: { isReactComponent?: boolean } };
+    if (fn.prototype?.isReactComponent) {
+      const Component = icon as React.ComponentType<{
+        color?: string;
+        size?: number;
+      }>;
       return React.createElement(Component, { color, size });
     }
+    try {
+      const result = (
+        icon as (props: { color: string; size: number }) => ReactNode
+      )({ color, size });
+      if (React.isValidElement(result) || result === null || result === undefined) {
+        return result;
+      }
+      return result;
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        /invalid hook call|hooks can only be called/i.test(error.message)
+      ) {
+        const Component = icon as React.ComponentType<{
+          color?: string;
+          size?: number;
+        }>;
+        return React.createElement(Component, { color, size });
+      }
+      throw error;
+    }
   }
-  if (typeof icon === "object" && icon !== null && "$$typeof" in icon) {
-    const Component = icon as unknown as React.ComponentType<{ color?: string; size?: number }>;
+  if (typeof icon === "object" && "$$typeof" in icon) {
+    const Component = icon as unknown as React.ComponentType<{
+      color?: string;
+      size?: number;
+    }>;
     return React.createElement(Component, { color, size });
   }
   return icon as ReactNode;
@@ -76,7 +285,7 @@ export interface VariantProps<V extends string = string> {
 /**
  * Base props interface for components that scale size.
  */
-export interface SizeProps<S extends string = ComponentSize> {
+export interface SizeProps<S extends string | number = ComponentSize> {
   /**
    * Size dimension scaling (e.g. 'sm', 'md', 'lg').
    */
@@ -149,11 +358,11 @@ export interface BaseHapticProps {
 }
 
 /**
- * Base props interface for components that support micro press scale animations.
+ * Base props interface for components that support micro timing transitions.
  */
 export interface BaseAnimatedProps {
   /**
-   * Enables micro spring scale down animation on press.
+   * Enables micro timing transition on press or state changes.
    * Default: true
    */
   animated?: boolean;
@@ -166,4 +375,3 @@ export interface BaseComponentProps
   extends BaseGlassProps,
     BaseHapticProps,
     BaseAnimatedProps {}
-

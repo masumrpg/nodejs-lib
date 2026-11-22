@@ -1,8 +1,8 @@
-import React from "react";
+import React, { forwardRef } from "react";
 import {
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
+  StyleSheet,
   View,
   type KeyboardAvoidingViewProps,
   type ScrollViewProps,
@@ -31,26 +31,31 @@ export interface KeyboardAvoidingProps extends Omit<
   style?: StyleProp<ViewStyle>;
 }
 
-export function KeyboardAvoiding({
-  bg = "background",
-  p,
-  px,
-  py,
-  gap,
-  scroll = false,
-  fullHeight = true,
-  behavior,
-  keyboardVerticalOffset = 0,
-  enabled = true,
-  contentContainerStyle,
-  scrollViewProps,
-  style,
-  children,
-  ...props
-}: KeyboardAvoidingProps) {
+export const KeyboardAvoiding = forwardRef<
+  KeyboardAvoidingView,
+  KeyboardAvoidingProps
+>(function KeyboardAvoiding(
+  {
+    bg = "background",
+    p,
+    px,
+    py,
+    gap,
+    scroll = false,
+    fullHeight = true,
+    behavior,
+    keyboardVerticalOffset = 0,
+    enabled = true,
+    contentContainerStyle,
+    scrollViewProps,
+    style,
+    children,
+    ...props
+  },
+  ref,
+) {
   const { colors, spacing } = useTheme();
-  const resolvedBehavior =
-    behavior ?? (Platform.OS === "ios" ? "padding" : "height");
+  const resolvedBehavior = behavior ?? "padding";
   const {
     contentContainerStyle: scrollContentContainerStyle,
     keyboardShouldPersistTaps = "handled",
@@ -58,25 +63,34 @@ export function KeyboardAvoiding({
     ...restScrollViewProps
   } = scrollViewProps ?? {};
 
-  const contentStyle: ViewStyle = {
-    padding: p ? spacing[p] : undefined,
-    paddingHorizontal: px ? spacing[px] : undefined,
-    paddingVertical: py ? spacing[py] : undefined,
-    gap: gap ? spacing[gap] : undefined,
-  };
+  const contentStyle = React.useMemo<ViewStyle>(
+    () => ({
+      ...(p ? { padding: spacing[p] } : null),
+      ...(px ? { paddingHorizontal: spacing[px] } : null),
+      ...(py ? { paddingVertical: spacing[py] } : null),
+      ...(gap ? { gap: spacing[gap] } : null),
+    }),
+    [gap, p, px, py, spacing],
+  );
+
+  const rootStyle = React.useMemo<ViewStyle>(
+    () => ({
+      ...(fullHeight ? { flex: 1 } : null),
+      backgroundColor: colors[bg],
+    }),
+    [bg, colors, fullHeight],
+  );
 
   return (
     <KeyboardAvoidingView
+      ref={ref}
       behavior={resolvedBehavior}
       keyboardVerticalOffset={keyboardVerticalOffset}
       enabled={enabled}
-      style={[
-        {
-          flex: fullHeight ? 1 : undefined,
-          backgroundColor: colors[bg],
-        },
-        style,
-      ]}
+      contentContainerStyle={
+        resolvedBehavior === "position" ? contentContainerStyle : undefined
+      }
+      style={[rootStyle, style]}
       {...props}
     >
       {scroll ? (
@@ -85,7 +99,7 @@ export function KeyboardAvoiding({
           contentInsetAdjustmentBehavior={contentInsetAdjustmentBehavior}
           contentContainerStyle={[
             contentStyle,
-            fullHeight && { flexGrow: 1 },
+            fullHeight && styles.flexGrow,
             contentContainerStyle,
             scrollContentContainerStyle,
           ]}
@@ -94,8 +108,21 @@ export function KeyboardAvoiding({
           {children}
         </ScrollView>
       ) : (
-        <View style={[contentStyle, contentContainerStyle]}>{children}</View>
+        <View
+          style={[
+            fullHeight && styles.flex,
+            contentStyle,
+            contentContainerStyle,
+          ]}
+        >
+          {children}
+        </View>
       )}
     </KeyboardAvoidingView>
   );
-}
+});
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  flexGrow: { flexGrow: 1 },
+});

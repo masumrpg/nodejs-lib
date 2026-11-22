@@ -1,28 +1,31 @@
-import React, { createContext, useContext } from "react";
+import React, { createContext, useContext, useMemo } from "react";
 import {
   Pressable,
+  StyleSheet,
   View,
   type PressableProps,
   type StyleProp,
   type TextStyle,
+  type ViewProps,
   type ViewStyle,
 } from "react-native";
 
 import { useTheme } from "../theme";
 import { Text } from "./Text";
+import {
+  resolveOutlineBorderColor,
+  resolveToneColors,
+  type ComponentTone,
+  type ToneProps,
+  type VariantProps,
+} from "./types";
 
-export type BubbleVariant =
-  | "default"
-  | "secondary"
-  | "muted"
-  | "tinted"
-  | "outline"
-  | "ghost"
-  | "destructive";
-
+export type BubbleVariant = "filled" | "soft" | "outline" | "ghost";
+export type BubbleTone = ComponentTone;
 export type BubbleAlign = "start" | "end";
 
 interface BubbleContextType {
+  tone: BubbleTone;
   variant: BubbleVariant;
   align: BubbleAlign;
 }
@@ -39,106 +42,169 @@ function useBubbleContext() {
   return context;
 }
 
-export interface BubbleGroupProps extends React.ComponentPropsWithoutRef<
-  typeof View
-> {
+export interface BubbleGroupProps extends ViewProps {
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
 }
 
-export function BubbleGroup({ style, children, ...props }: BubbleGroupProps) {
+export const BubbleGroup = React.memo(function BubbleGroup({
+  style,
+  children,
+  ...props
+}: BubbleGroupProps) {
   const { spacing } = useTheme();
 
-  const groupStyle: ViewStyle = {
-    flexDirection: "column",
-    gap: spacing.sm, // 8px (gap-2)
-    width: "100%",
-  };
-
   return (
-    <View style={[groupStyle, style]} {...props}>
+    <View
+      style={[styles.group, { gap: spacing.md }, style]}
+      {...props}
+    >
       {children}
     </View>
   );
-}
+});
 
-export interface BubbleProps extends React.ComponentPropsWithoutRef<
-  typeof View
-> {
-  variant?: BubbleVariant;
+export interface BubbleProps
+  extends ViewProps,
+    ToneProps<BubbleTone>,
+    VariantProps<BubbleVariant> {
   align?: BubbleAlign;
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
 }
 
-export function Bubble({
-  variant = "default",
+export const Bubble = React.memo(function Bubble({
+  tone = "primary",
+  variant = "filled",
   align = "start",
   style,
   children,
   ...props
 }: BubbleProps) {
-  const bubbleStyle: ViewStyle = {
-    alignSelf: align === "end" ? "flex-end" : "flex-start",
-    maxWidth: variant === "ghost" ? "100%" : "80%",
-    position: "relative",
-    flexDirection: "column",
-    gap: 4, // gap-1
-  };
+  const { spacing } = useTheme();
+
+  const contextValue = useMemo(
+    () => ({ tone, variant, align }),
+    [align, tone, variant],
+  );
+
+  const bubbleStyle = useMemo<ViewStyle>(
+    () => ({
+      alignSelf: align === "end" ? "flex-end" : "flex-start",
+      maxWidth: variant === "ghost" ? "100%" : "80%",
+      position: "relative",
+      flexDirection: "column",
+      gap: spacing.xs,
+    }),
+    [align, spacing.xs, variant],
+  );
 
   return (
-    <BubbleContext.Provider value={{ variant, align }}>
+    <BubbleContext.Provider value={contextValue}>
       <View style={[bubbleStyle, style]} {...props}>
         {children}
       </View>
     </BubbleContext.Provider>
   );
-}
+});
 
-export interface BubbleContentProps extends Omit<PressableProps, "style"> {
+export interface BubbleContentProps extends Omit<ViewProps, "style"> {
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
-  onPress?: () => void;
+  onPress?: PressableProps["onPress"];
   children?: React.ReactNode;
 }
 
-export function BubbleContent({
+export const BubbleContent = React.memo(function BubbleContent({
   style,
   textStyle,
   onPress,
   children,
   ...props
 }: BubbleContentProps) {
-  const { variant, align } = useBubbleContext();
-  const { colors, components, radii, spacing } = useTheme();
+  const { tone, variant, align } = useBubbleContext();
+  const { colors, components, radii, shadows, spacing, typography, isDark } =
+    useTheme();
+  const toneColors = resolveToneColors(tone, colors);
+  const hasSolidBorder = components.surface.filledBorderColor === "border";
+  const isTonalOutline = components.surface.outlineStyle === "tonal";
 
-  // Get themed color mapping for variant
-  const colorsMap = getVariantColors(variant, colors);
+  let bg = toneColors.solid;
+  let textColor = toneColors.on;
+  let borderColor = hasSolidBorder ? colors.border : colors.transparent;
 
-  const containerStyle: ViewStyle = {
-    paddingHorizontal: spacing.md, // px-3 (12px)
-    paddingVertical: spacing.sm + 2, // py-2.5 (10px)
-    borderRadius: radii.xl + 4, // rounded-3xl (~20-24px)
-    borderWidth: variant === "outline" ? components.borderWidth.default : 0,
-    borderColor: colorsMap.border,
-    backgroundColor: colorsMap.bg,
-    alignSelf: align === "end" ? "flex-end" : "flex-start",
-  };
+  if (variant === "soft") {
+    bg = toneColors.soft;
+    textColor =
+      tone === "warning" && !isDark
+        ? "#92400E"
+        : tone === "default"
+          ? colors.text
+          : toneColors.solid;
+  } else if (variant === "outline") {
+    bg = isTonalOutline
+      ? isDark
+        ? colors.surfaceRaised
+        : colors.backgroundMuted
+      : colors.surface;
+    textColor = colors.text;
+    borderColor = resolveOutlineBorderColor(
+      colors,
+      components.surface,
+      tone === "default" ? undefined : toneColors.border,
+    );
+  } else if (variant === "ghost") {
+    bg = colors.transparent;
+    textColor = colors.text;
+  }
 
   const isGhost = variant === "ghost";
+  const alignSelf = align === "end" ? "flex-end" : "flex-start";
+  const bubbleShadow = !isGhost
+    ? shadows[components.surface.feedbackShadow]
+    : shadows.none;
+
   const finalContainerStyle: ViewStyle = isGhost
     ? {
         borderWidth: 0,
-        backgroundColor: "transparent",
+        backgroundColor: colors.transparent,
         borderRadius: 0,
         paddingHorizontal: 0,
         paddingVertical: 0,
+        alignSelf,
       }
-    : containerStyle;
+    : {
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm + spacing.xxs,
+        borderRadius: radii.xl,
+        borderWidth:
+          variant === "outline"
+            ? isTonalOutline
+              ? 0
+              : components.borderWidth.control
+            : components.borderWidth.filled,
+        borderColor,
+        backgroundColor: bg,
+        alignSelf,
+        ...bubbleShadow,
+      };
+
+  const renderedChildren =
+    typeof children === "string" || typeof children === "number" ? (
+      <Text
+        variant="bodySmall"
+        style={[{ color: textColor, lineHeight: typography.bodySmall.lineHeight }, textStyle]}
+      >
+        {children}
+      </Text>
+    ) : (
+      children
+    );
 
   if (onPress) {
     return (
       <Pressable
+        accessibilityRole="button"
         onPress={onPress}
         style={({ pressed }) => [
           finalContainerStyle,
@@ -147,50 +213,26 @@ export function BubbleContent({
         ]}
         {...props}
       >
-        {typeof children === "string" ? (
-          <Text
-            style={[
-              { color: colorsMap.text, fontSize: 14, lineHeight: 20 },
-              textStyle,
-            ]}
-          >
-            {children}
-          </Text>
-        ) : (
-          children
-        )}
+        {renderedChildren}
       </Pressable>
     );
   }
 
   return (
     <View style={[finalContainerStyle, style]} {...props}>
-      {typeof children === "string" ? (
-        <Text
-          style={[
-            { color: colorsMap.text, fontSize: 14, lineHeight: 20 },
-            textStyle,
-          ]}
-        >
-          {children}
-        </Text>
-      ) : (
-        children
-      )}
+      {renderedChildren}
     </View>
   );
-}
+});
 
-export interface BubbleReactionsProps extends React.ComponentPropsWithoutRef<
-  typeof View
-> {
+export interface BubbleReactionsProps extends ViewProps {
   side?: "top" | "bottom";
   align?: "start" | "end";
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
 }
 
-export function BubbleReactions({
+export const BubbleReactions = React.memo(function BubbleReactions({
   side = "bottom",
   align = "end",
   style,
@@ -207,12 +249,12 @@ export function BubbleReactions({
     backgroundColor: colors.backgroundMuted,
     borderRadius: radii.full,
     borderWidth: components.borderWidth.focus,
-    borderColor: colors.surface, // ring-card
-    paddingHorizontal: spacing.xs + 2, // px-1.5
-    paddingVertical: spacing.xxs + 1, // py-0.5
+    borderColor: colors.surface,
+    paddingHorizontal: spacing.xs + spacing.xxs,
+    paddingVertical: spacing.xxs + 1,
     zIndex: 10,
-    ...(side === "top" ? { top: -12 } : { bottom: -12 }),
-    ...(align === "start" ? { left: 12 } : { right: 12 }),
+    ...(side === "top" ? { top: -10 } : { bottom: -10 }),
+    ...(align === "start" ? { left: spacing.md } : { right: spacing.md }),
   };
 
   return (
@@ -220,56 +262,11 @@ export function BubbleReactions({
       {children}
     </View>
   );
-}
+});
 
-// Helper to resolve themed background, text, and border colors based on Bubble variant
-function getVariantColors(
-  variant: BubbleVariant,
-  colors: ReturnType<typeof useTheme>["colors"],
-) {
-  switch (variant) {
-    case "secondary":
-      return {
-        bg: colors.secondarySoft,
-        text: colors.text,
-        border: "transparent",
-      };
-    case "muted":
-      return {
-        bg: colors.backgroundMuted,
-        text: colors.textMuted,
-        border: "transparent",
-      };
-    case "tinted":
-      return {
-        bg: colors.primarySoft,
-        text: colors.primary,
-        border: "transparent",
-      };
-    case "outline":
-      return {
-        bg: colors.background,
-        text: colors.text,
-        border: colors.border,
-      };
-    case "ghost":
-      return {
-        bg: "transparent",
-        text: colors.text,
-        border: "transparent",
-      };
-    case "destructive":
-      return {
-        bg: colors.dangerSoft,
-        text: colors.danger,
-        border: "transparent",
-      };
-    case "default":
-    default:
-      return {
-        bg: colors.primary,
-        text: colors.onPrimary,
-        border: "transparent",
-      };
-  }
-}
+const styles = StyleSheet.create({
+  group: {
+    flexDirection: "column",
+    width: "100%",
+  },
+});

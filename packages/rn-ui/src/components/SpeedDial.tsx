@@ -1,32 +1,39 @@
-import React, {
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Modal,
   Pressable,
-  StyleProp,
   StyleSheet,
-  TextStyle,
   View,
-  ViewStyle,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
 } from "react-native";
 import Animated, {
   Easing,
+  interpolate,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withDelay,
   withTiming,
 } from "react-native-reanimated";
-import Svg, { Line } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
 
-import { useTheme } from "../theme";
-import { withAlpha } from "../utils/color";
+import { Portal, usePortalContext, useTheme } from "../theme";
+import {
+  measureAnchorNode,
+  useDelayedUnmount,
+  withAlpha,
+  type AnchorMeasurement,
+} from "../utils";
 import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
+  ANIMATION_TIMING,
+  minTouchHitSlop,
   renderIcon,
+  resolveToneColors,
   type BaseAnimatedProps,
   type BaseGlassProps,
   type BaseHapticProps,
@@ -67,11 +74,24 @@ export interface SpeedDialProps
   offset?: number;
   overlay?: boolean;
   overlayColor?: string;
+  accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
   mainButtonStyle?: StyleProp<ViewStyle>;
   actionButtonStyle?: StyleProp<ViewStyle>;
   labelStyle?: StyleProp<TextStyle>;
 }
+
+const MAIN_FAB_SIZES: Record<"sm" | "md" | "lg", number> = {
+  sm: 48,
+  md: 56,
+  lg: 64,
+};
+
+const ACTION_FAB_SIZES: Record<"sm" | "md" | "lg", number> = {
+  sm: 40,
+  md: 44,
+  lg: 50,
+};
 
 interface SpeedDialActionRowProps {
   action: SpeedDialActionItem;
@@ -82,7 +102,7 @@ interface SpeedDialActionRowProps {
   isEnd: boolean;
   parentTone: ComponentTone;
   size: "sm" | "md" | "lg";
-  animated: boolean;
+  shouldAnimate: boolean;
   haptic: boolean;
   glass: boolean;
   onSelect: (action: SpeedDialActionItem) => void;
@@ -90,382 +110,478 @@ interface SpeedDialActionRowProps {
   labelStyle?: StyleProp<TextStyle>;
 }
 
-function SpeedDialActionRow({
+const SpeedDialActionRow = React.memo(function SpeedDialActionRow({
   action,
   index,
+  total,
   isOpen,
   isTop,
   isEnd,
   parentTone,
   size,
-  animated,
+  shouldAnimate,
   haptic,
   glass,
   onSelect,
   actionButtonStyle,
   labelStyle,
 }: SpeedDialActionRowProps) {
-  const { colors, radii } = useTheme();
-  const rowProgress = useSharedValue(0);
+  const { colors, components, radii, shadows, spacing } = useTheme();
+  const rowProgress = useSharedValue(isOpen ? 1 : 0);
+
+  const staggerIndex = isTop ? index : total - 1 - index;
+  const openDelay = shouldAnimate ? Math.min(staggerIndex * 28, 120) : 0;
 
   useEffect(() => {
-    const delay = animated ? index * 40 : 0;
+    if (!shouldAnimate) {
+      rowProgress.value = isOpen ? 1 : 0;
+      return;
+    }
     if (isOpen) {
       rowProgress.value = withDelay(
-        delay,
+        openDelay,
         withTiming(1, {
-          duration: 180,
-          easing: Easing.bezier(0.23, 1, 0.32, 1),
-        })
+          duration: ANIMATION_TIMING.transition,
+          easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+        }),
       );
     } else {
       rowProgress.value = withTiming(0, {
-        duration: 120,
-        easing: Easing.bezier(0.23, 1, 0.32, 1),
+        duration: 110,
+        easing: Easing.bezier(...ANIMATION_TIMING.bezier),
       });
     }
-  }, [animated, index, isOpen, rowProgress]);
+  }, [isOpen, openDelay, rowProgress, shouldAnimate]);
 
-  const animatedRowStyle = useAnimatedStyle(() => {
-    const translateY = (1 - rowProgress.value) * (isTop ? -16 : 16);
-    return {
-      opacity: rowProgress.value,
-      transform: [
-        { translateY },
-        { scale: 0.75 + rowProgress.value * 0.25 },
-      ],
-    };
-  });
+  const rowStyle = useAnimatedStyle(() => ({
+    opacity: rowProgress.value,
+    transform: [
+      {
+        translateY: interpolate(
+          rowProgress.value,
+          [0, 1],
+          [isTop ? -12 : 12, 0],
+        ),
+      },
+      { scale: interpolate(rowProgress.value, [0, 1], [0.88, 1]) },
+    ],
+  }));
 
-  const effectiveTone = action.tone || parentTone;
-  const actionColor =
-    effectiveTone === "primary"
-      ? colors.primary
-      : effectiveTone === "secondary"
-      ? colors.secondary
-      : effectiveTone === "accent"
-      ? colors.accent
-      : effectiveTone === "success"
-      ? colors.success
-      : effectiveTone === "warning"
-      ? colors.warning
-      : effectiveTone === "danger"
-      ? colors.danger
-      : colors.info;
-
-  const btnDimension = size === "sm" ? 38 : size === "lg" ? 48 : 42;
-  const iconSize = size === "sm" ? 16 : size === "lg" ? 22 : 18;
-
-  const handlePress = () => {
-    if (action.disabled) return;
-    if (haptic) {
-      triggerHaptic("selection");
-    }
-    onSelect(action);
-  };
+  const actionSize = ACTION_FAB_SIZES[size];
+  const resolvedTone = action.tone ?? parentTone;
+  const toneColors = resolveToneColors(resolvedTone, colors);
+  const iconColor = glass ? colors.text : toneColors.on;
 
   return (
     <Animated.View
       style={[
         styles.actionRow,
         isEnd ? styles.actionRowEnd : styles.actionRowStart,
-        animatedRowStyle,
+        rowStyle,
       ]}
     >
-      {/* Label Badge (on left if placement is end) */}
-      {isEnd && action.label && (
-        <View
-          style={[
+      {action.label && isEnd ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={action.label}
+          accessibilityState={{ disabled: Boolean(action.disabled) }}
+          disabled={action.disabled}
+          onPress={() => onSelect(action)}
+          style={({ pressed }) => [
             styles.labelContainer,
             {
               backgroundColor: glass
-                ? withAlpha(colors.surfaceRaised, 0.8)
-                : colors.surfaceRaised,
+                ? colors.glassSurfaceStrong
+                : colors.surface,
               borderRadius: radii.md,
+              borderWidth: components.borderWidth.default,
+              borderColor: glass ? colors.glassBorder : colors.border,
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.xs + 2,
+              opacity: action.disabled ? 0.5 : pressed ? 0.85 : 1,
             },
+            shadows.sm,
           ]}
         >
-          <Text
-            variant="caption"
-            weight="600"
-            style={[{ color: colors.text }, labelStyle]}
-          >
+          <Text variant="labelSmall" weight="600" style={labelStyle}>
             {action.label}
           </Text>
-        </View>
-      )}
+        </Pressable>
+      ) : null}
 
-      {/* Action Button */}
       <Pressable
-        onPress={handlePress}
-        disabled={action.disabled}
         accessibilityRole="button"
-        accessibilityLabel={action.label || `Action ${index + 1}`}
-        style={[
+        accessibilityLabel={action.label ?? action.id}
+        accessibilityState={{ disabled: Boolean(action.disabled) }}
+        disabled={action.disabled}
+        hitSlop={minTouchHitSlop(actionSize)}
+        onPress={() => {
+          if (action.disabled) return;
+          if (haptic) triggerHaptic("selection");
+          onSelect(action);
+        }}
+        style={({ pressed }) => [
           styles.actionButton,
           {
-            width: btnDimension,
-            height: btnDimension,
-            borderRadius: radii.full,
-            backgroundColor: actionColor,
-            opacity: action.disabled ? 0.45 : 1,
+            width: actionSize,
+            height: actionSize,
+            borderRadius: actionSize / 2,
+            backgroundColor: glass
+              ? colors.glassSurfaceStrong
+              : toneColors.solid,
+            borderWidth: glass ? components.borderWidth.default : 0,
+            borderColor: glass ? colors.glassBorder : "transparent",
+            opacity: action.disabled ? 0.5 : pressed ? 0.85 : 1,
           },
+          shadows.lg,
           actionButtonStyle,
         ]}
       >
-        {renderIcon(action.icon, colors.onPrimary, iconSize)}
+        {renderIcon(action.icon, iconColor, Math.round(actionSize * 0.45))}
       </Pressable>
 
-      {/* Label Badge (on right if placement is start) */}
-      {!isEnd && action.label && (
-        <View
-          style={[
+      {action.label && !isEnd ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={action.label}
+          accessibilityState={{ disabled: Boolean(action.disabled) }}
+          disabled={action.disabled}
+          onPress={() => onSelect(action)}
+          style={({ pressed }) => [
             styles.labelContainer,
             {
               backgroundColor: glass
-                ? withAlpha(colors.surfaceRaised, 0.8)
-                : colors.surfaceRaised,
+                ? colors.glassSurfaceStrong
+                : colors.surface,
               borderRadius: radii.md,
+              borderWidth: components.borderWidth.default,
+              borderColor: glass ? colors.glassBorder : colors.border,
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.xs + 2,
+              opacity: action.disabled ? 0.5 : pressed ? 0.85 : 1,
             },
+            shadows.sm,
           ]}
         >
-          <Text
-            variant="caption"
-            weight="600"
-            style={[{ color: colors.text }, labelStyle]}
-          >
+          <Text variant="labelSmall" weight="600" style={labelStyle}>
             {action.label}
           </Text>
-        </View>
-      )}
+        </Pressable>
+      ) : null}
     </Animated.View>
   );
-}
+});
 
-/**
- * Expanding floating action menu with staggered spring sub-actions, label pills, and backdrop overlay.
- */
-export function SpeedDial({
+export const SpeedDial = React.memo(function SpeedDial({
   actions,
-  open,
+  open: controlledOpen,
   defaultOpen = false,
   onOpenChange,
   icon,
   activeIcon,
-  placement = "bottom-end",
-  offset = 20,
   tone = "primary",
   size = "md",
+  placement = "bottom-end",
+  offset,
   overlay = true,
   overlayColor,
-  glass = false,
-  haptic = true,
   animated = true,
+  haptic = true,
+  glass = false,
+  accessibilityLabel,
   style,
   mainButtonStyle,
   actionButtonStyle,
   labelStyle,
 }: SpeedDialProps) {
-  const { colors, radii } = useTheme();
+  const { colors, components, shadows, spacing, isDark } = useTheme();
+  const portalStore = usePortalContext();
+  const reducedMotion = useReducedMotion();
+  const shouldAnimate = animated && !reducedMotion;
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
-  const isOpen = open !== undefined ? open : internalOpen;
+  const [anchor, setAnchor] = useState<AnchorMeasurement | null>(null);
+  const fabAnchorRef = useRef<React.ComponentRef<typeof View>>(null);
 
-  const toggleOpen = useCallback(() => {
-    if (haptic) {
-      triggerHaptic("selection");
-    }
-    const next = !isOpen;
-    if (open === undefined) {
-      setInternalOpen(next);
-    }
-    onOpenChange?.(next);
-  }, [haptic, isOpen, onOpenChange, open]);
+  const isControlled = controlledOpen !== undefined;
+  const isOpen = isControlled ? Boolean(controlledOpen) : internalOpen;
 
-  const handleActionSelect = useCallback(
-    (action: SpeedDialActionItem) => {
-      if (open === undefined) {
-        setInternalOpen(false);
-      }
-      onOpenChange?.(false);
-      action.onPress();
-    },
-    [onOpenChange, open]
+  const shouldStayMounted = useDelayedUnmount(
+    isOpen,
+    shouldAnimate ? 170 : 0,
   );
 
-  const mainProgress = useSharedValue(0);
+  const mainProgress = useSharedValue(isOpen ? 1 : 0);
 
   useEffect(() => {
-    if (animated) {
+    if (shouldAnimate) {
       mainProgress.value = withTiming(isOpen ? 1 : 0, {
-        duration: 200,
-        easing: Easing.bezier(0.23, 1, 0.32, 1),
+        duration: ANIMATION_TIMING.transition,
+        easing: Easing.bezier(...ANIMATION_TIMING.bezier),
       });
     } else {
       mainProgress.value = isOpen ? 1 : 0;
     }
-  }, [animated, isOpen, mainProgress]);
+  }, [isOpen, mainProgress, shouldAnimate]);
 
-  const mainRotateStyle = useAnimatedStyle(() => {
-    if (activeIcon) return {};
-    return {
-      transform: [{ rotate: `${mainProgress.value * 45}deg` }],
-    };
-  });
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (!isControlled) {
+        setInternalOpen(next);
+      }
+      onOpenChange?.(next);
+    },
+    [isControlled, onOpenChange],
+  );
 
+  const refreshAnchor = useCallback(() => {
+    measureAnchorNode(
+      fabAnchorRef,
+      (rect) => {
+        setAnchor(rect);
+      },
+      portalStore?.getHostRef("root"),
+    );
+  }, [portalStore]);
+
+  useEffect(() => {
+    if (isOpen) {
+      refreshAnchor();
+    }
+  }, [isOpen, refreshAnchor]);
+
+  const close = useCallback(() => {
+    if (haptic) triggerHaptic("selection");
+    setOpen(false);
+  }, [haptic, setOpen]);
+
+  const toggle = useCallback(() => {
+    if (haptic) triggerHaptic("medium");
+    if (!isOpen) {
+      refreshAnchor();
+    }
+    setOpen(!isOpen);
+  }, [haptic, isOpen, refreshAnchor, setOpen]);
+
+  const handleSelectAction = useCallback(
+    (action: SpeedDialActionItem) => {
+      if (action.disabled) return;
+      action.onPress();
+      setOpen(false);
+    },
+    [setOpen],
+  );
+
+  const edgeOffset = offset ?? spacing.lg;
   const isTop = placement.startsWith("top");
   const isEnd = placement.endsWith("end");
+  const mainSize = MAIN_FAB_SIZES[size];
+  const toneColors = resolveToneColors(tone, colors);
 
-  const mainColor =
-    tone === "primary"
-      ? colors.primary
-      : tone === "secondary"
-      ? colors.secondary
-      : tone === "accent"
-      ? colors.accent
-      : tone === "success"
-      ? colors.success
-      : tone === "warning"
-      ? colors.warning
-      : tone === "danger"
-      ? colors.danger
-      : colors.info;
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: mainProgress.value,
+  }));
 
-  const mainDimension = size === "sm" ? 48 : size === "lg" ? 64 : 56;
-  const iconDimension = size === "sm" ? 20 : size === "lg" ? 28 : 24;
+  const iconRotateStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        rotate: `${activeIcon ? 0 : interpolate(mainProgress.value, [0, 1], [0, 45])}deg`,
+      },
+    ],
+  }));
 
-  const positionStyles: ViewStyle = {
-    position: "absolute",
-    ...(isTop ? { top: offset } : { bottom: offset }),
-    ...(isEnd ? { right: offset } : { left: offset }),
+  const resolvedOverlayColor =
+    overlayColor ??
+    (isDark ? withAlpha("#000000", 0.56) : withAlpha("#0F172A", 0.36));
+
+  const mainBg = glass ? colors.glassSurfaceStrong : toneColors.solid;
+  const mainIconColor = glass ? colors.text : toneColors.on;
+
+  const renderMainFab = (inPortal: boolean) => {
+    const currentIcon =
+      isOpen && activeIcon
+        ? renderIcon(activeIcon, mainIconColor, Math.round(mainSize * 0.43))
+        : icon
+          ? renderIcon(icon, mainIconColor, Math.round(mainSize * 0.43))
+          : (
+              <Svg
+                width={Math.round(mainSize * 0.43)}
+                height={Math.round(mainSize * 0.43)}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={mainIconColor}
+                strokeWidth={2.4}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <Path d="M12 5v14M5 12h14" />
+              </Svg>
+            );
+
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={
+          accessibilityLabel ?? (isOpen ? "Close actions" : "Open actions")
+        }
+        accessibilityState={{ expanded: isOpen }}
+        hitSlop={minTouchHitSlop(mainSize)}
+        onPress={() => {
+          toggle();
+        }}
+        style={({ pressed }) => [
+          styles.mainFab,
+          {
+            width: mainSize,
+            height: mainSize,
+            borderRadius: mainSize / 2,
+            backgroundColor: mainBg,
+            borderWidth: glass ? components.borderWidth.default : 0,
+            borderColor: glass ? colors.glassBorder : "transparent",
+            opacity: !inPortal && overlay && (isOpen || shouldStayMounted) ? 0 : pressed ? 0.88 : 1,
+          },
+          shadows.lg,
+          mainButtonStyle,
+        ]}
+      >
+        <Animated.View style={iconRotateStyle}>{currentIcon}</Animated.View>
+      </Pressable>
+    );
   };
+
+  const renderActionRows = () => (
+    <View
+      style={[
+        styles.actionsWrapper,
+        isTop ? styles.actionsWrapperTop : styles.actionsWrapperBottom,
+        isEnd ? styles.alignEnd : styles.alignStart,
+        { gap: spacing.sm },
+      ]}
+    >
+      {actions.map((action, idx) => (
+        <SpeedDialActionRow
+          key={action.id}
+          action={action}
+          index={idx}
+          total={actions.length}
+          isOpen={isOpen}
+          isTop={isTop}
+          isEnd={isEnd}
+          parentTone={tone}
+          size={size}
+          shouldAnimate={shouldAnimate}
+          haptic={haptic}
+          glass={glass}
+          onSelect={handleSelectAction}
+          actionButtonStyle={actionButtonStyle}
+          labelStyle={labelStyle}
+        />
+      ))}
+    </View>
+  );
+
+  const cornerPosition: ViewStyle = useMemo(() => {
+    if (anchor) {
+      const rightOffset = Math.max(
+        edgeOffset,
+        windowWidth - (anchor.x + anchor.width),
+      );
+      const bottomOffset = Math.max(
+        edgeOffset,
+        windowHeight - (anchor.y + anchor.height),
+      );
+      return {
+        ...(isTop ? { top: anchor.y } : { bottom: bottomOffset }),
+        ...(isEnd ? { right: rightOffset } : { left: anchor.x }),
+      };
+    }
+    return {
+      ...(isTop ? { top: edgeOffset } : { bottom: edgeOffset }),
+      ...(isEnd ? { right: edgeOffset } : { left: edgeOffset }),
+    };
+  }, [anchor, edgeOffset, isEnd, isTop, windowHeight, windowWidth]);
+
+  const inlineCornerPosition: ViewStyle = {
+    ...(isTop ? { top: edgeOffset } : { bottom: edgeOffset }),
+    ...(isEnd ? { right: edgeOffset } : { left: edgeOffset }),
+  };
+
+  const showPortal = overlay && (isOpen || shouldStayMounted);
 
   return (
     <>
-      {/* Semi-transparent Modal Overlay when Open */}
-      {overlay && isOpen && (
-        <Modal
-          transparent
-          visible={isOpen}
-          animationType="fade"
-          statusBarTranslucent
-          onRequestClose={() => {
-            if (open === undefined) setInternalOpen(false);
-            onOpenChange?.(false);
-          }}
-        >
-          <Pressable
-            onPress={() => {
-              if (open === undefined) setInternalOpen(false);
-              onOpenChange?.(false);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Close speed dial"
-            style={[
-              styles.backdrop,
-              {
-                backgroundColor:
-                  overlayColor || withAlpha(colors.overlay || "#000", 0.45),
-              },
-            ]}
-          />
-        </Modal>
-      )}
-
-      {/* Floating SpeedDial Container */}
       <View
-        pointerEvents="box-none"
+        pointerEvents={showPortal ? "none" : "box-none"}
         style={[
           styles.container,
-          positionStyles,
-          isTop ? styles.containerTop : styles.containerBottom,
+          inlineCornerPosition,
           isEnd ? styles.alignEnd : styles.alignStart,
           style,
         ]}
       >
-        {/* Expanded Action Buttons (rendered above or below main button) */}
-        {isOpen && (
-          <View
+        {!overlay && (isOpen || shouldStayMounted) && !isTop
+          ? renderActionRows()
+          : null}
+
+        <View
+          ref={fabAnchorRef}
+          collapsable={false}
+          onLayout={(_e: LayoutChangeEvent) => {
+            if (isOpen) refreshAnchor();
+          }}
+        >
+          {renderMainFab(false)}
+        </View>
+
+        {!overlay && (isOpen || shouldStayMounted) && isTop
+          ? renderActionRows()
+          : null}
+      </View>
+
+      {showPortal ? (
+        <Portal layer="overlay">
+          <Animated.View
             style={[
-              styles.actionsWrapper,
-              isTop ? styles.actionsWrapperTop : styles.actionsWrapperBottom,
-              isEnd ? styles.alignEnd : styles.alignStart,
+              StyleSheet.absoluteFill,
+              { backgroundColor: resolvedOverlayColor },
+              backdropStyle,
             ]}
           >
-            {(isTop ? actions : [...actions].reverse()).map((act, idx) => (
-              <SpeedDialActionRow
-                key={act.id}
-                action={act}
-                index={idx}
-                total={actions.length}
-                isOpen={isOpen}
-                isTop={isTop}
-                isEnd={isEnd}
-                parentTone={tone}
-                size={size}
-                animated={animated}
-                haptic={haptic}
-                glass={glass}
-                onSelect={handleActionSelect}
-                actionButtonStyle={actionButtonStyle}
-                labelStyle={labelStyle}
-              />
-            ))}
-          </View>
-        )}
-
-        {/* Primary FAB Trigger Button */}
-        <Pressable
-          onPress={toggleOpen}
-          accessibilityRole="button"
-          accessibilityLabel="Open speed dial menu"
-          style={[
-            styles.mainFab,
-            {
-              width: mainDimension,
-              height: mainDimension,
-              borderRadius: radii.full,
-              backgroundColor: mainColor,
-            },
-            mainButtonStyle,
-          ]}
-        >
-          <Animated.View style={mainRotateStyle}>
-            {isOpen && activeIcon ? (
-              renderIcon(activeIcon, colors.onPrimary, iconDimension)
-            ) : icon ? (
-              renderIcon(icon, colors.onPrimary, iconDimension)
-            ) : (
-              <Svg
-                width={iconDimension}
-                height={iconDimension}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke={colors.onPrimary}
-                strokeWidth={2.6}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <Line x1={12} y1={5} x2={12} y2={19} />
-                <Line x1={5} y1={12} x2={19} y2={12} />
-              </Svg>
-            )}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close speed dial"
+              style={styles.flexOne}
+              onPress={close}
+            />
           </Animated.View>
-        </Pressable>
-      </View>
+
+          <View
+            pointerEvents="box-none"
+            style={[
+              styles.container,
+              cornerPosition,
+              isEnd ? styles.alignEnd : styles.alignStart,
+              style,
+            ]}
+          >
+            {!isTop ? renderActionRows() : null}
+            {renderMainFab(true)}
+            {isTop ? renderActionRows() : null}
+          </View>
+        </Portal>
+      ) : null}
     </>
   );
-}
+});
 
 const styles = StyleSheet.create({
+  flexOne: {
+    flex: 1,
+  },
   container: {
-    zIndex: 9999,
-  },
-  containerTop: {
-    flexDirection: "column",
-  },
-  containerBottom: {
-    flexDirection: "column-reverse",
+    position: "absolute",
+    zIndex: 20,
   },
   alignEnd: {
     alignItems: "flex-end",
@@ -474,13 +590,13 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   actionsWrapper: {
-    gap: 12,
+    width: "100%",
   },
   actionsWrapperBottom: {
-    marginBottom: 14,
+    marginBottom: 12,
   },
   actionsWrapperTop: {
-    marginTop: 14,
+    marginTop: 12,
   },
   actionRow: {
     flexDirection: "row",
@@ -496,31 +612,10 @@ const styles = StyleSheet.create({
   actionButton: {
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.16,
-    shadowRadius: 4,
-    elevation: 4,
   },
-  labelContainer: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-    elevation: 2,
-  },
+  labelContainer: {},
   mainFab: {
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.22,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  backdrop: {
-    flex: 1,
   },
 });

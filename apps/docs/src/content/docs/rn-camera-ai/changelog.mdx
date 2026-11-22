@@ -1,0 +1,105 @@
+---
+title: Changelog
+sidebar:
+  order: 99
+description: Release notes and version history for @masumdev/rn-camera-ai, @masumdev/rn-camera-ai-tflite, and @masumdev/rn-camera-ai-mlkit.
+---
+
+import ChangelogTimeline from '@/components/ChangelogTimeline.astro';
+
+export const releases = [
+  {
+    version: 'v0.3.0',
+    date: '2026-11-22',
+    tag: 'Latest Release',
+    isLatest: true,
+    changes: [
+      {
+        type: 'fix',
+        text: 'Added <code>avoidLabelOverlap</code> collision suppression to <code>&lt;DetectionOverlay /&gt;</code>, configurable <code>photoResolution</code>/<code>photoQualityPrioritization</code> props on <code>&lt;CameraAI /&gt;</code>, and auto-fit paper zoom, clean highlights, tap-to-inspect line banners, and a full-text reader overlay in <code>/ocr-scanner</code> so distant document scans remain crisp and readable.',
+      },
+      {
+        type: 'fix',
+        text: 'Hardened YUV document boundary detector (<code>analyzeFrameDocumentWorklet</code>) with 3-point median cell sampling, near-black mount exclusion, strict 4-connected flood-fill, and conditional morphological opening so top corners lock cleanly onto tilted sheets without leaking across mattress seams or tiles.',
+      },
+      {
+        type: 'fix',
+        text: 'Migrated Reanimated 4 dynamic constants inside <code>&lt;DocumentGuideOverlay /&gt;</code> and <code>&lt;ScannerAnimationOverlay /&gt;</code> to synced <code>SharedValue</code>s, eliminating all native <code>useAnimatedStyle</code> dependency-array warnings.',
+      },
+    ],
+  },
+  {
+    version: 'v0.2.0',
+    date: '2026-11-22',
+    tag: 'Feature Release',
+    isLatest: false,
+    changes: [
+      {
+        type: 'feat',
+        text: 'Added 468-point 3D Face Mesh decoding and wireframe rendering (anatomical contours, eyebrows, eyes, lips, jawline, and triangle tesselation web) using MediaPipe <code>face_landmark.tflite</code>.',
+      },
+      {
+        type: 'feat',
+        text: 'Added MobileFaceNet 112×112 biometric face recognition with 192-dimensional embeddings, L2-normalization, and real-time Cosine Similarity identity matching.',
+      },
+      {
+        type: 'feat',
+        text: 'Implemented 1-tap on-device face enrollment (<code>enrollLastDetectedFace</code>, <code>enrollFace</code>, <code>removeEnrolledFace</code>, <code>getEnrolledFaces</code>).',
+      },
+      {
+        type: 'feat',
+        text: 'Published new <code>@masumdev/rn-camera-ai-mlkit</code> Google ML Kit v2 OCR adapter (<code>createMLKitTextRecognizer</code>, <code>parseMLKitTextResult</code>, <code>evaluateDocumentFraming</code>, <code>recognizeTextFromUri</code>, <code>classifyOcrEntity</code>) and single-capture Smart Document Scanner (<code>/ocr-scanner</code>).',
+      },
+      {
+        type: 'feat',
+        text: 'Added paper-fitting 4-point quad <code>&lt;DocumentGuideOverlay /&gt;</code> (with seeded YUV flood-fill paper detector <code>createDocumentAlignmentProcessor</code> and independent skewed corners <code>DocumentQuad</code>) plus capture-triggered Reanimated 4 <code>&lt;ScannerAnimationOverlay /&gt;</code> with <code>ReduceMotion.System</code> support, full UI theme presets, and headless custom slot renderers (<code>renderDocumentGuide</code>, <code>renderDocumentCorner</code>, <code>renderDocumentStatus</code>, <code>renderLaser</code>).',
+      },
+      {
+        type: 'feat',
+        text: 'Added Hybrid Active + Passive Face Liveness &amp; Anti-Spoofing engine (<code>computeFaceLivenessMetrics</code>, <code>FaceLivenessMetrics</code>): Eye Aspect Ratio (EAR) blink detection, Mouth Aspect Ratio (MAR) &amp; smile detection, 3D Head Pose (Yaw/Pitch/Roll), 3D Z-depth relief verification, anti-Moiré/glare texture analysis, and 4-step e-KYC challenge screen (<code>/liveness-detection</code>).',
+      },
+      {
+        type: 'perf',
+        text: 'Architected <code>projectDetectionsWorklet</code>: 100% of screen coordinate projections, aspect ratio letterboxing, and 178-mesh-line trigonometry (<code>Math.atan2</code>, <code>Math.sqrt</code>) now execute on the Camera Worklet Thread with 0% JS-thread overhead and zero Reanimated mapper queue lag.',
+      },
+      {
+        type: 'feat',
+        text: 'Full UI Customization: added declarative <code>overlayTheme</code> with <code>boxVariant</code> (<code>solid</code>, <code>corners</code> scanner brackets, <code>dashed</code>), <code>labelPosition</code>, and custom slot renderers (<code>renderBox</code>, <code>renderLabel</code>, <code>renderLandmarkDot</code>).',
+      },
+      {
+        type: 'feat',
+        text: 'Introduced <code>apps/expo-native</code> Expo development build playground with Feature Menu Hub, Object Detection, and Face Recognition testing screens.',
+      },
+    ],
+  },
+  {
+    version: 'v0.1.0',
+    date: '2026-11-21',
+    tag: 'Initial Beta',
+    isLatest: false,
+    changes: [
+      {
+        type: 'feat',
+        text: 'Migrated <code>CameraAI</code> to React Native Vision Camera v5 Nitro (<code>useFrameOutput</code>, <code>outputs</code>, <code>constraints</code>, and automatic <code>frame.dispose()</code>).',
+      },
+      {
+        type: 'feat',
+        text: 'Adopted <code>react-native-worklets</code> and <code>react-native-vision-camera-worklets</code> with 3-tier processor dispatch (<code>processFrameWorklet</code>, worklet <code>processFrame</code>, and <code>scheduleOnRN</code> fallback).',
+      },
+      {
+        type: 'feat',
+        text: 'Added Vision Camera v5 <code>HybridFrameConverter</code> + <code>react-native-nitro-image</code> preprocessing with RGB uint8 conversion and deterministic intermediate image disposal.',
+      },
+      {
+        type: 'feat',
+        text: 'Updated <code>parseDetectionOutputs</code> for <code>react-native-fast-tflite</code> v3 <code>ArrayBuffer</code> tensor outputs and strict <code>confidenceThreshold &gt; 1</code> / <code>Infinity</code> rejection.',
+      },
+      {
+        type: 'feat',
+        text: 'Published initial core preview, <code>DetectionOverlay</code>, normalized math engine, and 4-tensor TFLite adapter.',
+      },
+    ],
+  },
+];
+
+<ChangelogTimeline releases={releases} />

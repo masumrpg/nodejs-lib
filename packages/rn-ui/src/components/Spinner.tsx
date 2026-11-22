@@ -1,7 +1,9 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  AppState,
   StyleSheet,
   View,
+  type AppStateStatus,
   type StyleProp,
   type TextStyle,
   type ViewProps,
@@ -12,6 +14,7 @@ import Animated, {
   Easing,
   interpolate,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -21,18 +24,27 @@ import Svg, { Circle } from "react-native-svg";
 
 import { useTheme } from "../theme";
 import { Text } from "./Text";
-import type { ComponentTone, ToneProps } from "./types";
+import {
+  resolveToneColors,
+  type BaseAnimatedProps,
+  type ComponentSize,
+  type ComponentTone,
+  type SizeProps,
+  type ToneProps,
+  type VariantProps,
+} from "./types";
 
 export type SpinnerVariant = "circular" | "dots" | "bars" | "ring";
-export type SpinnerSize = "xs" | "sm" | "default" | "lg" | "xl" | number;
+export type SpinnerSize = ComponentSize | number;
 export type SpinnerSpeed = "slow" | "normal" | "fast" | number;
 export type SpinnerLabelPlacement = "bottom" | "right" | "top" | "left";
 
-export interface SpinnerProps extends ViewProps, ToneProps<ComponentTone> {
-  /** Visual spinner animation structure. Defaults to "circular" */
-  variant?: SpinnerVariant;
-  /** Size scale or custom numeric pixel dimension. Defaults to "default" (32px) */
-  size?: SpinnerSize;
+export interface SpinnerProps
+  extends ViewProps,
+    VariantProps<SpinnerVariant>,
+    ToneProps<ComponentTone>,
+    SizeProps<SpinnerSize>,
+    BaseAnimatedProps {
   /** Custom stroke width for circular/ring variants. Calculated automatically if omitted. */
   strokeWidth?: number;
   /** Rotation/pulse animation speed. Defaults to "normal" */
@@ -47,20 +59,20 @@ export interface SpinnerProps extends ViewProps, ToneProps<ComponentTone> {
   trackColor?: string;
   /** Direct color override, superseding tone */
   color?: string;
-  /** Whether the loading animation is actively running. Defaults to true */
-  animated?: boolean;
 }
 
-const SIZE_MAP: Record<Exclude<SpinnerSize, number>, number> = {
+const SIZE_MAP: Record<ComponentSize, number> = {
   xs: 16,
   sm: 22,
-  default: 32,
+  md: 32,
   lg: 44,
   xl: 58,
 };
 
 function resolveDuration(speed: SpinnerSpeed): number {
-  if (typeof speed === "number" && Number.isFinite(speed) && speed > 0) return speed;
+  if (typeof speed === "number" && Number.isFinite(speed) && speed > 0) {
+    return speed;
+  }
   switch (speed) {
     case "fast":
       return 550;
@@ -74,13 +86,17 @@ function resolveDuration(speed: SpinnerSpeed): number {
 
 function resolveDimension(size: SpinnerSize): number {
   if (typeof size === "number") {
-    return Number.isFinite(size) && size > 0 ? size : 32;
+    return Number.isFinite(size) && size > 0 ? size : SIZE_MAP.md;
   }
-  return SIZE_MAP[size] ?? 32;
+  return SIZE_MAP[size] ?? SIZE_MAP.md;
 }
 
 function resolveStrokeWidth(dimension: number, customWidth?: number): number {
-  if (typeof customWidth === "number" && Number.isFinite(customWidth) && customWidth > 0) {
+  if (
+    typeof customWidth === "number" &&
+    Number.isFinite(customWidth) &&
+    customWidth > 0
+  ) {
     return Math.min(customWidth, dimension / 2.5);
   }
   if (dimension <= 18) return 2;
@@ -90,10 +106,6 @@ function resolveStrokeWidth(dimension: number, customWidth?: number): number {
   return 5;
 }
 
-/**
- * Worklet helper to calculate safe, positive rotation degrees strictly in the range [0, 360).
- * Prevents invalid double negatives (e.g. "--10deg") or "NaNdeg" that cause fatal native crashes.
- */
 function toSafeDeg(val: number, multiplier = 1): string {
   "worklet";
   if (!Number.isFinite(val)) return "0deg";
@@ -101,10 +113,6 @@ function toSafeDeg(val: number, multiplier = 1): string {
   const normalized = (raw + 360) % 360;
   return `${normalized.toFixed(1)}deg`;
 }
-
-// ---------------------------------------------------------------------------
-// Standalone Memoized Items for Dots & Bars (Resolves Hook Rule Violation)
-// ---------------------------------------------------------------------------
 
 interface DotItemProps {
   pulse: SharedValue<number>;
@@ -122,7 +130,7 @@ const DotItem = React.memo(function DotItem({
   const dotStyle = useAnimatedStyle(() => {
     const p = Number.isFinite(pulse.value) ? pulse.value : 0;
     const phase = (p + offset) % 1;
-    const scale = interpolate(phase, [0, 0.5, 1], [0.4, 1.15, 0.4]);
+    const scale = interpolate(phase, [0, 0.5, 1], [0.45, 1.1, 0.45]);
     const opacity = interpolate(phase, [0, 0.5, 1], [0.35, 1, 0.35]);
     return {
       transform: [{ scale: Number.isFinite(scale) ? scale : 1 }],
@@ -163,7 +171,7 @@ const BarItem = React.memo(function BarItem({
   const barStyle = useAnimatedStyle(() => {
     const p = Number.isFinite(pulse.value) ? pulse.value : 0;
     const phase = (p + offset) % 1;
-    const scaleY = interpolate(phase, [0, 0.5, 1], [0.28, 1, 0.28]);
+    const scaleY = interpolate(phase, [0, 0.5, 1], [0.3, 1, 0.3]);
     const opacity = interpolate(phase, [0, 0.5, 1], [0.4, 1, 0.4]);
     return {
       transform: [{ scaleY: Number.isFinite(scaleY) ? scaleY : 1 }],
@@ -186,14 +194,10 @@ const BarItem = React.memo(function BarItem({
   );
 });
 
-// ---------------------------------------------------------------------------
-// Main Component
-// ---------------------------------------------------------------------------
-
 function SpinnerComponent({
   variant = "circular",
   tone = "primary",
-  size = "default",
+  size = "md",
   strokeWidth: customStrokeWidth,
   speed = "normal",
   label,
@@ -206,38 +210,40 @@ function SpinnerComponent({
   ...props
 }: SpinnerProps) {
   const { colors, spacing } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const [appActive, setAppActive] = useState(
+    AppState.currentState === "active",
+  );
 
-  // Resolve active theme color
-  const toneColor =
-    customColor ||
-    (tone === "success"
-      ? colors.success
-      : tone === "warning"
-      ? colors.warning
-      : tone === "danger"
-      ? colors.danger
-      : tone === "accent"
-      ? colors.accent
-      : tone === "secondary"
-      ? colors.secondary
-      : tone === "info"
-      ? colors.info
-      : colors.primary);
+  useEffect(() => {
+    const subscription = AppState.addEventListener(
+      "change",
+      (next: AppStateStatus) => {
+        setAppActive(next === "active");
+      },
+    );
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
+  const toneColor = customColor || resolveToneColors(tone, colors).solid;
   const dimension = Math.max(8, resolveDimension(size));
-  const strokeWidth = Math.max(1, resolveStrokeWidth(dimension, customStrokeWidth));
+  const strokeWidth = Math.max(
+    1,
+    resolveStrokeWidth(dimension, customStrokeWidth),
+  );
   const duration = resolveDuration(speed);
 
-  // Selective animation requirement flags
+  const shouldAnimate = animated && !reducedMotion && appActive;
   const needsRotation = variant === "circular" || variant === "ring";
   const needsPulse = variant === "dots" || variant === "bars";
 
-  // Animation drivers
   const rotation = useSharedValue(0);
   const pulse = useSharedValue(0);
 
   useEffect(() => {
-    if (!animated) {
+    if (!shouldAnimate) {
       cancelAnimation(rotation);
       cancelAnimation(pulse);
       rotation.value = 0;
@@ -265,10 +271,10 @@ function SpinnerComponent({
       pulse.value = withRepeat(
         withTiming(1, {
           duration: Math.round(duration * 1.2),
-          easing: Easing.inOut(Easing.ease),
+          easing: Easing.linear,
         }),
         -1,
-        true,
+        false,
       );
     } else {
       cancelAnimation(pulse);
@@ -279,25 +285,23 @@ function SpinnerComponent({
       cancelAnimation(rotation);
       cancelAnimation(pulse);
     };
-  }, [animated, duration, needsPulse, needsRotation, pulse, rotation]);
+  }, [duration, needsPulse, needsRotation, pulse, rotation, shouldAnimate]);
 
-  // Animated styles with crash-proof safe degrees
   const spinStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: toSafeDeg(rotation.value, 1) }],
   }));
 
+  // Integer multiplier (-2x) ensures seamless wrap at 360deg without jump
   const counterSpinStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: toSafeDeg(rotation.value, -1.3) }],
+    transform: [{ rotate: toSafeDeg(rotation.value, -2) }],
   }));
 
-  // Calculations for circular arc with defensive bounds
   const radius = Math.max(1, (dimension - strokeWidth) / 2);
   const circumference = 2 * Math.PI * radius;
   const arcLength = circumference * 0.72;
-  const strokeDashoffset = Math.max(0, circumference - arcLength);
+  const gapLength = Math.max(0.01, circumference - arcLength);
   const backgroundTrackColor = trackColor || colors.backgroundSubtle;
 
-  // Render core loader based on variant
   const renderLoader = () => {
     switch (variant) {
       case "ring": {
@@ -308,14 +312,11 @@ function SpinnerComponent({
 
         return (
           <View
-            style={{
-              width: dimension,
-              height: dimension,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+            style={[
+              styles.ringContainer,
+              { width: dimension, height: dimension },
+            ]}
           >
-            {/* Outer Ring */}
             <Animated.View style={[StyleSheet.absoluteFill, spinStyle]}>
               <Svg width={dimension} height={dimension}>
                 <Circle
@@ -339,7 +340,6 @@ function SpinnerComponent({
               </Svg>
             </Animated.View>
 
-            {/* Inner Ring (Reverse Direction) */}
             <Animated.View style={counterSpinStyle}>
               <Svg width={innerDimension} height={innerDimension}>
                 <Circle
@@ -360,11 +360,11 @@ function SpinnerComponent({
       }
 
       case "dots": {
-        const dotSize = Math.max(4, Math.round(dimension * 0.24));
-        const gap = Math.max(3, Math.round(dotSize * 0.6));
+        const dotSize = Math.max(3, Math.floor(dimension * 0.22));
+        const gap = Math.max(2, Math.floor((dimension - dotSize * 3) / 2));
 
         return (
-          <View style={{ flexDirection: "row", alignItems: "center", gap }}>
+          <View style={[styles.rowCenter, { gap, height: dimension }]}>
             {[0, 0.33, 0.66].map((offset, idx) => (
               <DotItem
                 key={idx}
@@ -379,19 +379,13 @@ function SpinnerComponent({
       }
 
       case "bars": {
-        const barWidth = Math.max(2.5, Math.round(dimension * 0.16));
+        const barWidth = Math.max(2, Math.floor(dimension * 0.14));
         const barMaxHeight = dimension;
-        const gap = Math.max(2.5, Math.round(barWidth * 0.8));
+        const gap = Math.max(2, Math.floor((dimension - barWidth * 4) / 3));
 
         return (
           <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              height: barMaxHeight,
-              gap,
-            }}
+            style={[styles.rowCenter, { height: barMaxHeight, gap }]}
           >
             {[0, 0.25, 0.5, 0.75].map((offset, idx) => (
               <BarItem
@@ -411,16 +405,9 @@ function SpinnerComponent({
       default:
         return (
           <Animated.View
-            style={[
-              {
-                width: dimension,
-                height: dimension,
-              },
-              spinStyle,
-            ]}
+            style={[{ width: dimension, height: dimension }, spinStyle]}
           >
             <Svg width={dimension} height={dimension}>
-              {/* Background Track */}
               <Circle
                 cx={dimension / 2}
                 cy={dimension / 2}
@@ -429,15 +416,14 @@ function SpinnerComponent({
                 strokeWidth={strokeWidth}
                 fill="none"
               />
-              {/* Animated Progress Arc */}
               <Circle
                 cx={dimension / 2}
                 cy={dimension / 2}
                 r={radius}
                 stroke={toneColor}
                 strokeWidth={strokeWidth}
-                strokeDasharray={`${arcLength} ${circumference}`}
-                strokeDashoffset={strokeDashoffset}
+                strokeDasharray={`${arcLength} ${gapLength}`}
+                strokeDashoffset={0}
                 strokeLinecap="round"
                 fill="none"
               />
@@ -447,12 +433,17 @@ function SpinnerComponent({
     }
   };
 
-  // Layout orientation with optional label
   const isRowLayout = labelPlacement === "left" || labelPlacement === "right";
   const isReverse = labelPlacement === "top" || labelPlacement === "left";
 
   const containerStyle: ViewStyle = {
-    flexDirection: isRowLayout ? (isReverse ? "row-reverse" : "row") : (isReverse ? "column-reverse" : "column"),
+    flexDirection: isRowLayout
+      ? isReverse
+        ? "row-reverse"
+        : "row"
+      : isReverse
+        ? "column-reverse"
+        : "column",
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.sm,
@@ -462,6 +453,8 @@ function SpinnerComponent({
     <View
       accessibilityRole="progressbar"
       accessibilityLabel={label || "Loading"}
+      accessibilityState={{ busy: animated }}
+      accessibilityLiveRegion="polite"
       style={[containerStyle, style]}
       {...props}
     >
@@ -470,7 +463,8 @@ function SpinnerComponent({
         <Text
           variant="labelSmall"
           color="textMuted"
-          style={labelStyle}
+          numberOfLines={2}
+          style={[styles.labelText, labelStyle]}
         >
           {label}
         </Text>
@@ -480,4 +474,18 @@ function SpinnerComponent({
 }
 
 export const Spinner = React.memo(SpinnerComponent);
-export const Loader = Spinner;
+
+const styles = StyleSheet.create({
+  ringContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rowCenter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  labelText: {
+    flexShrink: 1,
+  },
+});

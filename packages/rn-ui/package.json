@@ -1,6 +1,6 @@
 {
   "name": "@masumdev/rn-ui",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "A reusable React Native UI kit with typed theme tokens, light/dark mode, and composable core components.",
   "main": "lib/commonjs/index.js",
   "module": "lib/module/index.js",
@@ -25,6 +25,8 @@
   "scripts": {
     "build": "bob build",
     "clean": "rm -rf lib",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage",
     "prepublishOnly": "bun run build"
   },
   "keywords": [
@@ -56,7 +58,7 @@
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
-    "react": ">=16",
+    "react": ">=18",
     "react-native": "*",
     "react-native-calendars": "*",
     "react-native-gesture-handler": "*",

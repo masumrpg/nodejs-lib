@@ -1,0 +1,190 @@
+---
+title: Face Recognition, 468 Mesh & Liveness (e-KYC)
+sidebar:
+  label: Face Mesh & Liveness (e-KYC)
+  order: 5
+description: Complete technical guide for the 3-model cooperative Face Recognition pipeline, 468-point 3D Face Mesh wireframe rendering, and Hybrid Active + Passive Face Liveness / Anti-Spoofing (e-KYC).
+---
+
+import { Tabs, TabItem, Card, CardGrid, Badge } from '@astrojs/starlight/components';
+
+`@masumdev/rn-camera-ai` and `@masumdev/rn-camera-ai-tflite` provide a production-ready, zero-JS-thread facial biometrics and anti-spoofing stack designed for **e-KYC**, **attendance terminals**, **identity verification**, and **AR facial analysis**.
+
+---
+
+## 1. Cooperative 3+1 Neural Pipeline
+
+All models execute synchronously inside the background **VisionCamera v5 Worklet Thread** using `react-native-fast-tflite` (Nitro C++) with GPU delegate acceleration:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    Camera Frame (VisionCamera v5)                       │
+│             enablePhysicalBufferRotation: true (Upright RGB)            │
+└───────────────────────────────────┬─────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. MediaPipe BlazeFace Full-Range (192×192, 2,304 Anchors)              │
+│    • High-recall face detection + initial 6 facial keypoints            │
+│    • Expands tight face ROI by 1.28× for 3D landmark regression         │
+└─────────────────┬─────────────────────────────────────┬─────────────────┘
+                  │                                     │
+                  ▼                                     ▼
+┌─────────────────────────────────────┐ ┌─────────────────────────────────┐
+│ 2. MediaPipe FaceMesh (192×192)     │ │ 3. MobileFaceNet (112×112)      │
+│    • Regresses 468 3D vertices      │ │    • 192-D biometric embedding  │
+│      (x, y, z) in [1, 1, 1, 1404]   │ │    • L2 unit-norm normalization │
+│    • Computes anatomical tightBox   │ │    • Cosine Similarity matching │
+└─────────────────┬───────────────────┘ └─────────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 4. Hybrid Active + Passive Liveness Engine (computeFaceLivenessMetrics) │
+│    • Active: Eye Aspect Ratio (EAR), Mouth/Smile (MAR), 3D Head Pose    │
+│    • Passive: 3D Z-Depth Relief + Anti-Moiré Texture + Optional FASNet  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. Initializing `createTFLiteFaceRecognizer`
+
+```tsx
+import {
+  createTFLiteFaceRecognizer,
+  type TFLiteFaceRecognizer,
+} from '@masumdev/rn-camera-ai-tflite';
+
+const recognizer = await createTFLiteFaceRecognizer({
+  // 1. Face Detector (BlazeFace Full-Range 192x192)
+  model: require('./assets/models/face_detection_full_range.tflite'),
+  // 2. 468-Point 3D Face Mesh (192x192 -> 1,404 floats = 468 x [x, y, z])
+  faceMeshModel: require('./assets/models/face_landmark.tflite'),
+  // 3. MobileFaceNet Biometric Embedder (112x112 -> 192-D embedding)
+  embeddingModel: require('./assets/models/mobilefacenet.tflite'),
+  // 4. Optional Dedicated Passive Anti-Spoofing Model (e.g. MiniFASNet 80x80)
+  // antiSpoofModel: require('./assets/models/fasnet.tflite'),
+
+  inputWidth: 192,
+  inputHeight: 192,
+  confidenceThreshold: 0.55,
+  similarityThreshold: 0.65,
+  enableLiveness: true,
+  livenessThreshold: 0.62,
+  iouThreshold: 0.30,
+  maxResults: 5,
+  targetFps: 24,
+  useGpu: true,
+});
+```
+
+---
+
+## 3. 468-Point 3D Face Mesh Rendering & Customization
+
+When `faceMeshModel` is provided, each `DetectionResult` contains `landmarks` with **468 normalized 3D vertices** (`{ x, y, z }`).
+
+`projectDetectionsWorklet` projects all 468 vertices, **178 anatomical contour & tesselation segments**, and **90 vertex dots** directly on the **Camera Worklet Thread** (`0%` JS thread math overhead):
+
+### Anatomical Mesh Groups
+
+| Group | Vertex Count / Segments | Default Color | Config Property |
+| :--- | :--- | :--- | :--- |
+| **Face Oval (Jawline & Forehead)** | 36 closed contour segments | `rgba(56, 189, 248, 0.75)` | `meshStyle.faceOvalColor` |
+| **Left & Right Eyes** | 32 closed eyelid segments | `#22d3ee` | `meshStyle.eyeContourColor` |
+| **Left & Right Eyebrows** | 16 upper/lower brow segments | `rgba(125, 211, 252, 0.85)` | `meshStyle.eyebrowContourColor` |
+| **Outer & Inner Lips** | 40 closed lip contour segments | `#34d399` / `#6ee7b7` | `meshStyle.lipOuterContourColor` / `lipInnerContourColor` |
+| **Nose Bridge & Tip** | 11 nasal contour segments | `#38bdf8` | `meshStyle.noseContourColor` |
+| **Interior Triangle Tesselation** | 43 cheek/forehead triangle edges | `rgba(56, 189, 248, 0.42)` | `meshStyle.tesselationColor` |
+
+### Switching Between 4 Mesh Display Modes
+
+```tsx
+<CameraAI
+  processor={recognizer}
+  cameraPosition="front"
+  showLandmarks={meshMode !== 'off'}
+  overlayTheme={{
+    showBoxes: boxMode !== 'none',
+    boxVariant: boxMode === 'solid' ? 'solid' : 'corners',
+    boxColor: '#3da441',
+    unrecognizedBoxColor: '#38bdf8',
+    cornerLength: 24,
+    cornerThickness: 3,
+    meshStyle: {
+      // 1. 'full': Contours + Tesselation + Dots
+      // 2. 'contours': Anatomical contours only
+      // 3. 'dots': Vertex dots only
+      showMeshLines: meshMode === 'full' || meshMode === 'contours',
+      showTesselation: meshMode === 'full',
+      showDots: meshMode === 'full' || meshMode === 'dots',
+      lineThickness: 1.0,
+    },
+  }}
+/>
+```
+
+---
+
+## 4. Hybrid Face Liveness & Anti-Spoofing (`FaceLivenessMetrics`)
+
+Every detected face includes `detection.liveness` (`FaceLivenessMetrics`), combining **Active Geometric Liveness** and **Passive Anti-Spoofing**:
+
+### `FaceLivenessMetrics` Contract
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `isLive` | `boolean` | `true` when `passiveScore >= livenessThreshold`. |
+| `passiveScore` | `number` | Combined passive anti-spoofing confidence in `[0, 1]`. |
+| `spoofRisk` | `'low' \| 'medium' \| 'high'` | Spoof risk classification (`low` when live, `high` on flat/screen artifacts). |
+| `depthReliefScore` | `number` | 3D $Z$-depth protrusion score comparing nose tip (`#1, #4`) against cheek (`#234, #454`) and eye (`#33, #263`) planes. |
+| `textureScore` | `number` | RGB surface texture naturalness score penalizing specular screen glare and LCD/OLED Moiré subpixel oscillations. |
+| `eyeAspectRatio` | `number` | Average Eye Aspect Ratio (EAR) across both eyes (`~0.28` open, `< 0.195` closed/blinking). |
+| `leftEyeEAR` | `number` | Left eye openness ratio (`#33, #160, #158, #133, #153, #144`). |
+| `rightEyeEAR` | `number` | Right eye openness ratio (`#362, #385, #387, #263, #373, #380`). |
+| `isBlinking` | `boolean` | `true` when `eyeAspectRatio < 0.195`. |
+| `mouthAspectRatio` | `number` | Inner vertical mouth opening ratio (`#13..#14` vs `#78..#308`). |
+| `isMouthOpen` | `boolean` | `true` when `mouthAspectRatio >= 0.30`. |
+| `smileRatio` | `number` | Outer lip width & corner lift ratio relative to jaw width (`#61..#291` vs `#234..#454`). |
+| `isSmiling` | `boolean` | `true` when `smileRatio >= 0.44`. |
+| `yawDeg` | `number` | Horizontal 3D head turn angle in degrees (`-45°` right to `+45°` left). |
+| `pitchDeg` | `number` | Vertical 3D head nod angle in degrees (`-35°` down to `+35°` up). |
+| `rollDeg` | `number` | Head tilt angle in degrees. |
+| `headDirection` | `'center' \| 'left' \| 'right' \| 'up' \| 'down'` | Semantic 3D head pose direction. |
+
+---
+
+## 5. Building a 4-Step e-KYC Liveness Challenge Wizard
+
+Below is the complete pattern used in `apps/expo-native/app/liveness-detection.tsx` to verify a live human user through a 4-stage interactive challenge:
+
+```tsx
+const handleDetections = useCallback(
+  (results: DetectionResult[]) => {
+    const face = results[0];
+    const lv = face?.liveness;
+    if (!lv || challengeCompleted) return;
+
+    // Step 0: Passive 3D Check + Look Straight
+    if (stepIndex === 0 && lv.isLive && lv.headDirection === 'center') {
+      setStepIndex(1);
+    }
+    // Step 1: Blink Both Eyes
+    else if (stepIndex === 1 && lv.isBlinking) {
+      setStepIndex(2);
+    }
+    // Step 2: Turn Head Left or Right
+    else if (
+      stepIndex === 2 &&
+      (lv.headDirection === 'left' || lv.headDirection === 'right')
+    ) {
+      setStepIndex(3);
+    }
+    // Step 3: Open Mouth or Smile
+    else if (stepIndex === 3 && (lv.isMouthOpen || lv.isSmiling)) {
+      setChallengeCompleted(true);
+    }
+  },
+  [stepIndex, challengeCompleted]
+);
+```

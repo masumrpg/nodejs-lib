@@ -25,7 +25,7 @@ export const QRLogo = ({ logo, size, matrix }: QRLogoProps) => {
   // Resolve asset source if needed
   const resolvedSource =
     typeof source === "number"
-      ? RNImage.resolveAssetSource(source).uri
+      ? RNImage.resolveAssetSource(source)?.uri ?? ""
       : source;
 
   const logoSize = Math.min(size * logoSizePercentage, size * 0.3);

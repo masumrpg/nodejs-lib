@@ -9,10 +9,38 @@ import ChangelogTimeline from '@/components/ChangelogTimeline.astro';
 
 export const releases = [
   {
+    version: 'v0.7.0',
+    date: '2026-11-22',
+    tag: 'Design System & Stability Release',
+    isLatest: true,
+    changes: [
+      {
+        type: 'feat',
+        text: '<strong>Multi-Theme Preset Engine & Hard/Minimal Styles</strong>: Added reactive <code>presets</code> / <code>setThemeName()</code> / <code>setElevation()</code> / <code>toggleElevation()</code> in <code>ThemeProvider</code>, auto-derived soft & contrast tokens in <code>createTheme()</code>, <code>createHardShadows()</code> with RN <code>boxShadow</code>, <code>components.surface</code>, and 3 built-in Light/Dark presets: <code>defaultThemePreset</code>, <code>minimalThemePreset</code> (HeroUI borderless), and <code>neoBrutalismThemePreset</code> (Neo-Brutalism).',
+      },
+      {
+        type: 'feat',
+        text: '<strong>Flexible Thin Shadows & Portal Layering</strong>: Added global <code>elevation?: boolean</code> toggle (default <code>true</code> for <code>subtleShadows</code>, <code>false</code> for <code>flatShadows</code>) across <code>ThemeProvider</code> and <code>createTheme()</code>, plus built-in <code>PortalProvider</code> / <code>PortalHost</code> overlay layering and semantic <code>glassSurface</code> / <code>glassBorder</code> tokens.',
+      },
+      {
+        type: 'refactor',
+        text: '<strong>Canonical Breaking API Cleanup</strong>: Standardized <code>Size</code> from <code>default</code> to <code>md</code>, aligned <code>Badge</code> (<code>filled | outline | soft | ghost</code>), <code>Alert</code> (<code>filled | soft | outline | accent</code> + <code>glass</code>), <code>Accordion</code> (<code>outline | flat | ghost</code> + <code>glass</code>), <code>Toast</code> (<code>outline</code>), <code>Switch</code> (<code>shape="pill | oval | rounded"</code>), and orthogonal <code>Bubble</code> <code>tone</code> + <code>variant</code>, while removing legacy aliases (<code>Loader</code>, <code>Tag</code>, <code>FormMessage</code>, <code>TimePickerDialog</code>).',
+      },
+      {
+        type: 'a11y',
+        text: '<strong>WCAG AA Palette Calibration</strong>: Recalibrated Light and Dark theme palettes for >= 4.5:1 text contrast, fixed custom <code>fontWeight</code> preservation in <code>Text</code>, and eliminated raw warning/close emoji fallbacks in favor of theme-colored SVG icons.',
+      },
+      {
+        type: 'perf',
+        text: '<strong>Zero-Bounce Timing & Overlay Fixes</strong>: Replaced all remaining <code>withSpring</code> animations with zero-bounce <code>withTiming</code> cubic curves and <code>useReducedMotion()</code>, introduced shared <code>useAnchorPosition</code> viewport clamping, fixed compound context bridging through <code>Portal</code>, and added <code>bun:test</code> coverage across 5 suites.',
+      },
+    ],
+  },
+  {
     version: 'v0.6.0',
     date: '2026-11-15',
     tag: 'Feature Release',
-    isLatest: true,
+    isLatest: false,
     changes: [
       {
         type: 'feat',

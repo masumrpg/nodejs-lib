@@ -15,7 +15,7 @@ This workspace is a **Turborepo** monorepo using **Bun** workspaces for high-per
 │   ├── rn-tajweed-verse/      # Tajweed Quranic verse parser & renderer with interactive tooltips
 │   └── rn-qr-code/            # SVG QR code generator with custom eye shapes & presets
 ├── apps/
-│   ├── native/                # Interactive Expo playground app (iOS / Android / Web)
+│   ├── expo-go/               # Interactive Expo Go playground app (iOS / Android / Web)
 │   ├── cli/                   # CLI playgrounds and compilation testing
 │   └── docs/                  # Astro 5 + Starlight documentation portal (https://lib.masumdev.id)
 ├── scripts/                   # Workspace maintenance & audit scripts (e.g. audit-codebase.ts)

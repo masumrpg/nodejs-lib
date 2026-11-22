@@ -1,0 +1,24 @@
+import React from 'react';
+
+export interface {{pascalCase name}}Props {
+  title?: string;
+  className?: string;
+}
+
+export function {{pascalCase name}}({ title = 'Hello', className }: {{pascalCase name}}Props) {
+  return (
+    <div
+      className={className}
+      style=\{{
+        padding: '1rem',
+        borderRadius: '0.5rem',
+        border: '1px solid #e2e8f0',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <span>{title} from @masumdev/{{kebabCase name}}</span>
+    </div>
+  );
+}

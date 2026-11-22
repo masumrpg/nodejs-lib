@@ -1,6 +1,6 @@
 ---
 title: Switch
-description: Animated toggle switch with active/inactive track colors, zero-bounce sliding physics, and haptic feedback.
+description: Unified fluid oval toggle switch with inward press-stretch animation, zero-bounce timing physics, and haptic feedback.
 sidebar:
   badge:
     text: Updated
@@ -30,7 +30,7 @@ export function SwitchExample() {
   );
 }`;
 
-`Switch` toggles the state of a single setting on or off with smooth UI thread worklet translation, custom tone color tracks, round and oval variants, and haptic taps.
+`Switch` toggles the state of a single setting on or off with a single unified fluid oval silhouette, UI-thread inward press-stretch animation, `filled` / `outline` variants, optional `glass` surface, semantic tones, and haptic feedback.
 
 ## Usage
 
@@ -43,8 +43,8 @@ export function SwitchExample() {
     value: { type: 'boolean', description: 'Controlled active toggle state.' },
     defaultValue: { type: 'boolean', default: 'false', description: 'Initial uncontrolled toggle state.' },
     onValueChange: { type: '(value: boolean) => void', description: 'Callback on toggle state change.' },
-    size: { type: "'sm' | 'md' | 'lg'", default: "'md'", description: 'Preset track and thumb scale.' },
-    variant: { type: "'round' | 'oval'", default: "'round'", description: 'Track corner radius variant.' },
+    size: { type: "'xs' | 'sm' | 'md' | 'lg' | 'xl'", default: "'md'", description: 'Preset oval track and thumb scale.' },
+    variant: { type: "'filled' | 'outline'", default: "'filled'", description: 'Visual track treatment.' },
     tone: { type: 'ComponentTone', default: "'primary'", description: 'Active track color tone.' },
     disabled: { type: 'boolean', default: 'false', description: 'Disables user interaction and dims opacity.' },
     invalid: { type: 'boolean', default: 'false', description: 'Highlights error state with danger outline.' },
@@ -52,5 +52,9 @@ export function SwitchExample() {
     haptic: { type: 'boolean', default: 'true', description: 'Trigger haptic feedback on toggle.' },
     activeIcon: { type: 'RenderIcon', description: 'Optional icon rendered inside the thumb when checked.' },
     inactiveIcon: { type: 'RenderIcon', description: 'Optional icon rendered inside the thumb when unchecked.' },
+    thumbContent: { type: 'SwitchThumbContent', description: 'Custom static or render-prop content inside the oval thumb.' },
+    activeThumbContent: { type: 'SwitchThumbContent', description: 'Custom content inside the oval thumb when checked.' },
+    inactiveThumbContent: { type: 'SwitchThumbContent', description: 'Custom content inside the oval thumb when unchecked.' },
+    renderThumb: { type: '(params: SwitchRenderThumbParams) => React.ReactNode', description: 'Full custom renderer for thumb contents.' },
   }}
 />

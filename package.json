@@ -4,8 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "turbo run dev",
-    "dev:native": "turbo dev --filter='@masumdev/*' --filter=native",
+    "dev:expo-go": "turbo dev --filter='@masumdev/*' --filter=expo-go",
+    "dev:native": "turbo dev --filter='@masumdev/*' --filter=expo-go",
     "dev:docs": "turbo dev --filter=docs",
+    "gen": "bunx turbo gen",
+    "gen:package": "bunx turbo gen package",
     "gen:expo-package": "bunx turbo gen expo-package",
     "gen:cli-package": "bunx turbo gen cli-package",
     "build": "turbo run build",
@@ -21,6 +24,7 @@
   },
   "devDependencies": {
     "@turbo/gen": "^2.10.12",
+    "expo-dev-client": "~58.0.21",
     "prettier": "^3.9.6",
     "turbo": "^2.10.12"
   },

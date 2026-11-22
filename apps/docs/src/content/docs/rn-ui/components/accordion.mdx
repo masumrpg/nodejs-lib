@@ -1,13 +1,13 @@
 ---
 title: Accordion
-description: Expandable accordion panel sections with variants (outlined, flat, ghost, glass), Reanimated height scaling, and indicator rotation.
+description: Expandable accordion panel sections with variants (outline, flat, ghost), glassmorphism support, Reanimated timing transitions, and indicator rotation.
 ---
 
 import { Code } from '@astrojs/starlight/components';
 import TypeTable from '@/components/TypeTable.astro';
 
 export const exampleCode = `import React from 'react';
-import { Accordion, Box, Text } from '@masumdev/rn-ui';
+import { Accordion, Box } from '@masumdev/rn-ui';
 
 export function AccordionExample() {
   const items = [
@@ -25,11 +25,11 @@ export function AccordionExample() {
 
   return (
     <Box gap="lg">
-      {/* Outlined Variant */}
-      <Accordion items={items} variant="outlined" />
+      {/* Outline Variant */}
+      <Accordion items={items} variant="outline" />
 
-      {/* Glassmorphism Variant */}
-      <Accordion items={items} variant="glass" />
+      {/* Glassmorphism Surface */}
+      <Accordion items={items} variant="outline" glass />
 
       {/* Flat Borderless Variant */}
       <Accordion items={items} variant="flat" />
@@ -41,17 +41,18 @@ export function AccordionExample() {
 
 ## Usage
 
-<Code code={exampleCode} lang="tsx" title="AccordionExample.tsx" mark={['Accordion', 'variant="outlined"', 'variant="glass"', 'variant="flat"']} />
+<Code code={exampleCode} lang="tsx" title="AccordionExample.tsx" mark={['Accordion', 'variant="outline"', 'glass', 'variant="flat"']} />
 
 ## Props API
 
 <TypeTable
   type={{
     items: { type: 'AccordionItem[]', description: 'Array of accordion panel objects containing id, title, and content.' },
-    variant: { type: "'outlined' | 'flat' | 'ghost' | 'glass'", default: "'outlined'", description: 'Visual container style variant.' },
-    type: { type: "'single' | 'multiple'", default: "'single'", description: 'Determines whether one or multiple panels can be expanded at once.' },
-    value: { type: 'string | string[]', description: 'Controlled value array or string of open panel IDs.' },
-    defaultValue: { type: 'string | string[]', description: 'Uncontrolled initial open panel IDs.' },
-    onValueChange: { type: '(value: any) => void', description: 'Callback triggered when open panel selection changes.' },
+    variant: { type: "'outline' | 'flat' | 'ghost'", default: "'outline'", description: 'Visual container style variant.' },
+    glass: { type: 'boolean', default: 'false', description: 'Enables translucent glass surface background styling.' },
+    allowMultiple: { type: 'boolean', default: 'false', description: 'Determines whether multiple panels can remain expanded simultaneously.' },
+    openIds: { type: 'string[]', description: 'Controlled array of open panel IDs.' },
+    defaultOpenIds: { type: 'string[]', default: '[]', description: 'Uncontrolled initial open panel IDs.' },
+    onOpenChange: { type: '(openIds: string[]) => void', description: 'Callback triggered when open panel selection changes.' },
   }}
 />

@@ -1,0 +1,48 @@
+{
+  "cli": {
+    "version": ">= 24.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development",
+      "bun": "1.4.2",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug -PreactNativeArchitectures=arm64-v8a --max-workers=2"
+      },
+      "env": {
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a",
+        "CMAKE_BUILD_PARALLEL_LEVEL": "2",
+        "GRADLE_OPTS": "-Dorg.gradle.jvmargs=\"-Xmx3072m -XX:MaxMetaspaceSize=768m -XX:+HeapDumpOnOutOfMemoryError\" -Dorg.gradle.project.reactNativeArchitectures=arm64-v8a -Dorg.gradle.workers.max=2"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "bun": "1.4.2",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a",
+        "CMAKE_BUILD_PARALLEL_LEVEL": "2",
+        "GRADLE_OPTS": "-Dorg.gradle.jvmargs=\"-Xmx3072m -XX:MaxMetaspaceSize=768m -XX:+HeapDumpOnOutOfMemoryError\" -Dorg.gradle.project.reactNativeArchitectures=arm64-v8a -Dorg.gradle.workers.max=2"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "channel": "production",
+      "bun": "1.4.2",
+      "env": {
+        "CMAKE_BUILD_PARALLEL_LEVEL": "2",
+        "GRADLE_OPTS": "-Dorg.gradle.jvmargs=\"-Xmx3072m -XX:MaxMetaspaceSize=768m -XX:+HeapDumpOnOutOfMemoryError\" -Dorg.gradle.workers.max=2"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

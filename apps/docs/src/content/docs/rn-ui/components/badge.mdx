@@ -1,6 +1,6 @@
 ---
 title: Badge
-description: Status pill tag indicator with size options (sm, md, lg), 6 style variants, tones, icons, and glassmorphism.
+description: Status pill badge indicator with size options (sm, md, lg), 4 style variants, tones, icons, and glassmorphism.
 ---
 
 import { Code } from '@astrojs/starlight/components';
@@ -15,23 +15,22 @@ export function BadgeExample() {
     <Box gap="md">
       {/* Variants Showcase */}
       <Box row gap="sm">
-        <Badge tone="primary" variant="solid">Solid</Badge>
+        <Badge tone="primary" variant="filled">Filled</Badge>
         <Badge tone="primary" variant="soft">Soft</Badge>
         <Badge tone="primary" variant="outline">Outline</Badge>
-        <Badge tone="primary" variant="subtle">Subtle</Badge>
         <Badge tone="primary" variant="ghost">Ghost</Badge>
         <Badge tone="primary" glass>Glass</Badge>
       </Box>
 
       {/* Tones with Icons */}
       <Box row gap="sm">
-        <Badge tone="primary" variant="solid" icon={({ color, size }) => <Sparkles color={color} size={size} />}>
+        <Badge tone="primary" variant="filled" icon={({ color, size }) => <Sparkles color={color} size={size} />}>
           Featured
         </Badge>
         <Badge tone="success" variant="soft" icon={({ color, size }) => <ShieldCheck color={color} size={size} />}>
           Verified
         </Badge>
-        <Badge tone="danger" variant="solid" icon={({ color, size }) => <Flame color={color} size={size} />}>
+        <Badge tone="danger" variant="filled" icon={({ color, size }) => <Flame color={color} size={size} />}>
           Hot Deal
         </Badge>
       </Box>
@@ -46,19 +45,19 @@ export function BadgeExample() {
   );
 }`;
 
-`Badge` displays compact status labels, count indicators, and category tags supporting 6 style variants, component tones, size scaling, and icon prefixes.
+`Badge` displays compact status labels, count indicators, and category pills supporting 4 style variants, component tones, size scaling, and icon slots.
 
 ## Usage
 
-<Code code={badgeCode} lang="tsx" title="BadgeExample.tsx" mark={['Badge', 'variant="subtle"', 'variant="ghost"', 'glass', 'icon']} />
+<Code code={badgeCode} lang="tsx" title="BadgeExample.tsx" mark={['Badge', 'variant="filled"', 'variant="ghost"', 'glass', 'icon']} />
 
 ## Props API
 
 <TypeTable
   type={{
-    children: { type: 'string', description: 'Badge label text string.' },
-    variant: { type: "'solid' | 'soft' | 'outline' | 'subtle' | 'ghost'", default: "'soft'", description: 'Visual style variant.' },
-    tone: { type: "'primary' | 'secondary' | 'accent' | 'success' | 'warning' | 'danger' | 'info'", default: "'primary'", description: 'Color tone styling.' },
+    children: { type: 'ReactNode', description: 'Badge label text or element.' },
+    variant: { type: "'filled' | 'outline' | 'soft' | 'ghost'", default: "'soft'", description: 'Visual style variant.' },
+    tone: { type: "'default' | 'primary' | 'secondary' | 'accent' | 'success' | 'warning' | 'danger' | 'info'", default: "'primary'", description: 'Color tone styling.' },
     size: { type: "'sm' | 'md' | 'lg'", default: "'md'", description: 'Size scale (sm, md, lg).' },
     glass: { type: 'boolean', default: 'false', description: 'Enables translucent frosted glass background styling.' },
     icon: { type: 'RenderIcon', description: 'Optional icon prefix render function (alias for leftIcon).' },

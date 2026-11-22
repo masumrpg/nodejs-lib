@@ -1,17 +1,20 @@
 import React, {
   useCallback,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import {
-  PanResponder,
-  StyleProp,
   StyleSheet,
   View,
-  ViewStyle,
+  type LayoutChangeEvent,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
+import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import Svg, { Path } from "react-native-svg";
+import { scheduleOnRN } from "react-native-worklets";
 
 import { useTheme } from "../theme";
 import { triggerHaptic } from "../utils/haptics";
@@ -36,6 +39,7 @@ export interface SignaturePadProps extends BaseHapticProps {
   onEnd?: () => void;
   onChange?: (paths: string[]) => void;
   height?: number;
+  accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -44,36 +48,12 @@ interface Point {
   y: number;
 }
 
-function pointsToSvgPath(points: Point[]): string {
-  if (points.length === 0) return "";
-  if (points.length === 1) {
-    const p = points[0];
-    if (!p) return "";
-    return `M ${p.x} ${p.y} L ${p.x + 0.1} ${p.y + 0.1}`;
-  }
-
-  let d = `M ${points[0]?.x ?? 0} ${points[0]?.y ?? 0}`;
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
-    if (prev && curr) {
-      const midX = (prev.x + curr.x) / 2;
-      const midY = (prev.y + curr.y) / 2;
-      d += ` Q ${prev.x} ${prev.y}, ${midX} ${midY}`;
-    }
-  }
-  const last = points[points.length - 1];
-  if (last) {
-    d += ` L ${last.x} ${last.y}`;
-  }
-  return d;
+function fmtCoord(n: number): string {
+  return (Math.round(n * 10) / 10).toString();
 }
 
-/**
- * Digital Signature Pad Canvas with SVG path rendering, undo, and export
- */
 export const SignaturePad = React.forwardRef<SignaturePadRef, SignaturePadProps>(
-  (
+  function SignaturePad(
     {
       strokeColor,
       strokeWidth = 3,
@@ -85,171 +65,235 @@ export const SignaturePad = React.forwardRef<SignaturePadRef, SignaturePadProps>
       onChange,
       haptic = true,
       height = 200,
+      accessibilityLabel = "Signature pad",
       style,
     },
     ref,
-  ) => {
-    const { colors, radii } = useTheme();
+  ) {
+    const { colors, components, radii } = useTheme();
     const activeStrokeColor = strokeColor ?? colors.text;
     const activeBgColor = backgroundColor ?? colors.surface;
 
     const [paths, setPaths] = useState<string[]>([]);
-    const [currentPoints, setCurrentPoints] = useState<Point[]>([]);
+    const [livePath, setLivePath] = useState("");
+    const canvasSizeRef = useRef({ width: 300, height });
 
-    const currentStrokeRef = useRef<Point[]>([]);
+    const pathsRef = useRef<string[]>([]);
+    const strokePointsRef = useRef<Point[]>([]);
+    const prefixPathRef = useRef("");
 
-    const clear = useCallback(() => {
-      if (haptic) triggerHaptic("selection");
-      setPaths([]);
-      setCurrentPoints([]);
-      currentStrokeRef.current = [];
-      onChange?.([]);
-    }, [haptic, onChange]);
+    const beginStroke = useCallback(
+      (x: number, y: number) => {
+        if (haptic) triggerHaptic("selection");
+        onBegin?.();
 
-    const undo = useCallback(() => {
-      if (paths.length === 0) return;
-      if (haptic) triggerHaptic("selection");
-      const next = paths.slice(0, -1);
-      setPaths(next);
-      onChange?.(next);
-    }, [haptic, onChange, paths]);
-
-    useImperativeHandle(ref, () => ({
-      clear,
-      undo,
-      getPaths: () => paths,
-      getSvg: () => {
-        const pathsXml = paths
-          .map(
-            (d) =>
-              `<path d="${d}" fill="none" stroke="${activeStrokeColor}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" />`,
-          )
-          .join("");
-        return `<svg xmlns="http://www.w3.org/2000/svg" height="${height}" width="100%">${pathsXml}</svg>`;
+        const startPt = { x, y };
+        strokePointsRef.current = [startPt];
+        prefixPathRef.current = `M ${fmtCoord(x)} ${fmtCoord(y)}`;
+        setLivePath(
+          `${prefixPathRef.current} L ${fmtCoord(x + 0.1)} ${fmtCoord(y + 0.1)}`,
+        );
       },
-      isEmpty: () => paths.length === 0 && currentPoints.length === 0,
-    }));
+      [haptic, onBegin],
+    );
 
-    const panResponder = useRef(
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (e) => {
-          const { locationX, locationY } = e.nativeEvent;
-          currentStrokeRef.current = [{ x: locationX, y: locationY }];
-          setCurrentPoints([{ x: locationX, y: locationY }]);
-          onBegin?.();
+    const appendStrokePoint = useCallback((x: number, y: number) => {
+      const points = strokePointsRef.current;
+      const prev = points[points.length - 1];
+      if (!prev) return;
+      if (Math.hypot(x - prev.x, y - prev.y) < 1.2) return;
+
+      const midX = (prev.x + x) / 2;
+      const midY = (prev.y + y) / 2;
+      prefixPathRef.current += ` Q ${fmtCoord(prev.x)} ${fmtCoord(prev.y)}, ${fmtCoord(midX)} ${fmtCoord(midY)}`;
+      points.push({ x, y });
+      setLivePath(`${prefixPathRef.current} L ${fmtCoord(x)} ${fmtCoord(y)}`);
+    }, []);
+
+    const finishStroke = useCallback(() => {
+      const points = strokePointsRef.current;
+      if (points.length === 0) return;
+
+      const last = points[points.length - 1];
+      const finalPath =
+        points.length === 1 && last
+          ? `M ${fmtCoord(last.x)} ${fmtCoord(last.y)} L ${fmtCoord(last.x + 0.1)} ${fmtCoord(last.y + 0.1)}`
+          : last
+            ? `${prefixPathRef.current} L ${fmtCoord(last.x)} ${fmtCoord(last.y)}`
+            : prefixPathRef.current;
+
+      strokePointsRef.current = [];
+      prefixPathRef.current = "";
+      setLivePath("");
+
+      if (finalPath) {
+        const nextPaths = [...pathsRef.current, finalPath];
+        pathsRef.current = nextPaths;
+        setPaths(nextPaths);
+        onChange?.(nextPaths);
+      }
+
+      onEnd?.();
+    }, [onChange, onEnd]);
+
+    const panConfig = useMemo(
+      () => ({
+        minDistance: 0,
+        shouldCancelWhenOutside: false,
+        onBegin: (event: { x: number; y: number }) => {
+          "worklet";
+          scheduleOnRN(beginStroke, event.x, event.y);
         },
-        onPanResponderMove: (e) => {
-          const { locationX, locationY } = e.nativeEvent;
-          currentStrokeRef.current.push({ x: locationX, y: locationY });
-          setCurrentPoints([...currentStrokeRef.current]);
+        onUpdate: (event: { x: number; y: number }) => {
+          "worklet";
+          scheduleOnRN(appendStrokePoint, event.x, event.y);
         },
-        onPanResponderRelease: () => {
-          if (currentStrokeRef.current.length > 0) {
-            const svgPath = pointsToSvgPath(currentStrokeRef.current);
-            if (svgPath) {
-              setPaths((prev) => {
-                const next = [...prev, svgPath];
-                setTimeout(() => onChange?.(next), 0);
-                return next;
-              });
-            }
-          }
-          currentStrokeRef.current = [];
-          setCurrentPoints([]);
-          onEnd?.();
+        onFinalize: () => {
+          "worklet";
+          scheduleOnRN(finishStroke);
         },
       }),
-    ).current;
+      [appendStrokePoint, beginStroke, finishStroke],
+    );
 
-    const currentStrokeD = pointsToSvgPath(currentPoints);
+    const panGesture = usePanGesture(panConfig);
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        clear: () => {
+          if (haptic) triggerHaptic("light");
+          pathsRef.current = [];
+          strokePointsRef.current = [];
+          prefixPathRef.current = "";
+          setPaths([]);
+          setLivePath("");
+          onChange?.([]);
+        },
+        undo: () => {
+          if (pathsRef.current.length === 0) return;
+          if (haptic) triggerHaptic("selection");
+          const next = pathsRef.current.slice(0, -1);
+          pathsRef.current = next;
+          setPaths(next);
+          onChange?.(next);
+        },
+        getPaths: () => pathsRef.current,
+        getSvg: () => {
+          const w = Math.max(1, Math.round(canvasSizeRef.current.width));
+          const h = Math.max(1, Math.round(canvasSizeRef.current.height));
+          const pathElements = pathsRef.current
+            .map(
+              (d) =>
+                `<path d="${d}" fill="none" stroke="${activeStrokeColor}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" />`,
+            )
+            .join("\n  ");
+          return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">\n  ${pathElements}\n</svg>`;
+        },
+        isEmpty: () => pathsRef.current.length === 0 && strokePointsRef.current.length === 0,
+      }),
+      [activeStrokeColor, haptic, onChange, strokeWidth],
+    );
+
+    const handleLayout = useCallback((event: LayoutChangeEvent) => {
+      const { width, height: layoutHeight } = event.nativeEvent.layout;
+      if (width > 0 && layoutHeight > 0) {
+        canvasSizeRef.current = { width, height: layoutHeight };
+      }
+    }, []);
 
     return (
       <View
+        accessible
+        accessibilityRole="none"
+        accessibilityLabel={accessibilityLabel}
+        onLayout={handleLayout}
         style={[
+          styles.container,
           {
-            width: "100%",
             height,
             backgroundColor: activeBgColor,
             borderRadius: radii.lg,
-            borderWidth: 1,
+            borderWidth: components.borderWidth.default,
             borderColor: colors.border,
-            overflow: "hidden",
-            position: "relative",
           },
           style,
         ]}
       >
-        {/* Sign Base Guideline */}
-        {showGuideLine && (
-          <View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              bottom: 36,
-              left: 20,
-              right: 20,
-              alignItems: "center",
-            }}
-          >
+        {showGuideLine ? (
+          <View pointerEvents="none" style={styles.guidelineContainer}>
             <View
-              style={{
-                width: "100%",
-                height: 1,
-                borderStyle: "dashed",
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor: colors.border,
-              }}
+              style={[
+                styles.guidelineRule,
+                { borderColor: colors.border },
+              ]}
             />
-            {guideLineText && (
-              <Text
-                style={{
-                  fontSize: 10,
-                  fontWeight: "600",
-                  color: colors.textMuted,
-                  letterSpacing: 0.6,
-                  marginTop: 6,
-                  textTransform: "uppercase",
-                }}
-              >
+            {guideLineText ? (
+              <Text style={[styles.guidelineText, { color: colors.textMuted }]}>
                 {guideLineText}
               </Text>
-            )}
+            ) : null}
           </View>
-        )}
+        ) : null}
 
-        {/* SVG Drawing Canvas Layer */}
-        <Svg style={StyleSheet.absoluteFill}>
-          {paths.map((d, idx) => (
-            <Path
-              key={`sig-stroke-${idx}`}
-              d={d}
-              fill="none"
-              stroke={activeStrokeColor}
-              strokeWidth={strokeWidth}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          ))}
+        <GestureDetector gesture={panGesture}>
+          <View style={StyleSheet.absoluteFill}>
+            <Svg style={StyleSheet.absoluteFill}>
+              {paths.map((d, idx) => (
+                <Path
+                  key={`sig-stroke-${idx}`}
+                  d={d}
+                  fill="none"
+                  stroke={activeStrokeColor}
+                  strokeWidth={strokeWidth}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ))}
 
-          {currentStrokeD ? (
-            <Path
-              d={currentStrokeD}
-              fill="none"
-              stroke={activeStrokeColor}
-              strokeWidth={strokeWidth}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          ) : null}
-        </Svg>
-
-        {/* Transparent Touch Capture Overlay */}
-        <View {...panResponder.panHandlers} style={StyleSheet.absoluteFill} />
+              {livePath ? (
+                <Path
+                  d={livePath}
+                  fill="none"
+                  stroke={activeStrokeColor}
+                  strokeWidth={strokeWidth}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ) : null}
+            </Svg>
+          </View>
+        </GestureDetector>
       </View>
     );
   },
 );
 
 SignaturePad.displayName = "SignaturePad";
+
+const styles = StyleSheet.create({
+  container: {
+    overflow: "hidden",
+    position: "relative",
+  },
+  guidelineContainer: {
+    position: "absolute",
+    bottom: 36,
+    left: 20,
+    right: 20,
+    alignItems: "center",
+  },
+  guidelineRule: {
+    width: "100%",
+    height: 1,
+    borderStyle: "dashed",
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  guidelineText: {
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 0.6,
+    marginTop: 6,
+    textTransform: "uppercase",
+  },
+});

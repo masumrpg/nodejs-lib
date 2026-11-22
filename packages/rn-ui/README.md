@@ -1,6 +1,6 @@
 # @masumdev/rn-ui
 
-> A modern, flat-designed React Native & Expo UI kit with 67+ typed components, dynamic light/dark theme engine, versatile borderless/outlined styling, zero-bounce worklet animations, and pluggable architecture.
+> A modern, typed React Native & Expo UI kit with 63 typed components, WCAG AA light/dark theme engine, flexible thin shadows, built-in Portal overlay layering, zero-bounce worklet animations, and pluggable architecture.
 
 [![npm version](https://img.shields.io/npm/v/@masumdev/rn-ui.svg?style=flat-square&color=33CDCF)](https://www.npmjs.com/package/@masumdev/rn-ui)
 [![npm downloads](https://img.shields.io/npm/dt/@masumdev/rn-ui.svg?style=flat-square&color=33CDCF)](https://www.npmjs.com/package/@masumdev/rn-ui)
@@ -12,44 +12,44 @@
 
 ---
 
-## 📚 Full Documentation
+## Full Documentation
 
 Comprehensive guides, component previews, prop tables, and interactive examples are available in our official documentation:
 
-👉 **[Explore Full Documentation & Component Catalog](https://lib.masumdev.id/rn-ui)**
+**[Explore Full Documentation & Component Catalog](https://lib.masumdev.id/rn-ui)**
 
-- 📖 **[Installation Guide](https://lib.masumdev.id/rn-ui/installation)**
-- 🎨 **[Theming & Dark Mode](https://lib.masumdev.id/rn-ui/theming)**
-- 🧩 **[67+ Component Catalog](https://lib.masumdev.id/rn-ui/components)**
-- 🛠️ **[Building Custom Components](https://lib.masumdev.id/rn-ui/custom-components)**
-- 📜 **[Architectural Rules](./RULES.md)**
-- 🚀 **[Changelog](https://lib.masumdev.id/rn-ui/changelog)**
+- **[Installation Guide](https://lib.masumdev.id/rn-ui/installation)**
+- **[Theming & Dark Mode](https://lib.masumdev.id/rn-ui/theming)**
+- **[63 Component Catalog](https://lib.masumdev.id/rn-ui/components)**
+- **[Building Custom Components](https://lib.masumdev.id/rn-ui/custom-components)**
+- **[Changelog](https://lib.masumdev.id/rn-ui/changelog)**
 
 ---
 
-## ✨ Features
+## Features
 
-- **Versatile Flat & Borderless Design**: Border-based, clean UI primitives with zero elevation/shadow by default, full support for Spotify-style borderless layouts, elevated shadow cards, and glassmorphism.
-- **Dynamic Theme Engine**: Light, dark, and system preference support via `ThemeProvider` with single-source-of-truth semantic tokens.
-- **67+ Typed Components**: Forms, feedback, overlays, navigation, data display, and chat UI primitives.
-- **Pluggable Architecture**: Zero lock-in for fonts, icons, navigation, storage, or haptics.
-- **Zero-Bounce Worklets**: Critically damped spring physics (`dampingRatio: 1, overshootClamping: true`) and cubic bezier curves running 100% on the UI thread.
-- **A11y First**: Enforced accessibility roles, interactive states, and touch targets (≥ 44pt).
+- **Flexible Multi-Theme Design System**: Switch live at runtime between **Default**, **Minimal (HeroUI-inspired borderless)**, and **Neo-Brutalism** (solid ink borders, zero-blur hard-offset shadows via `createHardShadows()`, and offset press feedback) via `ThemeProvider` `presets` + `setThemeName()`, alongside toggleable `elevation` (`setElevation()` / `toggleElevation()`) and semantic `glassSurface` / `glassBorder` tokens.
+- **Built-in Portal Overlay Layering**: `ThemeProvider` automatically mounts `<PortalProvider>` and `<PortalHost name="root" />` so floating menus, selects, tooltips, popovers, speed dials, and toasts layer reliably above screens.
+- **WCAG AA Dynamic Theme Engine**: Light, dark, and system preference support via `ThemeProvider` with contrast-calibrated semantic tokens.
+- **63 Typed Components**: Forms, feedback, overlays, navigation, calendars, data display, and chat UI primitives.
+- **Pluggable Architecture**: Zero lock-in for fonts, icons (`renderIcon`), navigation, storage, or haptics.
+- **Zero-Bounce Timing Worklets**: Pure `withTiming` transitions using `Easing.bezier(0.23, 1, 0.32, 1)` and `useReducedMotion()` running on the UI thread with zero spring bounce.
+- **A11y First**: Enforced accessibility roles, interactive states, SVG icons, and touch targets (>= 44pt).
 - **Strict Type Safety**: 100% TypeScript with zero `any` types and shared base UI prop interfaces.
 
-### 🧩 Component Highlights (67+ Primitives)
+### Component Highlights (62 Primitives)
 
 - **Navigation & Structure**: `Tabs` (Compound TabView with animated indicator & fluid slide/scale transitions), `Breadcrumb`, `Pagination`, `Stepper`
 - **Overlays & Modals**: `Tooltip` (Collision-aware balloons with pointer arrows & tap-and-hold), `SpeedDial` (Expanding FAB with staggered actions), `Alert`, `AlertDialog`, `Toast`, `Popover`, `HoverCard`, `DropdownMenu`, `ContextMenu`, `Command`
 - **Form Controls & Inputs**: `SearchBar` (Debounced input with clear & cancel transition), `Input`, `InputGroup`, `InputOTP`, `DatePicker`, `TimePicker`, `Textarea`, `Checkbox`, `RadioGroup`, `Switch`, `Slider`, `RangeSlider`, `SignaturePad`, `Rating`, `Select`, `Combobox`, `Label`, `FormField`
-- **Buttons & Actions**: `Button`, `IconButton`, `ButtonGroup`, `Chip`, `SegmentedControl`, `FloatingActionButton`
+- **Buttons & Actions**: `Button`, `IconButton`, `Chip`, `SegmentedControl`, `FloatingActionButton`
 - **Typography & Data**: `Text`, `Avatar`, `Badge`, `Item`, `SwipeableItem`, `Bubble`, `Attachment`, `DataList`, `MetricCard`, `Table`, `Timeline`, `Empty`
 - **Layout & Foundations**: `Box`, `Card`, `Divider`, `AspectRatio`, `KeyboardAvoiding`
 - **Disclosure & Loading**: `Accordion`, `Collapsible`, `Carousel`, `Calendar`, `ExpandableCalendar`, `TimelineCalendar`, `Progress`, `Skeleton`, `Spinner`
 
 ---
 
-## 📦 Quick Install
+## Quick Install
 
 ### Expo
 ```sh
@@ -64,7 +64,7 @@ bun add @masumdev/rn-ui react-native-reanimated react-native-worklets react-nati
 
 ---
 
-## ⚡ Quick Setup
+## Quick Setup
 
 Wrap your application root with `GestureHandlerRootView` and `ThemeProvider`:
 
@@ -87,7 +87,7 @@ export default function App() {
 
 ---
 
-## 🚀 Basic Usage
+## Basic Usage
 
 ```tsx
 import React from "react";
@@ -118,6 +118,6 @@ export function ExampleScreen() {
 
 ---
 
-## 📄 License
+## License
 
 MIT © [Ma'sum](https://github.com/masumrpg)

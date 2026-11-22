@@ -1,36 +1,50 @@
 import React from "react";
-import {
-  type TextInputInstance,
-  type TextInputProps,
-} from "react-native";
+import type { TextInputInstance } from "react-native";
 
+import { useTheme } from "../theme";
 import { Input, type InputProps } from "./Input";
+import type { ComponentSize } from "./types";
 
-export interface TextareaProps extends Omit<InputProps, "multiline"> {
+export interface TextareaProps
+  extends Omit<InputProps, "multiline" | "type" | "secureTextEntry"> {
   minRows?: number;
 }
 
-export const Textarea: (
-  props: TextareaProps & { ref?: React.Ref<TextInputInstance> },
-) => React.ReactNode = React.forwardRef<TextInputInstance, TextareaProps>(
-  function Textarea({ minRows = 4, size = "md", style, ...props }, ref) {
-  const minHeight = size === "lg" ? 132 : size === "sm" ? 84 : 108;
+const ROW_MULTIPLIER: Record<ComponentSize, number> = {
+  xs: 18,
+  sm: 20,
+  md: 24,
+  lg: 26,
+  xl: 28,
+};
 
-  return (
-    <Input
-      ref={ref as never}
+export const Textarea: React.NamedExoticComponent<
+  TextareaProps & React.RefAttributes<TextInputInstance>
+> = React.memo(
+  React.forwardRef<TextInputInstance, TextareaProps>(function Textarea(
+    { minRows = 4, size = "md", style, ...props },
+    ref,
+  ) {
+    const { spacing, typography } = useTheme();
+    const safeRows = Math.max(1, Math.round(minRows));
+    const lineHeight = ROW_MULTIPLIER[size] ?? typography.body.lineHeight;
+    const minHeight = safeRows * lineHeight + spacing.lg;
+
+    return (
+      <Input
+        ref={ref}
         multiline
         size={size}
         textAlignVertical="top"
         style={[
           {
-            minHeight: Math.max(minRows * 24, minHeight),
-            paddingVertical: 10,
+            minHeight,
+            paddingVertical: spacing.sm + spacing.xxs,
           },
           style,
         ]}
-        {...(props as TextInputProps)}
+        {...props}
       />
     );
-  },
+  }),
 );

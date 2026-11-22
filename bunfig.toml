@@ -3,3 +3,7 @@
 # This prevents per-package node_modules from being created for workspace
 # packages' peer dependencies, solving the expo-doctor duplicate warnings.
 linker = "hoisted"
+
+[test]
+preload = ["./tests/e2e/setup/mock-native.ts"]
+
