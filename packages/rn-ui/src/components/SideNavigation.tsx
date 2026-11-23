@@ -30,6 +30,7 @@ import { scheduleOnRN } from "react-native-worklets";
 
 import { useTheme } from "../theme";
 import { Portal } from "../theme/Portal";
+import { useDelayedUnmount } from "../utils";
 import { withAlpha } from "../utils/color";
 import { triggerHaptic } from "../utils/haptics";
 import { Badge } from "./Badge";
@@ -248,6 +249,11 @@ export const SideNavigation = React.memo(function SideNavigation({
 
   const drawerAnim = useSharedValue(isOpen ? 1 : 0);
   const dragTranslateX = useSharedValue(0);
+  const exitDuration = shouldAnimate ? 180 : 0;
+  const shouldMountDrawer = useDelayedUnmount(
+    variant === "drawer" && isOpen,
+    exitDuration,
+  );
 
   useEffect(() => {
     if (!shouldAnimate) {
@@ -411,7 +417,7 @@ export const SideNavigation = React.memo(function SideNavigation({
 
   // Render Drawer Overlay
   if (variant === "drawer") {
-    if (!isOpen && drawerAnim.value === 0) {
+    if (!shouldMountDrawer && !isOpen) {
       return null;
     }
 

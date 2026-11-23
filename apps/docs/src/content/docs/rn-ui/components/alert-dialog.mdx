@@ -40,11 +40,18 @@ export function AlertDialogExample() {
 <TypeTable
   type={{
     visible: { type: 'boolean', description: 'Modal visibility state.' },
-    title: { type: 'string', description: 'Dialog heading.' },
-    description: { type: 'string', description: 'Detailed confirmation explanation.' },
+    portal: { type: 'boolean', default: 'true', description: 'Mount inside PortalProvider overlay layer instead of native Modal.' },
+    scrollable: { type: 'boolean', default: 'false', description: 'Enable vertical ScrollView wrapper inside dialog body.' },
+    align: { type: "'center' | 'left'", default: "'center'", description: 'Content and button alignment.' },
+    tone: { type: "'primary' | 'success' | 'warning' | 'danger' | 'info' | 'secondary'", default: "'primary'", description: 'Tone applied to icons, borders, and confirm action.' },
+    title: { type: 'ReactNode', description: 'Dialog heading.' },
+    description: { type: 'ReactNode', description: 'Detailed confirmation explanation.' },
     confirmText: { type: 'string', default: "'Confirm'", description: 'Primary action button text.' },
     cancelText: { type: 'string', default: "'Cancel'", description: 'Cancel action button text.' },
     onConfirm: { type: '() => void', description: 'Callback when confirm button is pressed.' },
-    onClose: { type: '() => void', description: 'Callback when modal requests close.' },
+    onCancel: { type: '() => void', description: 'Callback when cancel button is pressed.' },
+    onClose: { type: '() => void', description: 'Callback when modal requests close (backdrop or close button).' },
+    dismissOnBackdropPress: { type: 'boolean', default: 'true', description: 'Close dialog when tapping outside the card.' },
+    animated: { type: 'boolean', default: 'true', description: 'Enable zero-bounce cubic bezier entrance and exit animations.' },
   }}
 />

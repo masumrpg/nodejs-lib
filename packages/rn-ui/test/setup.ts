@@ -242,6 +242,10 @@ mock.module("react-native", () => ({
     isReduceMotionEnabled: async () => mockUiState.reducedMotion,
     addEventListener: () => ({ remove: () => {} }),
   },
+  BackHandler: {
+    addEventListener: () => ({ remove: () => {} }),
+    exitApp: () => {},
+  },
   StyleSheet: {
     create: <T extends Record<string, unknown>>(styles: T): T => styles,
     flatten: flattenStyle,

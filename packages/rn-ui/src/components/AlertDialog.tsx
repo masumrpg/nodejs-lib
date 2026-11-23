@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect } from "react";
 import {
+  BackHandler,
   Modal,
   Pressable,
   ScrollView,
@@ -19,7 +20,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 
-import { useTheme } from "../theme";
+import { Portal, usePortalContext, useTheme } from "../theme";
 import { useDelayedUnmount, withAlpha } from "../utils";
 import { triggerHaptic } from "../utils/haptics";
 import { Button } from "./Button";
@@ -68,6 +69,8 @@ export interface AlertDialogProps
   cancelDisabled?: boolean;
   dismissOnBackdropPress?: boolean;
   animationDuration?: number;
+  portal?: boolean;
+  scrollable?: boolean;
   modalProps?: Omit<
     ModalProps,
     "visible" | "transparent" | "animationType" | "onRequestClose"
@@ -103,6 +106,8 @@ export const AlertDialog = React.memo(function AlertDialog({
   dismissOnBackdropPress = true,
   animated = true,
   animationDuration = 160,
+  portal = true,
+  scrollable = false,
   modalProps,
   overlayStyle,
   style,
@@ -111,6 +116,8 @@ export const AlertDialog = React.memo(function AlertDialog({
   descriptionStyle,
 }: AlertDialogProps) {
   const { colors, components, radii, shadows, spacing, isDark } = useTheme();
+  const portalStore = usePortalContext();
+  const usePortal = portal !== false && portalStore !== null;
   const reducedMotion = useReducedMotion();
   const shouldAnimate = animated && !reducedMotion;
   const exitDuration = shouldAnimate ? Math.max(110, animationDuration - 30) : 0;
@@ -161,6 +168,18 @@ export const AlertDialog = React.memo(function AlertDialog({
     }
   }, [haptic, onCancel, onClose]);
 
+  useEffect(() => {
+    if (!shouldMount || !visible || !usePortal) return;
+    const backSubscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        requestClose();
+        return true;
+      },
+    );
+    return () => backSubscription.remove();
+  }, [shouldMount, visible, usePortal, requestClose]);
+
   const handleBackdropPress = useCallback(() => {
     if (dismissOnBackdropPress) {
       requestClose();
@@ -191,7 +210,7 @@ export const AlertDialog = React.memo(function AlertDialog({
   const isCentered = align === "center";
 
   const dialog = (
-    <View
+    <Animated.View
       accessibilityViewIsModal={true}
       style={[
         styles.dialog,
@@ -201,10 +220,10 @@ export const AlertDialog = React.memo(function AlertDialog({
           borderWidth: components.borderWidth.strong,
           borderColor,
           padding: spacing.xl,
-          gap: spacing.lg,
           alignItems: isCentered ? "center" : "stretch",
         },
         shadows.lg,
+        shouldAnimate ? cardAnimatedStyle : undefined,
         style,
       ]}
     >
@@ -244,83 +263,151 @@ export const AlertDialog = React.memo(function AlertDialog({
         </Pressable>
       ) : null}
 
-      {icon ? (
-        <View
-          style={{
-            width: isCentered ? 56 : 44,
-            height: isCentered ? 56 : 44,
-            borderRadius: isCentered ? radii.full : radii.md,
-            backgroundColor: withAlpha(toneColor, 0.14),
-            borderWidth: components.borderWidth.strong,
-            borderColor: withAlpha(toneColor, 0.28),
-            alignItems: "center",
-            justifyContent: "center",
-            alignSelf: isCentered ? "center" : "flex-start",
-          }}
-        >
-          {renderIcon(icon, toneColor, isCentered ? 26 : 22)}
-        </View>
-      ) : null}
-
-      <ScrollView
-        bounces={false}
-        showsVerticalScrollIndicator={false}
-        style={styles.bodyScroll}
-        contentContainerStyle={[
-          styles.content,
+      <View
+        style={[
+          styles.dialogBody,
           {
-            gap: spacing.xs,
-            alignItems: isCentered ? "center" : "flex-start",
+            gap: spacing.lg,
+            alignItems: isCentered ? "center" : "stretch",
           },
-          contentStyle,
         ]}
       >
-        {title ? (
-          typeof title === "string" ? (
-            <Text
-              variant="h3"
-              weight="700"
-              style={[
-                {
-                  textAlign: isCentered ? "center" : "left",
-                  color: colors.text,
-                },
-                titleStyle,
-              ]}
-            >
-              {title}
-            </Text>
-          ) : (
-            title
-          )
-        ) : null}
-
-        {description ? (
-          typeof description === "string" ? (
-            <Text
-              variant="bodySmall"
-              color="textMuted"
-              style={[
-                {
-                  textAlign: isCentered ? "center" : "left",
-                  lineHeight: 22,
-                },
-                descriptionStyle,
-              ]}
-            >
-              {description}
-            </Text>
-          ) : (
-            description
-          )
-        ) : null}
-
-        {children ? (
-          <View style={[styles.fullWidth, { marginTop: spacing.xs }]}>
-            {children}
+        {icon ? (
+          <View
+            style={{
+              width: isCentered ? 56 : 44,
+              height: isCentered ? 56 : 44,
+              borderRadius: isCentered ? radii.full : radii.md,
+              backgroundColor: withAlpha(toneColor, 0.14),
+              borderWidth: components.borderWidth.strong,
+              borderColor: withAlpha(toneColor, 0.28),
+              alignItems: "center",
+              justifyContent: "center",
+              alignSelf: isCentered ? "center" : "flex-start",
+            }}
+          >
+            {renderIcon(icon, toneColor, isCentered ? 26 : 22)}
           </View>
         ) : null}
-      </ScrollView>
+
+        {scrollable ? (
+        <ScrollView
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+          style={styles.bodyScroll}
+          contentContainerStyle={[
+            styles.content,
+            {
+              gap: spacing.xs,
+              alignItems: isCentered ? "center" : "flex-start",
+            },
+            contentStyle,
+          ]}
+        >
+          {title ? (
+            typeof title === "string" ? (
+              <Text
+                variant="h3"
+                weight="700"
+                style={[
+                  {
+                    textAlign: isCentered ? "center" : "left",
+                    color: colors.text,
+                  },
+                  titleStyle,
+                ]}
+              >
+                {title}
+              </Text>
+            ) : (
+              title
+            )
+          ) : null}
+
+          {description ? (
+            typeof description === "string" ? (
+              <Text
+                variant="bodySmall"
+                color="textMuted"
+                style={[
+                  {
+                    textAlign: isCentered ? "center" : "left",
+                    lineHeight: 22,
+                  },
+                  descriptionStyle,
+                ]}
+              >
+                {description}
+              </Text>
+            ) : (
+              description
+            )
+          ) : null}
+
+          {children ? (
+            <View style={[styles.fullWidth, { marginTop: spacing.xs }]}>
+              {children}
+            </View>
+          ) : null}
+        </ScrollView>
+      ) : (
+        <View
+          style={[
+            styles.content,
+            {
+              gap: spacing.xs,
+              alignItems: isCentered ? "center" : "flex-start",
+            },
+            contentStyle,
+          ]}
+        >
+          {title ? (
+            typeof title === "string" ? (
+              <Text
+                variant="h3"
+                weight="700"
+                style={[
+                  {
+                    textAlign: isCentered ? "center" : "left",
+                    color: colors.text,
+                  },
+                  titleStyle,
+                ]}
+              >
+                {title}
+              </Text>
+            ) : (
+              title
+            )
+          ) : null}
+
+          {description ? (
+            typeof description === "string" ? (
+              <Text
+                variant="bodySmall"
+                color="textMuted"
+                style={[
+                  {
+                    textAlign: isCentered ? "center" : "left",
+                    lineHeight: 22,
+                  },
+                  descriptionStyle,
+                ]}
+              >
+                {description}
+              </Text>
+            ) : (
+              description
+            )
+          ) : null}
+
+          {children ? (
+            <View style={[styles.fullWidth, { marginTop: spacing.xs }]}>
+              {children}
+            </View>
+          ) : null}
+        </View>
+      )}
 
       {onCancel || onConfirm ? (
         <View
@@ -329,40 +416,80 @@ export const AlertDialog = React.memo(function AlertDialog({
             {
               justifyContent: isCentered ? "center" : "flex-end",
               gap: spacing.sm,
-              marginTop: spacing.xs,
             },
           ]}
         >
           {onCancel ? (
-            <Button
-              variant="outline"
-              tone="secondary"
-              size="md"
-              style={isCentered ? styles.flexOne : undefined}
-              disabled={cancelDisabled}
-              onPress={handleCancel}
-            >
-              {cancelText}
-            </Button>
+            <View style={isCentered ? styles.flexOne : undefined}>
+              <Button
+                fullWidth={isCentered}
+                variant="outline"
+                tone="secondary"
+                size="md"
+                disabled={cancelDisabled}
+                onPress={handleCancel}
+              >
+                {cancelText}
+              </Button>
+            </View>
           ) : null}
 
           {onConfirm ? (
-            <Button
-              variant="filled"
-              tone={tone}
-              size="md"
-              style={isCentered ? styles.flexOne : undefined}
-              loading={confirmLoading}
-              disabled={confirmDisabled}
-              onPress={handleConfirm}
-            >
-              {confirmText}
-            </Button>
+            <View style={isCentered ? styles.flexOne : undefined}>
+              <Button
+                fullWidth={isCentered}
+                variant="filled"
+                tone={tone}
+                size="md"
+                loading={confirmLoading}
+                disabled={confirmDisabled}
+                onPress={handleConfirm}
+              >
+                {confirmText}
+              </Button>
+            </View>
           ) : null}
         </View>
       ) : null}
+      </View>
+    </Animated.View>
+  );
+
+  const overlayContent = (
+    <View
+      style={[
+        styles.container,
+        StyleSheet.absoluteFill,
+        { padding: spacing.xl },
+      ]}
+    >
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: isDark
+              ? withAlpha("#000000", 0.78)
+              : withAlpha("#0F172A", 0.65),
+          },
+          backdropAnimatedStyle,
+          overlayStyle,
+        ]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss dialog"
+          style={styles.flexOne}
+          onPress={handleBackdropPress}
+        />
+      </Animated.View>
+
+      {dialog}
     </View>
   );
+
+  if (usePortal) {
+    return <Portal layer="overlay">{overlayContent}</Portal>;
+  }
 
   return (
     <Modal
@@ -375,35 +502,7 @@ export const AlertDialog = React.memo(function AlertDialog({
       onRequestClose={requestClose}
       {...modalProps}
     >
-      <View style={[styles.container, { padding: spacing.xl }]}>
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              backgroundColor: isDark
-                ? withAlpha("#000000", 0.78)
-                : withAlpha("#0F172A", 0.65),
-            },
-            backdropAnimatedStyle,
-            overlayStyle,
-          ]}
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Dismiss dialog"
-            style={styles.flexOne}
-            onPress={handleBackdropPress}
-          />
-        </Animated.View>
-
-        {shouldAnimate ? (
-          <Animated.View style={[styles.cardWrap, cardAnimatedStyle]}>
-            {dialog}
-          </Animated.View>
-        ) : (
-          dialog
-        )}
-      </View>
+      {overlayContent}
     </Modal>
   );
 });
@@ -414,19 +513,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  cardWrap: {
-    width: "100%",
-    maxWidth: 400,
-    alignItems: "center",
-  },
   dialog: {
     width: "100%",
     maxWidth: 400,
-    maxHeight: "85%",
     position: "relative",
+  },
+  dialogBody: {
+    width: "100%",
   },
   bodyScroll: {
     width: "100%",
+    flexGrow: 0,
+    flexShrink: 1,
   },
   closeButton: {
     position: "absolute",
@@ -445,7 +543,7 @@ const styles = StyleSheet.create({
   actions: {
     width: "100%",
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "center",
   },
   flexOne: {
     flex: 1,
