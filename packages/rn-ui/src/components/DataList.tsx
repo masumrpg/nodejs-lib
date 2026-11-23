@@ -16,6 +16,7 @@ export interface DataListProps extends ViewProps {
 
 export interface DataListItemProps extends ViewProps {
   isLast?: boolean;
+  alignItems?: "center" | "flex-start" | "start";
   style?: StyleProp<ViewStyle>;
 }
 
@@ -54,10 +55,12 @@ export const DataList = React.memo(function DataList({
 
 export const DataListItem = React.memo(function DataListItem({
   isLast = false,
+  alignItems = "center",
   style,
   ...props
 }: DataListItemProps) {
   const { colors, components, spacing } = useTheme();
+  const resolvedAlign = alignItems === "start" ? "flex-start" : alignItems;
 
   return (
     <View
@@ -65,6 +68,7 @@ export const DataListItem = React.memo(function DataListItem({
       style={[
         styles.item,
         {
+          alignItems: resolvedAlign,
           gap: spacing.md,
           paddingVertical: spacing.sm,
           borderBottomWidth: isLast ? 0 : components.borderWidth.default,

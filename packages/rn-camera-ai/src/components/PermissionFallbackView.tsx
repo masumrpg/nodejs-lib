@@ -8,6 +8,8 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import { useCameraAITheme } from '../theme/context';
+import type { CameraAITheme } from '../theme/types';
 
 export interface PermissionFallbackViewProps {
   /** Optional custom title text */
@@ -22,6 +24,8 @@ export interface PermissionFallbackViewProps {
   onOpenSettings?: () => void;
   /** Optional container style */
   style?: StyleProp<ViewStyle>;
+  /** Optional theme override */
+  theme?: CameraAITheme;
 }
 
 /**
@@ -35,7 +39,11 @@ export const PermissionFallbackView: React.FC<PermissionFallbackViewProps> = ({
   onRequestPermission,
   onOpenSettings,
   style,
+  theme,
 }) => {
+  const contextTheme = useCameraAITheme();
+  const activeTheme = theme ?? contextTheme;
+
   const handlePress = React.useCallback(async () => {
     if (onRequestPermission) {
       try {
@@ -58,17 +66,58 @@ export const PermissionFallbackView: React.FC<PermissionFallbackViewProps> = ({
   }, [onRequestPermission, onOpenSettings]);
 
   return (
-    <View style={[styles.container, style]}>
-      <View style={styles.card}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.message}>{message}</Text>
+    <View
+      style={[
+        styles.container,
+        activeTheme ? { backgroundColor: activeTheme.background } : null,
+        style,
+      ]}
+    >
+      <View
+        style={[
+          styles.card,
+          activeTheme
+            ? {
+                backgroundColor: activeTheme.surface,
+                borderColor: activeTheme.border,
+              }
+            : null,
+        ]}
+      >
+        <Text
+          style={[
+            styles.title,
+            activeTheme ? { color: activeTheme.text } : null,
+          ]}
+        >
+          {title}
+        </Text>
+        <Text
+          style={[
+            styles.message,
+            activeTheme ? { color: activeTheme.muted } : null,
+          ]}
+        >
+          {message}
+        </Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={buttonText}
           onPress={handlePress}
-          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+          style={({ pressed }) => [
+            styles.button,
+            activeTheme ? { backgroundColor: activeTheme.primary } : null,
+            pressed && styles.buttonPressed,
+          ]}
         >
-          <Text style={styles.buttonText}>{buttonText}</Text>
+          <Text
+            style={[
+              styles.buttonText,
+              activeTheme ? { color: activeTheme.textLight } : null,
+            ]}
+          >
+            {buttonText}
+          </Text>
         </Pressable>
       </View>
     </View>

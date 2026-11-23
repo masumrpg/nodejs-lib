@@ -1,15 +1,7 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  SignaturePad,
-  type SignaturePadRef,
-  Text,
-} from "@masumdev/rn-ui";
-import { RotateCcw, Trash2, CheckCircle2 } from "lucide-react-native";
+import { Box, Button, SignaturePad, type SignaturePadRef } from "@masumdev/rn-ui";
+import { CheckCircle2, RotateCcw, Trash2 } from "lucide-react-native";
 import { useRef, useState } from "react";
-import { Section, type RnUiSectionContext } from "../shared";
+import { DemoCard, DemoReadout, Section, type RnUiSectionContext } from "../shared";
 
 export function SignaturePadSection(_props?: { ctx?: RnUiSectionContext }) {
   const padRef = useRef<SignaturePadRef>(null);
@@ -35,24 +27,14 @@ export function SignaturePadSection(_props?: { ctx?: RnUiSectionContext }) {
   return (
     <Section title="SignaturePad">
       <Box gap="lg">
-        <Card outlined>
+        {/* Card 1: Digital Signature Authorization Canvas */}
+        <DemoCard
+          title="Digital Signature Canvas"
+          badge="Bezier Curves"
+          badgeTone="primary"
+          description="High-performance vector touch drawing with undo, clear, guideline baseline, and SVG export."
+        >
           <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Digital Signature Canvas
-              </Text>
-              <Badge tone="primary">Bezier Curves</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Smooth responsive touch drawing with undo, clear, stroke width adjustments, and SVG export.
-            </Text>
-
-            {/* Signature Canvas Pad */}
             <SignaturePad
               ref={padRef}
               height={220}
@@ -64,61 +46,60 @@ export function SignaturePadSection(_props?: { ctx?: RnUiSectionContext }) {
               }}
             />
 
-            {/* Actions: Undo, Clear, Save */}
-            <Box row gap="sm" style={{ marginTop: 4 }}>
-              <Button
-                variant="outline"
-                tone="secondary"
-                size="sm"
-                onPress={handleUndo}
-                style={{ flex: 1 }}
-              >
-                <RotateCcw size={15} color="#94a3b8" />
-                <Text style={{ marginLeft: 6 }}>Undo</Text>
-              </Button>
+            <Box
+              row
+              wrap
+              gap="sm"
+              style={{ justifyContent: "space-between", alignItems: "center" }}
+            >
+              <Box row gap="xs">
+                <Button
+                  variant="outline"
+                  tone="secondary"
+                  size="sm"
+                  leftIcon={({ color, size }) => <RotateCcw color={color} size={size} />}
+                  onPress={handleUndo}
+                  disabled={strokeCount === 0}
+                >
+                  Undo
+                </Button>
+                <Button
+                  variant="outline"
+                  tone="danger"
+                  size="sm"
+                  leftIcon={({ color, size }) => <Trash2 color={color} size={size} />}
+                  onPress={handleClear}
+                  disabled={strokeCount === 0}
+                >
+                  Clear
+                </Button>
+              </Box>
 
               <Button
-                variant="outline"
-                tone="danger"
-                size="sm"
-                onPress={handleClear}
-                style={{ flex: 1 }}
-              >
-                <Trash2 size={15} color="#ef4444" />
-                <Text style={{ marginLeft: 6 }}>Clear</Text>
-              </Button>
-
-              <Button
-                variant="filled"
+                variant={isSaved ? "soft" : "filled"}
                 tone="primary"
                 size="sm"
+                leftIcon={({ color, size }) => <CheckCircle2 color={color} size={size} />}
                 onPress={handleSave}
-                style={{ flex: 1 }}
+                disabled={strokeCount === 0}
               >
-                Save
+                {isSaved ? "Saved" : "Save Signature"}
               </Button>
             </Box>
 
-            {/* Saved Confirmation */}
-            {isSaved && (
-              <Box
-                row
-                center
-                gap="xs"
-                style={{
-                  padding: 10,
-                  borderRadius: 8,
-                  backgroundColor: "rgba(16, 185, 129, 0.12)",
-                }}
-              >
-                <CheckCircle2 size={16} color="#10b981" />
-                <Text style={{ fontSize: 13, color: "#10b981", fontWeight: "600" }}>
-                  Signature captured ({strokeCount} strokes)!
-                </Text>
-              </Box>
-            )}
+            <DemoReadout
+              label="Signature Canvas Status"
+              value={
+                isSaved
+                  ? `Saved (${strokeCount} strokes)`
+                  : strokeCount > 0
+                    ? `Drawing (${strokeCount} strokes)`
+                    : "Empty Canvas"
+              }
+              tone={isSaved ? "success" : strokeCount > 0 ? "primary" : "muted"}
+            />
           </Box>
-        </Card>
+        </DemoCard>
       </Box>
     </Section>
   );

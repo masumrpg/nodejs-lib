@@ -26,7 +26,7 @@ import {
   type RenderIcon,
 } from "@masumdev/rn-ui";
 import { SystemUIOverlay } from "../components/system-ui-overlay";
-import { ScreenHeader } from "../components/ScreenHeader";
+import { ScreenHeader, ScreenHeroHeader } from "../components/ScreenHeader";
 import { useHeaderScroll } from "../components/useHeaderScroll";
 
 const icon =
@@ -115,9 +115,10 @@ export default function TajweedVerseScreen() {
   const [customInfoTitle, setCustomInfoTitle] = useState("Interactive Guide");
   const [renderCount, setRenderCount] = useState(0);
 
-  const { onScroll, headerStyle, scrollEventThrottle } = useHeaderScroll({
-    headerHeight: 220,
-  });
+  const { onScroll, scrollEventThrottle, isHeaderScrolled, showTitle } =
+    useHeaderScroll({
+      threshold: 60,
+    });
 
   const getThemeConfig = () => {
     let fontFamily: string | undefined;
@@ -204,10 +205,9 @@ export default function TajweedVerseScreen() {
 
       <ScreenHeader
         showBack
-        eyebrow="@masumdev/rn-tajweed-verse"
         title="Tajweed Verse Renderer"
-        subtitle="Quranic text parsing, coloring, and interactive rule previews."
-        headerStyle={headerStyle}
+        showTitle={showTitle}
+        isScrolled={isHeaderScrolled}
       />
 
       <ScrollView
@@ -217,12 +217,17 @@ export default function TajweedVerseScreen() {
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: spacing.md,
             paddingBottom: insets.bottom + spacing.xl,
           },
         ]}
         showsVerticalScrollIndicator={false}
       >
+        <ScreenHeroHeader
+          eyebrow="@masumdev/rn-tajweed-verse"
+          title="Tajweed Verse Renderer"
+          subtitle="Quranic text parsing, coloring, and interactive rule previews."
+        />
+
         <Section title="Configurations" icon={icon(Sliders)}>
           <Card>
             <SettingRow

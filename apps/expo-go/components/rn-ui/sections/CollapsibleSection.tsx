@@ -1,41 +1,41 @@
 import {
   Box,
-  Card,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
   Text,
 } from "@masumdev/rn-ui";
-import { ChevronsUpDown, Package, Truck, CreditCard } from "lucide-react-native";
-import { Section, type RnUiSectionContext } from "../shared";
+import { ChevronsUpDown, CreditCard, Package, Shield, Truck } from "lucide-react-native";
+import {
+  DemoCard,
+  DemoSurface,
+  Section,
+  type RnUiSectionContext,
+} from "../shared";
 
 export function CollapsibleSection({ ctx }: { ctx: RnUiSectionContext }) {
   const { colors } = ctx;
 
   return (
     <Section title="Collapsible">
-      <Card outlined>
-        <Box gap="lg">
-          <Text color="textMuted">
-            A lightweight expandable container component to show/hide detailed section content with smooth height scaling.
-          </Text>
-
-          {/* Order Details Demo */}
+      <Box gap="lg">
+        {/* 1. Order Fulfillment Details */}
+        <DemoCard
+          title="Collapsible Panel"
+          badge="defaultOpen={false}"
+          badgeTone="primary"
+          description="Lightweight expandable container with smooth 60fps Reanimated height interpolation."
+        >
           <Collapsible defaultOpen={false} style={{ width: "100%" }}>
             <CollapsibleTrigger>
-              <Box
-                row
-                gap="sm"
+              <DemoSurface
+                tone="raised"
                 style={{
+                  flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  paddingVertical: 8,
-                  paddingHorizontal: 12,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  backgroundColor: colors.surface,
-                  width: "100%",
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
                 }}
               >
                 <Box row center gap="sm" style={{ flexShrink: 1 }}>
@@ -44,96 +44,130 @@ export function CollapsibleSection({ ctx }: { ctx: RnUiSectionContext }) {
                     Order #4189 Details
                   </Text>
                 </Box>
-                <Box
-                  center
+                <DemoSurface
+                  tone="muted"
+                  radius="xs"
+                  padded={false}
+                  bordered={false}
                   style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 8,
-                    backgroundColor: colors.backgroundMuted,
+                    width: 28,
+                    height: 28,
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
                   <ChevronsUpDown color={colors.textMuted} size={16} />
-                </Box>
-              </Box>
+                </DemoSurface>
+              </DemoSurface>
             </CollapsibleTrigger>
 
             <CollapsibleContent>
               <Box gap="sm" style={{ marginTop: 10 }}>
-                {/* Status Card */}
-                <Box
-                  row
-                  wrap
-                  gap="sm"
+                {/* Status Row */}
+                <DemoSurface
+                  tone="muted"
                   style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    borderRadius: 10,
-                    backgroundColor: colors.surfaceMuted,
+                    flexDirection: "row",
                     alignItems: "center",
                     justifyContent: "space-between",
+                    paddingVertical: 10,
                   }}
                 >
                   <Text color="textMuted" variant="bodySmall">
-                    Status
+                    Fulfillment Status
                   </Text>
                   <Text weight="600" color="success" variant="bodySmall">
-                    Shipped (On the way)
+                    Shipped • Tracking Active
                   </Text>
-                </Box>
+                </DemoSurface>
 
                 {/* Shipping address */}
-                <Box
-                  style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    borderRadius: 10,
-                    backgroundColor: colors.surfaceMuted,
-                    gap: 2,
-                  }}
-                >
+                <DemoSurface tone="muted" style={{ gap: 4 }}>
                   <Box row center gap="xs">
                     <Truck color={colors.primary} size={16} />
                     <Text weight="600" color="text" variant="bodySmall">
-                      Shipping Address
+                      Delivery Destination
                     </Text>
                   </Box>
                   <Text color="textMuted" variant="bodySmall">
-                    100 Market St, San Francisco, CA 94105
+                    100 Market St, Suite 400, San Francisco, CA 94105
                   </Text>
-                </Box>
+                </DemoSurface>
 
                 {/* Items & Payment */}
-                <Box
-                  style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    borderRadius: 10,
-                    backgroundColor: colors.surfaceMuted,
-                    gap: 2,
-                  }}
-                >
+                <DemoSurface tone="muted" style={{ gap: 4 }}>
                   <Box row center gap="xs">
                     <CreditCard color={colors.primary} size={16} />
                     <Text weight="600" color="text" variant="bodySmall">
-                      Items Purchased
+                      Items & Billing
                     </Text>
                   </Box>
                   <Text color="textMuted" variant="bodySmall">
-                    2x Studio Pro Wireless Headphones ($299.00)
+                    2x Studio Pro Wireless Headphones • Total $598.00
                   </Text>
-                </Box>
+                </DemoSurface>
               </Box>
             </CollapsibleContent>
           </Collapsible>
-        </Box>
-      </Card>
+        </DemoCard>
+
+        {/* 2. Security Details Disclosure */}
+        <DemoCard
+          title="Security Disclosure Panel"
+          badge="defaultOpen"
+          badgeTone="accent"
+          description="Expandable disclosure state for configuration options and sensitive keys."
+        >
+          <Collapsible defaultOpen style={{ width: "100%" }}>
+            <CollapsibleTrigger>
+              <DemoSurface
+                tone="raised"
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                }}
+              >
+                <Box row center gap="sm" style={{ flexShrink: 1 }}>
+                  <Shield color={colors.accent} size={20} />
+                  <Text weight="700" color="text" style={{ flexShrink: 1 }}>
+                    API Key Permissions
+                  </Text>
+                </Box>
+                <DemoSurface
+                  tone="muted"
+                  radius="xs"
+                  padded={false}
+                  bordered={false}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <ChevronsUpDown color={colors.textMuted} size={16} />
+                </DemoSurface>
+              </DemoSurface>
+            </CollapsibleTrigger>
+
+            <CollapsibleContent>
+              <Box gap="sm" style={{ marginTop: 10 }}>
+                <DemoSurface tone="muted" style={{ gap: 4 }}>
+                  <Text weight="600" color="text" variant="bodySmall">
+                    Authorized Scopes
+                  </Text>
+                  <Text color="textMuted" variant="caption">
+                    read:users, write:deployments, manage:webhooks
+                  </Text>
+                </DemoSurface>
+              </Box>
+            </CollapsibleContent>
+          </Collapsible>
+        </DemoCard>
+      </Box>
     </Section>
   );
 }

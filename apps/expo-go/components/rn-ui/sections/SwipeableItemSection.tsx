@@ -1,14 +1,7 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  SwipeableItem,
-  Text,
-} from "@masumdev/rn-ui";
+import { Badge, Box, Button, SwipeableItem, Text, useTheme } from "@masumdev/rn-ui";
 import { Archive, Trash2, Pin, Mail, Share2, CheckCircle2, RotateCcw } from "lucide-react-native";
 import { useState } from "react";
-import { Section, type RnUiSectionContext } from "../shared";
+import { DemoCard, Section, type RnUiSectionContext } from "../shared";
 
 interface EmailItem {
   id: string;
@@ -59,10 +52,18 @@ const INITIAL_TASKS: SimpleTask[] = [
   { id: "t4", title: "Run end-to-end Expo tests on Android", done: true },
 ];
 
-export function SwipeableItemSection(_props?: { ctx?: RnUiSectionContext }) {
+export function SwipeableItemSection({ ctx }: { ctx?: RnUiSectionContext }) {
+  const { colors, components, radii, spacing, isDark } = useTheme();
   const [emails, setEmails] = useState<EmailItem[]>(INITIAL_EMAILS);
   const [tasks, setTasks] = useState<SimpleTask[]>(INITIAL_TASKS);
   const [message, setMessage] = useState<string>("");
+
+  const isBorderless = components.borderWidth.default === 0;
+  const rowSurface = isBorderless
+    ? isDark
+      ? colors.surfaceRaised
+      : colors.surfaceMuted
+    : colors.surface;
 
   const deleteEmail = (id: string) => {
     setEmails((prev) => prev.filter((item) => item.id !== id));
@@ -90,48 +91,36 @@ export function SwipeableItemSection(_props?: { ctx?: RnUiSectionContext }) {
     <Section title="Swipeable Item & Row">
       <Box gap="lg">
         {/* 1. Multi-line Rich Mail Card */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Rich Mail List (Full Swipe Delete)
-              </Text>
-              <Badge tone="primary">Swipe Left & Right</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Full swipe to the left triggers a smooth collapse delete animation.
-            </Text>
+        <DemoCard
+          title="Rich Mail Swipe Actions"
+          badge="Swipe Left & Right"
+          badgeTone="primary"
+          description="Momentum-driven swipe reveal actions with smooth collapse delete animation."
+        >
 
             {message ? (
               <Box
                 style={{
-                  padding: 8,
-                  borderRadius: 6,
-                  backgroundColor: "rgba(59, 130, 246, 0.12)",
+                  padding: spacing.sm,
+                  borderRadius: radii.sm,
+                  backgroundColor: colors.primarySoft,
                 }}
               >
-                <Text style={{ fontSize: 12, color: "#3b82f6", fontWeight: "600" }}>
+                <Text variant="labelSmall" color="primary" weight="600">
                   {message}
                 </Text>
               </Box>
             ) : null}
 
-            {/* Swipeable Items List */}
-            <Box gap="sm" style={{ marginTop: 4 }}>
-              {emails.map((item) => (
+            {/* Swipeable Items List (uses itemGap so spacing collapses cleanly) */}
+            <Box style={{ marginTop: 4 }}>
+              {emails.map((item, idx) => (
                 <SwipeableItem
                   key={item.id}
-                  containerStyle={{ borderRadius: 10 }}
+                  itemGap={idx < emails.length - 1 ? spacing.sm : 0}
                   style={{
                     padding: 14,
-                    borderWidth: 1,
-                    borderColor: "rgba(148, 163, 184, 0.2)",
-                    borderRadius: 10,
+                    backgroundColor: rowSurface,
                   }}
                   leftActions={[
                     {
@@ -152,7 +141,6 @@ export function SwipeableItemSection(_props?: { ctx?: RnUiSectionContext }) {
                       label: "Archive",
                       icon: ({ color, size }) => <Archive color={color} size={size} />,
                       tone: "secondary",
-                      backgroundColor: "#475569",
                       isDestructive: true,
                       onPress: () => archiveEmail(item.id),
                     },
@@ -178,8 +166,8 @@ export function SwipeableItemSection(_props?: { ctx?: RnUiSectionContext }) {
                             style={{
                               width: 8,
                               height: 8,
-                              borderRadius: 4,
-                              backgroundColor: "#3b82f6",
+                              borderRadius: radii.full,
+                              backgroundColor: colors.primary,
                             }}
                           />
                         )}
@@ -202,8 +190,8 @@ export function SwipeableItemSection(_props?: { ctx?: RnUiSectionContext }) {
               ))}
 
               {emails.length === 0 && (
-                <Box center style={{ padding: 18, gap: 8 }}>
-                  <Mail size={28} color="#94a3b8" />
+                <Box center style={{ padding: 18, gap: spacing.sm }}>
+                  <Mail size={28} color={colors.textSubtle} />
                   <Text color="textMuted" variant="bodySmall">
                     All mailbox messages deleted!
                   </Text>
@@ -211,47 +199,35 @@ export function SwipeableItemSection(_props?: { ctx?: RnUiSectionContext }) {
                     size="sm"
                     variant="outline"
                     tone="primary"
+                    leftIcon={ctx ? ctx.icon(RotateCcw) : ({ color, size }) => <RotateCcw color={color} size={size} />}
                     onPress={() => setEmails(INITIAL_EMAILS)}
                   >
-                    <RotateCcw size={14} color="#3b82f6" />
-                    <Text style={{ marginLeft: 6 }}>Reset Messages</Text>
+                    Reset Messages
                   </Button>
                 </Box>
               )}
             </Box>
-          </Box>
-        </Card>
+        </DemoCard>
 
-        {/* 2. Single-Line Task List (1 Baris Teks) */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Single-Line Task Items (1-Line Text)
-              </Text>
-              <Badge tone="accent">Compact Row</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Swipe right to mark complete, swipe left to delete simple 1-line tasks.
-            </Text>
+        {/* 2. Single-Line Task List */}
+        <DemoCard
+          title="Single-Line Task Items"
+          badge="Compact Row"
+          badgeTone="accent"
+          description="Swipe right to mark complete, swipe left to delete simple 1-line tasks."
+        >
 
-            <Box gap="xs" style={{ marginTop: 4 }}>
-              {tasks.map((task) => (
+            <Box style={{ marginTop: 4 }}>
+              {tasks.map((task, idx) => (
                 <SwipeableItem
                   key={task.id}
                   actionWidth={68}
-                  containerStyle={{ borderRadius: 8 }}
+                  itemGap={idx < tasks.length - 1 ? spacing.xs : 0}
+                  containerStyle={{ borderRadius: radii.md }}
                   style={{
                     paddingVertical: 12,
                     paddingHorizontal: 14,
-                    borderWidth: 1,
-                    borderColor: "rgba(148, 163, 184, 0.2)",
-                    borderRadius: 8,
+                    backgroundColor: rowSurface,
                   }}
                   leftActions={[
                     {
@@ -299,7 +275,7 @@ export function SwipeableItemSection(_props?: { ctx?: RnUiSectionContext }) {
               ))}
 
               {tasks.length === 0 && (
-                <Box center style={{ padding: 18, gap: 8 }}>
+                <Box center style={{ padding: 18, gap: spacing.sm }}>
                   <Text color="textMuted" variant="bodySmall">
                     All tasks completed and cleared!
                   </Text>
@@ -307,16 +283,15 @@ export function SwipeableItemSection(_props?: { ctx?: RnUiSectionContext }) {
                     size="sm"
                     variant="outline"
                     tone="primary"
+                    leftIcon={ctx ? ctx.icon(RotateCcw) : ({ color, size }) => <RotateCcw color={color} size={size} />}
                     onPress={() => setTasks(INITIAL_TASKS)}
                   >
-                    <RotateCcw size={14} color="#3b82f6" />
-                    <Text style={{ marginLeft: 6 }}>Reset Tasks</Text>
+                    Reset Tasks
                   </Button>
                 </Box>
               )}
             </Box>
-          </Box>
-        </Card>
+        </DemoCard>
       </Box>
     </Section>
   );

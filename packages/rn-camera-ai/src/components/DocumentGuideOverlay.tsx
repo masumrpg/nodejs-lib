@@ -16,6 +16,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { transformNormalizedPointToPixel } from '../math/transforms';
+import { useCameraAITheme } from '../theme/context';
+import type { CameraAITheme } from '../theme/types';
 import type {
   DocumentCornerPosition,
   DocumentGuideTarget,
@@ -52,6 +54,8 @@ export interface DocumentGuideOverlayProps {
   orientation?: FrameOrientation;
   /** Declarative colors, corner dimensions, outer vignette mask, and timing config */
   theme?: DocumentGuideThemeConfig;
+  /** Optional theme token binding override */
+  cameraTheme?: CameraAITheme;
   /** Headless full-canvas custom renderer replacing the entire DocumentGuideOverlay chrome */
   renderGuide?: (params: RenderDocumentGuideParams) => React.ReactNode;
   /** Custom per-corner bracket renderer receiving fitted vertex point and edge angles */
@@ -73,21 +77,22 @@ const EDGE_MARGIN_PX = 10;
 
 function resolveReadinessColor(
   readiness: DocumentReadinessState,
-  theme?: DocumentGuideThemeConfig
+  theme?: DocumentGuideThemeConfig,
+  cameraTheme?: CameraAITheme
 ): string {
   switch (readiness) {
     case 'optimal':
     case 'complete':
       return readiness === 'complete'
-        ? (theme?.completeColor ?? '#22c55e')
-        : (theme?.optimalColor ?? '#22c55e');
+        ? (theme?.completeColor ?? cameraTheme?.success ?? '#22c55e')
+        : (theme?.optimalColor ?? cameraTheme?.success ?? '#22c55e');
     case 'adjusting':
-      return theme?.adjustingColor ?? '#f59e0b';
+      return theme?.adjustingColor ?? cameraTheme?.warning ?? '#f59e0b';
     case 'analyzing':
-      return theme?.analyzingColor ?? '#38bdf8';
+      return theme?.analyzingColor ?? cameraTheme?.info ?? cameraTheme?.primary ?? '#38bdf8';
     case 'searching':
     default:
-      return theme?.searchingColor ?? '#94a3b8';
+      return theme?.searchingColor ?? cameraTheme?.muted ?? '#94a3b8';
   }
 }
 
@@ -190,6 +195,7 @@ export const DocumentGuideOverlay: React.FC<DocumentGuideOverlayProps> = ({
   isMirrored = false,
   orientation = 'portrait',
   theme,
+  cameraTheme,
   renderGuide,
   renderCorner,
   renderStatus,
@@ -197,6 +203,9 @@ export const DocumentGuideOverlay: React.FC<DocumentGuideOverlayProps> = ({
   style,
   children,
 }) => {
+  const contextTheme = useCameraAITheme();
+  const activeCameraTheme = cameraTheme ?? contextTheme;
+
   const reducedMotion =
     typeof useReducedMotion === 'function' ? useReducedMotion() : false;
 
@@ -204,14 +213,19 @@ export const DocumentGuideOverlay: React.FC<DocumentGuideOverlayProps> = ({
   const cornerThickness = theme?.cornerThickness ?? 3.5;
   const cornerRadius = theme?.cornerRadius ?? 14;
   const showMask = theme?.showMask ?? true;
-  const maskColor = theme?.maskColor ?? 'rgba(5, 22, 30, 0.36)';
+  const maskColor =
+    theme?.maskColor ?? activeCameraTheme?.mask ?? 'rgba(5, 22, 30, 0.36)';
   const showGuideOutline = theme?.showGuideOutline ?? true;
   const outlineOpacity = theme?.outlineOpacity ?? 0.42;
   const showStatusPill = theme?.showStatusPill ?? true;
   const statusPosition = theme?.statusPosition ?? 'top';
   const snapDurationMs = theme?.snapDurationMs ?? 170;
 
-  const activeColor = resolveReadinessColor(guide.readiness, theme);
+  const activeColor = resolveReadinessColor(
+    guide.readiness,
+    theme,
+    activeCameraTheme
+  );
 
   const pixelQuad = useMemo<DocumentQuad>(() => {
     if (viewDimensions.width <= 0 || viewDimensions.height <= 0) {

@@ -1,5 +1,6 @@
 import type React from 'react';
 import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
+import type { CameraAITheme, ThemeColorsLike } from '../theme/types';
 import type { CameraAIError } from './errors';
 
 /**
@@ -807,6 +808,11 @@ export interface CameraAIProps {
   showBoxes?: boolean;
   /** Bounding box visual style: 'solid', 'corners', or 'dashed' (default: 'solid') */
   boxVariant?: BoundingBoxVariant;
+  /**
+   * Optional theme configuration or token map (e.g. from @masumdev/rn-ui useTheme().colors).
+   * Automatically tints bounding boxes, facial landmarks, document guide overlays, laser scanners, and permission fallback cards.
+   */
+  theme?: CameraAITheme | ThemeColorsLike;
   /** Primary bounding box & badge accent color (default: '#3da441') */
   boxColor?: string;
   /** Facial landmark dot color (default: '#38bdf8') */

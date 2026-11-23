@@ -1,72 +1,87 @@
-import { AlertDialog, Box, Button, Card, Text } from "@masumdev/rn-ui";
-import { LogOut, Trash } from "lucide-react-native";
-import React from "react";
-import { Section, type RnUiSectionContext } from "../shared";
+import { AlertDialog, Box, Button } from "@masumdev/rn-ui";
+import { LogOut, Trash2 } from "lucide-react-native";
+import { useState } from "react";
+import { DemoCard, DemoReadout, Section, type RnUiSectionContext } from "../shared";
 
 export function AlertDialogSection({ ctx }: { ctx: RnUiSectionContext }) {
-  const { icon, alertDialogVisible, setAlertDialogVisible } = ctx;
-  const [logoutVisible, setLogoutVisible] = React.useState(false);
+  const { icon } = ctx;
+  const [deleteVisible, setDeleteVisible] = useState(false);
+  const [logoutVisible, setLogoutVisible] = useState(false);
+  const [lastAction, setLastAction] = useState("None");
 
   return (
-    <Section title="Alert Dialog">
-      <Card outlined>
-        <Box gap="md">
-          <Text color="textMuted">
-            Modal confirmation dialog with circular tone badge, glowing border tints, glassmorphism, animated scale entry, backdrop dismiss, and haptics.
-          </Text>
+    <Section title="AlertDialog">
+      <Box gap="lg">
+        {/* Card 1: Modal Confirmation Dialogs */}
+        <DemoCard
+          title="Confirmation Dialogs"
+          badge="Destructive & Neutral"
+          badgeTone="danger"
+          description="Blocking modal confirmation dialogs with tone badges, backdrop blur, and haptic feedback."
+        >
+          <Box gap="md">
+            <Box row gap="sm" style={{ flexWrap: "wrap" }}>
+              <Button
+                variant="filled"
+                tone="danger"
+                leftIcon={icon(Trash2)}
+                onPress={() => setDeleteVisible(true)}
+              >
+                Delete Workspace
+              </Button>
 
-          <Box row gap="sm" style={{ flexWrap: "wrap" }}>
-            <Button
-              variant="filled"
+              <Button
+                variant="outline"
+                tone="secondary"
+                leftIcon={icon(LogOut)}
+                onPress={() => setLogoutVisible(true)}
+              >
+                Sign Out
+              </Button>
+            </Box>
+
+            <DemoReadout label="Last Dialog Action" value={lastAction} />
+
+            {/* 1. Destructive Delete Workspace Dialog */}
+            <AlertDialog
+              visible={deleteVisible}
+              onClose={() => setDeleteVisible(false)}
               tone="danger"
-              leftIcon={icon(Trash)}
-              onPress={() => setAlertDialogVisible(true)}
-            >
-              Open Delete Dialog
-            </Button>
+              title="Delete Entire Workspace?"
+              description="This action cannot be undone. All repository packages, build caches, and deployed artifacts will be permanently destroyed."
+              confirmText="Permanently Delete"
+              cancelText="Keep Workspace"
+              onConfirm={() => {
+                setDeleteVisible(false);
+                setLastAction("Confirmed permanent deletion");
+              }}
+              onCancel={() => {
+                setDeleteVisible(false);
+                setLastAction("Cancelled deletion");
+              }}
+            />
 
-            <Button
-              variant="outline"
+            {/* 2. Sign Out Confirmation Dialog */}
+            <AlertDialog
+              visible={logoutVisible}
+              onClose={() => setLogoutVisible(false)}
               tone="warning"
-              leftIcon={icon(LogOut)}
-              onPress={() => setLogoutVisible(true)}
-            >
-              Open Logout Dialog
-            </Button>
+              title="Sign Out of Session?"
+              description="Are you sure you want to end your active developer session? Unsaved staging files will be preserved locally."
+              confirmText="Sign Out"
+              cancelText="Stay Signed In"
+              onConfirm={() => {
+                setLogoutVisible(false);
+                setLastAction("Signed out of session");
+              }}
+              onCancel={() => {
+                setLogoutVisible(false);
+                setLastAction("Cancelled sign out");
+              }}
+            />
           </Box>
-
-          {/* 1. Centered Delete Confirmation Dialog */}
-          <AlertDialog
-            visible={alertDialogVisible}
-            tone="danger"
-            align="center"
-            glass
-            title="Delete Workspace?"
-            description="Are you sure you want to permanently delete this project workspace? This action cannot be undone and all data will be removed."
-            icon={icon(Trash)}
-            confirmText="Delete Workspace"
-            cancelText="Cancel"
-            onConfirm={() => setAlertDialogVisible(false)}
-            onCancel={() => setAlertDialogVisible(false)}
-            onClose={() => setAlertDialogVisible(false)}
-          />
-
-          {/* 2. Logout Confirmation Dialog */}
-          <AlertDialog
-            visible={logoutVisible}
-            tone="warning"
-            align="center"
-            title="Sign Out of Account?"
-            description="You will need to sign in again to access your saved projects and synchronized cloud data."
-            icon={icon(LogOut)}
-            confirmText="Sign Out"
-            cancelText="Stay Signed In"
-            onConfirm={() => setLogoutVisible(false)}
-            onCancel={() => setLogoutVisible(false)}
-            onClose={() => setLogoutVisible(false)}
-          />
-        </Box>
-      </Card>
+        </DemoCard>
+      </Box>
     </Section>
   );
 }

@@ -1,27 +1,10 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  IconButton,
-  Text,
-  Tooltip,
-  useTheme,
-} from "@masumdev/rn-ui";
-import {
-  Info,
-  HelpCircle,
-  Download,
-  Share2,
-  Shield,
-  Settings,
-  Bookmark,
-  RefreshCw,
-} from "lucide-react-native";
-import { Section, type RnUiSectionContext } from "../shared";
+import { Box, Button, IconButton, Text, Tooltip } from "@masumdev/rn-ui";
+import { Bookmark, Download, HelpCircle, Settings, Share2, Shield } from "lucide-react-native";
+import { DemoCard, DemoSurface, Section, type RnUiSectionContext } from "../shared";
 
-export function TooltipSection(_props?: { ctx?: RnUiSectionContext }) {
-  const { colors } = useTheme();
+export function TooltipSection({ ctx }: { ctx?: RnUiSectionContext }) {
+  const icon = ctx?.icon ?? ((Icon: React.ComponentType<{ color?: string; size?: number }>) => ({ color, size }: { color?: string; size?: number }) => <Icon color={color} size={size} />);
+
   const dummyItems = [
     {
       id: "1",
@@ -58,264 +41,161 @@ export function TooltipSection(_props?: { ctx?: RnUiSectionContext }) {
   return (
     <Section title="Tooltip">
       <Box gap="lg">
-        {/* 1. Smart Edge Collision & Auto-Flip Test */}
-        <Card outlined>
+        {/* Card 1: Smart Edge Auto-Flip Collision */}
+        <DemoCard
+          title="Edge Collision & Auto-Flip"
+          badge="Collision-Safe"
+          badgeTone="primary"
+          description="Tooltips automatically measure window boundaries and flip axes to avoid edge clipping."
+        >
           <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Smart Edge Auto-Flip
-              </Text>
-              <Badge tone="success">Smart Collision</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              When near the edge, tooltips automatically invert (right ➔ left, left ➔ right, top ➔ bottom, bottom ➔ top).
-            </Text>
-
-            {/* Left and Right Edge test buttons */}
             <Box row center style={{ justifyContent: "space-between", paddingVertical: 8 }}>
               <Tooltip
-                content="Near left edge: auto-flips to the right"
+                content="Near left edge: auto-flips to right"
+                triggerMode="press"
                 position="left"
                 autoFlip
-                tone="primary"
               >
-                <Button
-                  size="sm"
-                  variant="outline"
-                  tone="primary"
-                  leftIcon={({ color, size }) => <Info color={color} size={size} />}
-                >
+                <Button variant="outline" tone="secondary" size="xs">
                   Left Edge
                 </Button>
               </Tooltip>
 
               <Tooltip
-                content="Near right edge: auto-flips to the left"
+                content="Top center: anchored above button"
+                triggerMode="press"
+                position="top"
+              >
+                <Button variant="filled" tone="primary" size="xs">
+                  Top Balloon
+                </Button>
+              </Tooltip>
+
+              <Tooltip
+                content="Near right edge: auto-flips to left"
+                triggerMode="press"
                 position="right"
                 autoFlip
-                tone="dark"
               >
-                <Button
-                  size="sm"
-                  variant="outline"
-                  tone="secondary"
-                  rightIcon={({ color, size }) => <Info color={color} size={size} />}
-                >
+                <Button variant="outline" tone="secondary" size="xs">
                   Right Edge
                 </Button>
               </Tooltip>
             </Box>
           </Box>
-        </Card>
+        </DemoCard>
 
-        {/* 2. Tap & Hold Tooltip Toolbar */}
-        <Card outlined>
+        {/* Card 2: Interactive Toolbar Icon Tooltips */}
+        <DemoCard
+          title="Toolbar Action Hints"
+          badge="Trigger on Press"
+          badgeTone="secondary"
+          description="Accessible hint balloons attached to compact icon buttons with arrow indicators."
+        >
           <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Tap & Hold Action Bar
-              </Text>
-              <Badge tone="primary">Tap & Hold 250ms</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Tap and hold on any button to reveal directional pointer balloon. Tap outside to dismiss.
-            </Text>
+            <DemoSurface radius="md">
+              <Box row gap="md" center style={{ justifyContent: "space-around" }}>
+                <Tooltip content="Share project link" triggerMode="press" position="top" tone="primary">
+                  <IconButton
+                    icon={icon(Share2)}
+                    variant="ghost"
+                    tone="primary"
+                    size="md"
+                    accessibilityLabel="Share"
+                  />
+                </Tooltip>
 
-            <Box row gap="sm" center style={{ justifyContent: "space-around", paddingVertical: 12 }}>
-              <Tooltip content="Download monthly balance statement" position="top">
-                <IconButton
-                  icon={({ color, size }) => <Download color={color} size={size} />}
-                  variant="outline"
-                  tone="primary"
-                />
-              </Tooltip>
+                <Tooltip content="Download production bundle" triggerMode="press" position="top" tone="success">
+                  <IconButton
+                    icon={icon(Download)}
+                    variant="ghost"
+                    tone="success"
+                    size="md"
+                    accessibilityLabel="Download"
+                  />
+                </Tooltip>
 
-              <Tooltip content="Share record with team member" position="bottom" tone="primary">
-                <IconButton
-                  icon={({ color, size }) => <Share2 color={color} size={size} />}
-                  variant="filled"
-                  tone="primary"
-                />
-              </Tooltip>
+                <Tooltip content="Security audit passed" triggerMode="press" position="top" tone="accent">
+                  <IconButton
+                    icon={icon(Shield)}
+                    variant="ghost"
+                    tone="accent"
+                    size="md"
+                    accessibilityLabel="Security"
+                  />
+                </Tooltip>
 
-              <Tooltip content="Two-factor security active" position="top" tone="success">
-                <IconButton
-                  icon={({ color, size }) => <Shield color={color} size={size} />}
-                  variant="soft"
-                  tone="success"
-                />
-              </Tooltip>
+                <Tooltip content="Bookmark workspace" triggerMode="press" position="top" tone="warning">
+                  <IconButton
+                    icon={icon(Bookmark)}
+                    variant="ghost"
+                    tone="warning"
+                    size="md"
+                    accessibilityLabel="Bookmark"
+                  />
+                </Tooltip>
 
-              <Tooltip content="Detailed security documentation" position="left">
-                <IconButton
-                  icon={({ color, size }) => <HelpCircle color={color} size={size} />}
-                  variant="soft"
-                  tone="accent"
-                />
-              </Tooltip>
-
-              <Tooltip content="System telemetry status" position="right" tone="dark">
-                <IconButton
-                  icon={({ color, size }) => <Info color={color} size={size} />}
-                  variant="outline"
-                  tone="secondary"
-                />
-              </Tooltip>
-            </Box>
+                <Tooltip content="Project settings" triggerMode="press" position="top" tone="secondary">
+                  <IconButton
+                    icon={icon(Settings)}
+                    variant="ghost"
+                    tone="secondary"
+                    size="md"
+                    accessibilityLabel="Settings"
+                  />
+                </Tooltip>
+              </Box>
+            </DemoSurface>
           </Box>
-        </Card>
+        </DemoCard>
 
-        {/* 3. Direct Tap Mode */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Direct Tap Mode
-              </Text>
-              <Badge tone="accent">Press Mode</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Single tap opens tooltip immediately with 3s auto-dismiss or backdrop dismissal.
-            </Text>
-
-            <Box row gap="sm" center style={{ justifyContent: "center", paddingVertical: 8 }}>
-              <Tooltip
-                content="API key configured for production"
-                triggerMode="press"
-                position="top"
-                tone="dark"
-                duration={3000}
+        {/* Card 3: Scrollable List with Anchored Tooltips */}
+        <DemoCard
+          title="List Item Information"
+          badge="Scrollable Anchors"
+          badgeTone="secondary"
+          description="Consistent portal projection even inside nested scroll views and list rows."
+        >
+          <Box gap="xs">
+            {dummyItems.map((item) => (
+              <DemoSurface
+                key={item.id}
+                radius="sm"
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                }}
               >
-                <Button
-                  tone="secondary"
-                  variant="outline"
-                  leftIcon={({ color, size }) => <Info color={color} size={size} />}
-                >
-                  Tap to Inspect API Key
-                </Button>
-              </Tooltip>
-            </Box>
-          </Box>
-        </Card>
-
-        {/* 4. Scrollable List Sample with Action Tooltips */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Scrollable List Test Cases
-              </Text>
-              <Badge tone="default">5 Items</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Scroll up and down to test tooltips at varying screen vertical positions.
-            </Text>
-
-            <Box gap="xs">
-              {dummyItems.map((item, index) => (
-                <Box
-                  key={item.id}
-                  row
-                  center
-                  style={[
-                    {
-                      paddingVertical: 10,
-                      paddingHorizontal: 8,
-                      justifyContent: "space-between",
-                    },
-                    index < dummyItems.length - 1 && {
-                      borderBottomWidth: 1,
-                      borderBottomColor: colors.borderMuted,
-                    },
-                  ]}
-                >
-                  <Box style={{ flex: 1, paddingRight: 12 }}>
-                    <Text weight="600">{item.title}</Text>
-                    <Text color="textMuted" variant="bodySmall">
-                      {item.desc}
-                    </Text>
-                  </Box>
-                  <Box row gap="xs" center>
-                    <Tooltip content={item.tip} position="top" tone="primary">
-                      <IconButton
-                        size="sm"
-                        variant="ghost"
-                        tone="primary"
-                        icon={({ color, size }) => <Bookmark color={color} size={size} />}
-                      />
-                    </Tooltip>
-
-                    <Tooltip content={`Configure ${item.title}`} position="top" tone="dark">
-                      <IconButton
-                        size="sm"
-                        variant="ghost"
-                        tone="secondary"
-                        icon={({ color, size }) => <Settings color={color} size={size} />}
-                      />
-                    </Tooltip>
-                  </Box>
+                <Box flex={1} gap="xxs">
+                  <Text variant="label" weight="600">
+                    {item.title}
+                  </Text>
+                  <Text variant="caption" color="textMuted">
+                    {item.desc}
+                  </Text>
                 </Box>
-              ))}
-            </Box>
-          </Box>
-        </Card>
 
-        {/* 5. Bottom Card to Test Bottom-Edge Auto-Flip */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Bottom Edge Flip Test
-              </Text>
-              <Badge tone="warning">Bottom Viewport</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              This button specifies position="bottom", but when near the bottom of the screen, it flips smoothly to top!
-            </Text>
-
-            <Box row center style={{ justifyContent: "center", paddingVertical: 12 }}>
-              <Tooltip
-                content="Trigger snapshot rebuild now"
-                position="bottom"
-                autoFlip
-                tone="warning"
-              >
-                <Button
-                  tone="warning"
-                  variant="filled"
-                  leftIcon={({ color, size }) => <RefreshCw color={color} size={size} />}
+                <Tooltip
+                  content={item.tip}
+                  triggerMode="press"
+                  position="left"
+                  autoFlip
                 >
-                  Bottom Button (Flips to Top)
-                </Button>
-              </Tooltip>
-            </Box>
+                  <IconButton
+                    icon={icon(HelpCircle)}
+                    variant="ghost"
+                    tone="secondary"
+                    size="xs"
+                    accessibilityLabel={`Hint for ${item.title}`}
+                  />
+                </Tooltip>
+              </DemoSurface>
+            ))}
           </Box>
-        </Card>
+        </DemoCard>
       </Box>
     </Section>
   );

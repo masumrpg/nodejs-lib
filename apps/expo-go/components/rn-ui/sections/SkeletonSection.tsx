@@ -6,7 +6,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Divider,
   Skeleton,
   SkeletonGroup,
@@ -25,8 +24,14 @@ import {
   Users,
 } from "lucide-react-native";
 import React from "react";
-import { Image, TouchableOpacity } from "react-native";
-import { SAMPLE_ASSETS, Section, type RnUiSectionContext } from "../shared";
+import { Image, Pressable } from "react-native";
+import {
+  DemoCard,
+  DemoSurface,
+  SAMPLE_ASSETS,
+  Section,
+  type RnUiSectionContext,
+} from "../shared";
 
 export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
   const { colors, icon } = ctx;
@@ -54,7 +59,12 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
     <Box gap="xl">
       {/* Existing Skeleton Loaders Section */}
       <Section title="Skeleton Loaders">
-        <Card outlined>
+        <DemoCard
+          title="Skeleton Shimmer"
+          badge="UI Worklet"
+          badgeTone="primary"
+          description="Hardware-accelerated shimmer placeholder animations designed for zero layout-shift (CLS) transitions."
+        >
           <Box gap="md">
             <Box
               row
@@ -62,34 +72,54 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
               gap="sm"
               style={{ justifyContent: "space-between", alignItems: "center" }}
             >
-              <Text variant="title" style={{ flexShrink: 1 }}>
-                Skeleton Shimmer
+              <Text variant="caption" color="textMuted">
+                Toggle worklet shimmer animation:
               </Text>
               <Button
                 size="xs"
-                variant="outline"
+                variant={animated ? "outline" : "filled"}
+                tone={animated ? "default" : "primary"}
                 onPress={() => setAnimated(!animated)}
               >
-                {animated ? "Pause" : "Play"}
+                {animated ? "Pause Animation" : "Play Animation"}
               </Button>
             </Box>
 
-            <Card outlined>
+            <DemoSurface tone="muted" radius="md">
               <Box gap="md">
                 <Box row style={{ alignItems: "center", gap: 12 }}>
-                  <Skeleton animated={animated} radius="full" style={{ width: 48, height: 48 }} />
+                  <Skeleton
+                    animated={animated}
+                    radius="full"
+                    style={{ width: 48, height: 48 }}
+                  />
                   <Box flex={1} gap="xs">
-                    <Skeleton animated={animated} style={{ height: 16, width: "60%" }} />
-                    <Skeleton animated={animated} style={{ height: 12, width: "40%" }} />
+                    <Skeleton
+                      animated={animated}
+                      style={{ height: 16, width: "60%" }}
+                    />
+                    <Skeleton
+                      animated={animated}
+                      style={{ height: 12, width: "40%" }}
+                    />
                   </Box>
                 </Box>
                 <Box gap="xs" style={{ marginTop: 4 }}>
-                  <Skeleton animated={animated} style={{ height: 14, width: "100%" }} />
-                  <Skeleton animated={animated} style={{ height: 14, width: "85%" }} />
-                  <Skeleton animated={animated} style={{ height: 14, width: "50%" }} />
+                  <Skeleton
+                    animated={animated}
+                    style={{ height: 14, width: "100%" }}
+                  />
+                  <Skeleton
+                    animated={animated}
+                    style={{ height: 14, width: "85%" }}
+                  />
+                  <Skeleton
+                    animated={animated}
+                    style={{ height: 14, width: "50%" }}
+                  />
                 </Box>
               </Box>
-            </Card>
+            </DemoSurface>
 
             <Box gap="sm" style={{ marginTop: 4 }}>
               <Text variant="caption" color="textMuted">
@@ -111,12 +141,17 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
               />
             </Box>
           </Box>
-        </Card>
+        </DemoCard>
       </Section>
 
       {/* Interactive Data Transition Simulation Section */}
       <Section title="Data Transition Simulation">
-        <Card outlined>
+        <DemoCard
+          title="Live Content Transition"
+          badge={isLoading ? "Fetching" : "Live Ready"}
+          badgeTone={isLoading ? "warning" : "success"}
+          description="Demonstrating zero layout-shift (CLS) transition from placeholder skeleton to loaded components."
+        >
           <Box gap="lg">
             {/* Header & Controls */}
             <Box gap="sm">
@@ -126,8 +161,8 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
                 gap="sm"
                 style={{ justifyContent: "space-between", alignItems: "center" }}
               >
-                <Text variant="title" style={{ flexShrink: 1 }}>
-                  Live Content Transition
+                <Text variant="subtitle" weight="600" style={{ flexShrink: 1 }}>
+                  Transition Controls
                 </Text>
                 {isLoading ? (
                   <Box row center gap="xs">
@@ -147,9 +182,6 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
                   </Badge>
                 )}
               </Box>
-              <Text variant="bodySmall" color="textMuted">
-                Demonstrating zero layout-shift (CLS) transition from placeholder skeleton to loaded components.
-              </Text>
 
               {/* Action Buttons / Controls */}
               <Box
@@ -196,7 +228,7 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
                 1. USER PROFILE CARD
               </Text>
 
-              <Card outlined>
+              <DemoSurface tone="muted" radius="md">
                 {isLoading ? (
                   /* Skeleton State - Driven by a single shared clock via SkeletonGroup */
                   <SkeletonGroup>
@@ -205,29 +237,29 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
                         <Skeleton radius="full" style={{ width: 56, height: 56 }} />
                         <Box flex={1} gap="xs">
                           <Box row style={{ alignItems: "center", gap: 8 }}>
-                            <Skeleton style={{ height: 18, width: 120, borderRadius: 4 }} />
-                            <Skeleton style={{ height: 18, width: 44, borderRadius: 10 }} />
+                            <Skeleton radius="xs" style={{ height: 18, width: 120 }} />
+                            <Skeleton radius="md" style={{ height: 18, width: 44 }} />
                           </Box>
-                          <Skeleton style={{ height: 13, width: 160, borderRadius: 4 }} />
+                          <Skeleton radius="xs" style={{ height: 13, width: 160 }} />
                         </Box>
                       </Box>
 
                       <Box gap="xs">
-                        <Skeleton style={{ height: 13, width: "100%", borderRadius: 4 }} />
-                        <Skeleton style={{ height: 13, width: "88%", borderRadius: 4 }} />
+                        <Skeleton radius="xs" style={{ height: 13, width: "100%" }} />
+                        <Skeleton radius="xs" style={{ height: 13, width: "88%" }} />
                       </Box>
 
                       {/* Stats pills */}
                       <Box row gap="xs" style={{ flexWrap: "wrap" }}>
-                        <Skeleton style={{ height: 24, width: 95, borderRadius: 12 }} />
-                        <Skeleton style={{ height: 24, width: 105, borderRadius: 12 }} />
-                        <Skeleton style={{ height: 24, width: 85, borderRadius: 12 }} />
+                        <Skeleton radius="full" style={{ height: 24, width: 95 }} />
+                        <Skeleton radius="full" style={{ height: 24, width: 105 }} />
+                        <Skeleton radius="full" style={{ height: 24, width: 85 }} />
                       </Box>
 
                       {/* Actions */}
                       <Box row gap="sm" style={{ marginTop: 4 }}>
-                        <Skeleton style={{ height: 36, flex: 1, borderRadius: 8 }} />
-                        <Skeleton style={{ height: 36, flex: 1, borderRadius: 8 }} />
+                        <Skeleton radius="md" style={{ height: 36, flex: 1 }} />
+                        <Skeleton radius="md" style={{ height: 36, flex: 1 }} />
                       </Box>
                     </Box>
                   </SkeletonGroup>
@@ -276,7 +308,7 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
                         size="sm"
                         icon={icon(Sparkles)}
                       >
-                        63+ Components
+                        61+ Components
                       </Badge>
                       <Badge
                         tone="warning"
@@ -299,7 +331,7 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
                     </Box>
                   </Box>
                 )}
-              </Card>
+              </DemoSurface>
             </Box>
 
             {/* Pattern 2: Media Feed Card */}
@@ -308,29 +340,29 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
                 2. MEDIA / FEED ARTICLE CARD
               </Text>
 
-              <Card outlined>
+              <DemoSurface tone="muted" radius="md">
                 {isLoading ? (
                   /* Skeleton State - Driven by SkeletonGroup */
                   <SkeletonGroup>
                     <Box gap="md">
-                      <Skeleton style={{ width: "100%", height: 130, borderRadius: 8 }} />
+                      <Skeleton style={{ width: "100%", height: 130, borderRadius: ctx.radii.md, borderCurve: "continuous" }} />
 
                       <Box row style={{ alignItems: "center", gap: 8 }}>
-                        <Skeleton style={{ height: 18, width: 85, borderRadius: 4 }} />
-                        <Skeleton style={{ height: 14, width: 65, borderRadius: 4 }} />
+                        <Skeleton radius="xs" style={{ height: 18, width: 85 }} />
+                        <Skeleton radius="xs" style={{ height: 14, width: 65 }} />
                       </Box>
 
                       <Box gap="xs">
-                        <Skeleton style={{ height: 18, width: "95%", borderRadius: 4 }} />
-                        <Skeleton style={{ height: 18, width: "65%", borderRadius: 4 }} />
+                        <Skeleton radius="xs" style={{ height: 18, width: "95%" }} />
+                        <Skeleton radius="xs" style={{ height: 18, width: "65%" }} />
                       </Box>
 
                       <Box row style={{ justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
                         <Box row style={{ alignItems: "center", gap: 8 }}>
                           <Skeleton radius="full" style={{ width: 28, height: 28 }} />
-                          <Skeleton style={{ height: 14, width: 100, borderRadius: 4 }} />
+                          <Skeleton radius="xs" style={{ height: 14, width: 100 }} />
                         </Box>
-                        <Skeleton style={{ height: 24, width: 24, borderRadius: 4 }} />
+                        <Skeleton radius="xs" style={{ height: 24, width: 24 }} />
                       </Box>
                     </Box>
                   </SkeletonGroup>
@@ -339,7 +371,7 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
                   <Box gap="md">
                     <Image
                       source={{ uri: SAMPLE_ASSETS.bannerImageUrl }}
-                      style={{ width: "100%", height: 130, borderRadius: 8 }}
+                      style={{ width: "100%", height: 130, borderRadius: ctx.radii.md, borderCurve: "continuous" }}
                       resizeMode="cover"
                     />
 
@@ -371,31 +403,31 @@ export function SkeletonSection({ ctx }: { ctx: RnUiSectionContext }) {
                       </Box>
 
                       <Box row center gap="sm">
-                        <TouchableOpacity onPress={() => setLiked(!liked)} activeOpacity={0.7}>
+                        <Pressable onPress={() => setLiked(!liked)} hitSlop={8}>
                           <Star
                             size={18}
-                            color={liked ? colors.warning || "#F59E0B" : colors.textMuted}
-                            fill={liked ? colors.warning || "#F59E0B" : "none"}
+                            color={liked ? colors.warning : colors.textMuted}
+                            fill={liked ? colors.warning : "none"}
                           />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setBookmarked(!bookmarked)} activeOpacity={0.7}>
+                        </Pressable>
+                        <Pressable onPress={() => setBookmarked(!bookmarked)} hitSlop={8}>
                           <Bookmark
                             size={18}
                             color={bookmarked ? colors.primary : colors.textMuted}
                             fill={bookmarked ? colors.primary : "none"}
                           />
-                        </TouchableOpacity>
-                        <TouchableOpacity activeOpacity={0.7}>
+                        </Pressable>
+                        <Pressable hitSlop={8}>
                           <Share2 size={18} color={colors.textMuted} />
-                        </TouchableOpacity>
+                        </Pressable>
                       </Box>
                     </Box>
                   </Box>
                 )}
-              </Card>
+              </DemoSurface>
             </Box>
           </Box>
-        </Card>
+        </DemoCard>
       </Section>
     </Box>
   );

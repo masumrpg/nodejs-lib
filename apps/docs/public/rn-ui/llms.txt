@@ -1,7 +1,7 @@
 # @masumdev/rn-ui — AI Developer & Context Guide
 
 > Production-ready, typed React Native & Expo component library.
-> Version: 0.7.0 | 63 Component Modules | Monorepo: Masum Dev
+> Version: 0.7.0 | 61 Component Modules | Monorepo: Masum Dev
 
 This document is optimized for LLMs and AI coding assistants writing React Native / Expo applications using `@masumdev/rn-ui`.
 
@@ -19,7 +19,7 @@ This document is optimized for LLMs and AI coding assistants writing React Nativ
    - Avoid hardcoding ad-hoc shadow or borderWidth values outside `theme.shadows` and `theme.components.borderWidth`.
 2. **Strict Orthogonal `tone` vs `variant`**:
    - **`tone` (Semantic Intent)**: `"default"` | `"primary"` | `"secondary"` | `"accent"` | `"success"` | `"warning"` | `"danger"` | `"info"`.
-   - **`variant` (Visual Treatment)**: `"filled"` | `"outline"` | `"ghost"` | `"soft"` (with component-specific structural variants such as `"accent"` on `Alert`, `"flat"` on `Accordion` / `Toast`, `"line"` / `"pill"` on `Tabs`).
+   - **`variant` (Visual Treatment)**: `"filled"` | `"outline"` | `"ghost"` | `"soft"` (with component-specific structural variants such as `"accent"` on `Alert`, `"flat"` on `Accordion` / `Toast`, `"line"` / `"pill"` / `"flush"` on `Tabs`, `"surface"` / `"flush"` on `SegmentedControl`).
    - **CRITICAL CONVENTIONS (`v0.7.0`)**:
      - Use `variant="filled"` on `Button`, `Badge`, `Alert`, `Bubble`, `IconButton`, and `Chip` (do **NOT** use `variant="solid"` on those components).
      - Use `variant="outline"` on `Accordion`, `Alert`, `Badge`, `Bubble`, `Button`, `Chip`, `Toast`, `Select`, and `Combobox` (do **NOT** use `variant="outlined"`).
@@ -31,7 +31,7 @@ This document is optimized for LLMs and AI coding assistants writing React Nativ
    - `withSpring` is strictly disallowed across `@masumdev/rn-ui`.
 4. **Built-in Portal Overlay Layering & Native Modals**:
    - `ThemeProvider` automatically mounts `<PortalProvider>` and `<PortalHost name="root" />` over your app tree, with explicit layer ordering for anchored overlays (`Select`, `Combobox`, `Popover`, `Tooltip`, `HoverCard`, `DropdownMenu`, `ContextMenu`, `SpeedDial`) and `ToastViewport`.
-   - Full-screen / blocking sheets (`AlertDialog`, `Command`, `DatePickerModal`, `TimePickerModal`) use React Native's built-in `<Modal>` with zero `@gorhom/bottom-sheet` dependency.
+   - Full-screen / blocking dialogs (`AlertDialog`, `DatePickerModal`, `TimePickerModal`) use React Native's built-in `<Modal>` with zero `@gorhom/bottom-sheet` dependency.
    - `Tabs` (`Tabs`, `TabsList`, `TabsTrigger`, `TabsContent`) and `SegmentedControl` are both included cleanly.
 5. **Pluggable Iconography (`RenderIcon`)**:
    - Icons are not hardcoded to any icon library.
@@ -473,11 +473,11 @@ export function NavigationExamples() {
 
 ---
 
-## Full Catalog (62 Component Modules + ThemeProvider / Portal)
+## Full Catalog (61 Component Modules + ThemeProvider / Portal)
 
 All components are imported directly from `@masumdev/rn-ui`:
 
-### Layout & Surface (11)
+### Layout & Surface (10)
 - `Box`: Flex container primitive with shorthand layout props (`row`, `center`, `gap`, `p`, `bg`).
 - `Card`: Bordered surface container with toggleable `elevated`, `outlined`, `padded`, and `glass`.
 - `Item`, `ItemGroup`, `ItemMedia`, `ItemContent`, `ItemTitle`, `ItemDescription`, `ItemActions`, `ItemSeparator`: Structured compound list row primitives.
@@ -487,7 +487,6 @@ All components are imported directly from `@masumdev/rn-ui`:
 - `Timeline`, `TimelineItem`, `TimelineDot`, `TimelineConnector`, `TimelineContent`, `TimelineTitle`, `TimelineDescription`, `TimelineTime`: Vertical event timeline.
 - `Divider`: Hairline content separator.
 - `AspectRatio`: Ratio-constrained container (`16 / 9`, `1 / 1`).
-- `KeyboardAvoiding`: Safe keyboard avoiding layout wrapper.
 - `Empty`, `EmptyMedia`, `EmptyHeader`, `EmptyTitle`, `EmptyDescription`, `EmptyContent`: Empty state placeholder primitives.
 
 ### Typography & Actions (7)
@@ -515,7 +514,7 @@ All components are imported directly from `@masumdev/rn-ui`:
 - `SearchBar`: Debounced mobile search input with clear and animated cancel transition.
 - `FormField`, `FormLabel`, `FormControl`, `FormDescription`, `FormError`: Accessible form context wrapper.
 - `Label`: Form input label with required indicator.
-- `SegmentedControl`: Cupertino sliding pill tab switcher with haptics.
+- `SegmentedControl`: Cupertino sliding pill or container-flush tab switcher with haptics.
 
 ### Overlays, Menus & Dialogs (9)
 - `Alert`: Inline notification callout with SVG status icons, `variant`, `tone`, and `glass`.
@@ -526,10 +525,10 @@ All components are imported directly from `@masumdev/rn-ui`:
 - `HoverCard`, `HoverCardTrigger`, `HoverCardContent`: Preview popover triggered on press or long press.
 - `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuCheckboxItem`, `DropdownMenuRadioGroup`, `DropdownMenuRadioItem`, `DropdownMenuLabel`, `DropdownMenuSeparator`: Floating action menu.
 - `ContextMenu`, `ContextMenuTrigger`, `ContextMenuContent`, `ContextMenuItem`, `ContextMenuLabel`, `ContextMenuSeparator`: Long-press context menu popup.
-- `Command`: Searchable command palette modal.
 
-### Disclosure & Navigation (7)
-- `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent`: Compound tab navigation with directional slide/scale transitions.
+### Disclosure & Navigation (8)
+- `SideNavigation`, `SideNavHeader`, `SideNavContent`, `SideNavSection`, `SideNavItem`, `SideNavFooter`, `SideNavToggle`: Responsive side navigation with gesture-dismiss drawer, compact 70px rail with tooltips, expanded sidebar, and floating island dock.
+- `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent`: Compound tab navigation (line, pill, soft, flush) with directional slide/scale transitions.
 - `Accordion`: Expandable FAQ panels (`outline`, `flat`, `ghost`, `glass`).
 - `Collapsible`, `CollapsibleTrigger`, `CollapsibleContent`: Single-panel animated disclosure.
 - `Carousel`: Virtualized horizontal gallery with pagination dots.

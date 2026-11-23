@@ -1,12 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AppState,
   Pressable,
   StatusBar,
   StyleSheet,
   View,
   useWindowDimensions,
-  type AppStateStatus,
   type LayoutChangeEvent,
   type StyleProp,
   type TextStyle,
@@ -22,7 +20,6 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withRepeat,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -34,9 +31,9 @@ import { withAlpha } from "../utils/color";
 import { triggerHaptic } from "../utils/haptics";
 import { Button } from "./Button";
 import { Progress } from "./Progress";
+import { Spinner } from "./Spinner";
 import { Text } from "./Text";
 import {
-  ANIMATION_TIMING,
   minTouchHitSlop,
   renderIcon,
   resolveOutlineBorderColor,
@@ -62,6 +59,7 @@ export interface ToastOptions {
   tone?: ToastTone;
   variant?: ToastVariant;
   glass?: boolean;
+  loading?: boolean;
   icon?: RenderIcon;
   media?: React.ReactNode;
   banner?: React.ReactNode;
@@ -78,6 +76,7 @@ export interface ToastRecord extends Required<Pick<ToastOptions, "id">> {
   tone: ToastTone;
   variant: ToastVariant;
   glass?: boolean;
+  loading?: boolean;
   icon?: RenderIcon;
   media?: React.ReactNode;
   banner?: React.ReactNode;
@@ -121,6 +120,25 @@ export interface ToastProviderProps extends BaseGlassProps {
     controls: ToastContextValue,
   ) => React.ReactNode;
   viewportStyle?: StyleProp<ViewStyle>;
+}
+
+const TOAST_EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+
+function projectToastMomentum(velocity: number, decelerationRate = 0.996): number {
+  "worklet";
+  return ((velocity / 1000) * decelerationRate) / (1 - decelerationRate);
+}
+
+function rubberbandToastDrag(
+  overshoot: number,
+  dimension: number,
+  constant = 0.45,
+): number {
+  "worklet";
+  return (
+    (overshoot * dimension * constant) /
+    (dimension + constant * Math.abs(overshoot))
+  );
 }
 
 function createToastId() {
@@ -216,6 +234,7 @@ export function ToastProvider({
         tone: options.tone ?? "default",
         variant: options.variant ?? defaultVariant,
         glass: options.glass ?? defaultGlass,
+        loading: options.loading,
         duration: options.duration ?? duration,
         open: true,
       };
@@ -240,13 +259,36 @@ export function ToastProvider({
 
   const update = useCallback(
     (id: string, options: Omit<ToastOptions, "id">) => {
-      triggerHaptic("selection");
       const existing = toastsRef.current.find((toast) => toast.id === id);
+      const resolvedTone = options.tone ?? existing?.tone ?? "default";
+      triggerHaptic(
+        resolvedTone === "success"
+          ? "success"
+          : resolvedTone === "danger"
+            ? "error"
+            : resolvedTone === "warning"
+              ? "warning"
+              : "selection",
+      );
+
+      const resolvedDuration = options.duration ?? existing?.duration ?? duration;
+      const nextLoading =
+        options.loading !== undefined
+          ? options.loading
+          : resolvedDuration > 0 ||
+              resolvedTone === "success" ||
+              resolvedTone === "danger" ||
+              resolvedTone === "warning"
+            ? false
+            : existing?.loading;
+
       const nextToast: ToastRecord | null = existing
         ? {
             ...existing,
             ...options,
-            duration: options.duration ?? existing.duration,
+            tone: resolvedTone,
+            loading: nextLoading,
+            duration: resolvedDuration,
             open: true,
           }
         : null;
@@ -254,10 +296,23 @@ export function ToastProvider({
       setToasts((current) =>
         current.map((toast) => {
           if (toast.id !== id) return toast;
+          const mergedTone = options.tone ?? toast.tone;
+          const mergedDuration = options.duration ?? toast.duration;
+          const mergedLoading =
+            options.loading !== undefined
+              ? options.loading
+              : mergedDuration > 0 ||
+                  mergedTone === "success" ||
+                  mergedTone === "danger" ||
+                  mergedTone === "warning"
+                ? false
+                : toast.loading;
           return {
             ...toast,
             ...options,
-            duration: options.duration ?? toast.duration,
+            tone: mergedTone,
+            loading: mergedLoading,
+            duration: mergedDuration,
             open: true,
           };
         }),
@@ -267,7 +322,7 @@ export function ToastProvider({
         scheduleDismiss(nextToast);
       }
     },
-    [scheduleDismiss],
+    [duration, scheduleDismiss],
   );
 
   useEffect(
@@ -290,25 +345,28 @@ export function ToastProvider({
         offset={resolvedViewportOffset}
         style={viewportStyle}
       >
-        {toasts.map((toast, index) =>
-          renderToast ? (
-            <React.Fragment key={toast.id}>
-              {renderToast(toast, controls)}
-            </React.Fragment>
-          ) : (
-            <Toast
-              key={toast.id}
-              toast={toast}
-              index={index}
-              totalToasts={toasts.length}
-              viewportOffset={resolvedViewportOffset}
-              placement={placement}
-              swipeToDismiss={swipeToDismiss}
-              onDismiss={() => dismiss(toast.id)}
-              onCloseComplete={() => remove(toast.id)}
-            />
-          ),
-        )}
+        {toasts
+          .map((toast, index) => ({ toast, index }))
+          .reverse()
+          .map(({ toast, index }) =>
+            renderToast ? (
+              <React.Fragment key={toast.id}>
+                {renderToast(toast, controls)}
+              </React.Fragment>
+            ) : (
+              <Toast
+                key={toast.id}
+                toast={toast}
+                index={index}
+                totalToasts={toasts.length}
+                viewportOffset={resolvedViewportOffset}
+                placement={placement}
+                swipeToDismiss={swipeToDismiss}
+                onDismiss={() => dismiss(toast.id)}
+                onCloseComplete={() => remove(toast.id)}
+              />
+            ),
+          )}
       </ToastViewport>
     ) : null;
 
@@ -363,12 +421,12 @@ export const ToastViewport = React.memo(function ToastViewport({
       style={[
         styles.viewport,
         {
-          gap: spacing.sm,
-          flexDirection: placement === "top" ? "column" : "column-reverse",
           left: spacing.lg,
           right: spacing.lg,
           top: placement === "top" ? resolvedOffset : undefined,
           bottom: placement === "bottom" ? resolvedOffset : undefined,
+          minHeight: 120,
+          overflow: "visible",
         },
         style,
       ]}
@@ -503,10 +561,49 @@ const DefaultToastToneIcon = React.memo(function DefaultToastToneIcon({
   );
 });
 
+const ToastIconTransition = React.memo(function ToastIconTransition({
+  animated,
+  children,
+}: {
+  animated: boolean;
+  children: React.ReactNode;
+}) {
+  const reducedMotion = useReducedMotion();
+  const shouldAnimate = animated && !reducedMotion;
+  const transitionProgress = useSharedValue(shouldAnimate ? 0 : 1);
+
+  useEffect(() => {
+    if (!shouldAnimate) {
+      transitionProgress.value = 1;
+      return;
+    }
+    transitionProgress.value = 0;
+    transitionProgress.value = withTiming(1, {
+      duration: 180,
+      easing: TOAST_EASE_OUT,
+    });
+    return () => {
+      cancelAnimation(transitionProgress);
+    };
+  }, [shouldAnimate, transitionProgress]);
+
+  const iconTransitionStyle = useAnimatedStyle(
+    () => ({
+      opacity: transitionProgress.value,
+      transform: [{ scale: 0.88 + transitionProgress.value * 0.12 }],
+    }),
+    webDeps([]),
+  );
+
+  return <Animated.View style={iconTransitionStyle}>{children}</Animated.View>;
+});
+
 const CLOSE_BUTTON_SIZE = 30;
 
 export const Toast = React.memo(function Toast({
   toast,
+  index = 0,
+  totalToasts = 1,
   viewportOffset = 56,
   onToggleExpand,
   placement = "top",
@@ -524,20 +621,49 @@ export const Toast = React.memo(function Toast({
   const progress = useSharedValue(0);
   const translateX = useSharedValue(0);
   const translateYDrag = useSharedValue(0);
-  const rotateValue = useSharedValue(0);
+
+  const stackOffset = placement === "top" ? 14 : -14;
+  const targetStackY = index * stackOffset;
+  const targetScale = Math.max(0.82, 1 - index * 0.06);
+  const targetOpacity = index < 3 ? 1 : 0;
+
+  const stackY = useSharedValue(targetStackY);
+  const stackScale = useSharedValue(targetScale);
+  const stackOpacity = useSharedValue(targetOpacity);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      stackY.value = targetStackY;
+      stackScale.value = targetScale;
+      stackOpacity.value = targetOpacity;
+      return;
+    }
+    stackY.value = withTiming(targetStackY, {
+      duration: 260,
+      easing: TOAST_EASE_OUT,
+    });
+    stackScale.value = withTiming(targetScale, {
+      duration: 260,
+      easing: TOAST_EASE_OUT,
+    });
+    stackOpacity.value = withTiming(targetOpacity, {
+      duration: 260,
+      easing: TOAST_EASE_OUT,
+    });
+  }, [
+    index,
+    reducedMotion,
+    stackOpacity,
+    stackScale,
+    stackY,
+    targetOpacity,
+    targetScale,
+    targetStackY,
+  ]);
+
   const slideDistanceSV = useSharedValue(
     Math.max(140, toastHeight + viewportOffset + 32),
   );
-  const [appActive, setAppActive] = useState(
-    AppState.currentState === "active",
-  );
-
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
-      setAppActive(next === "active");
-    });
-    return () => sub.remove();
-  }, []);
 
   useEffect(() => {
     slideDistanceSV.value = Math.max(140, toastHeight + viewportOffset + 32);
@@ -547,7 +673,11 @@ export const Toast = React.memo(function Toast({
     () => getToastTone(toast.tone, colors),
     [colors, toast.tone],
   );
-  const isAsyncLoading = toast.duration === 0;
+  const isLoading =
+    toast.loading === true ||
+    (toast.loading !== false &&
+      toast.duration === 0 &&
+      (toast.tone === "info" || toast.tone === "default"));
 
   useEffect(() => {
     if (toast.open) {
@@ -564,21 +694,19 @@ export const Toast = React.memo(function Toast({
 
     progress.value = withTiming(
       toast.open ? 1 : 0,
-      toast.open
-        ? {
-            duration: 280,
-            easing: Easing.bezier(0.22, 1, 0.36, 1),
-          }
-        : {
-            duration: 230,
-            easing: Easing.bezier(0.4, 0, 1, 1),
-          },
+      {
+        duration: toast.open ? 280 : 220,
+        easing: TOAST_EASE_OUT,
+      },
       (finished) => {
         if (finished && !toast.open && onCloseComplete) {
           scheduleOnRN(onCloseComplete);
         }
       },
     );
+    return () => {
+      cancelAnimation(progress);
+    };
   }, [
     onCloseComplete,
     progress,
@@ -589,20 +717,11 @@ export const Toast = React.memo(function Toast({
   ]);
 
   useEffect(() => {
-    if (isAsyncLoading && appActive && !reducedMotion) {
-      rotateValue.value = withRepeat(
-        withTiming(360, { duration: 900, easing: Easing.linear }),
-        -1,
-        false,
-      );
-      return () => {
-        cancelAnimation(rotateValue);
-      };
-    }
-    cancelAnimation(rotateValue);
-    rotateValue.value = 0;
-    return undefined;
-  }, [appActive, isAsyncLoading, reducedMotion, rotateValue]);
+    return () => {
+      cancelAnimation(translateX);
+      cancelAnimation(translateYDrag);
+    };
+  }, [translateX, translateYDrag]);
 
   const exitDistance = windowWidth + 40;
 
@@ -622,36 +741,38 @@ export const Toast = React.memo(function Toast({
             : event.translationY > 0;
         translateYDrag.value = towardDismissEdge
           ? event.translationY
-          : event.translationY * 0.15;
+          : rubberbandToastDrag(event.translationY, 44);
       }
     },
     onDeactivate: (event) => {
       "worklet";
       if (event.canceled) {
         translateX.value = withTiming(0, {
-          duration: ANIMATION_TIMING.transition,
-          easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+          duration: 180,
+          easing: TOAST_EASE_OUT,
         });
         translateYDrag.value = withTiming(0, {
-          duration: ANIMATION_TIMING.transition,
-          easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+          duration: 180,
+          easing: TOAST_EASE_OUT,
         });
         return;
       }
       const isHorizontal =
         Math.abs(event.translationX) > Math.abs(event.translationY);
+      const projectedX =
+        event.translationX + projectToastMomentum(event.velocityX);
+      const projectedY =
+        event.translationY + projectToastMomentum(event.velocityY);
 
       if (
         isHorizontal &&
-        (Math.abs(event.translationX) > 72 || Math.abs(event.velocityX) > 600)
+        (Math.abs(event.translationX) > 72 || Math.abs(projectedX) > 120)
       ) {
         const exitTarget =
-          event.velocityX > 0 || (event.velocityX === 0 && event.translationX > 0)
-            ? exitDistance
-            : -exitDistance;
+          projectedX >= 0 ? exitDistance : -exitDistance;
         translateX.value = withTiming(
           exitTarget,
-          { duration: 150, easing: Easing.bezier(...ANIMATION_TIMING.bezier) },
+          { duration: 160, easing: TOAST_EASE_OUT },
           (finished) => {
             if (finished && onDismiss) {
               scheduleOnRN(onDismiss);
@@ -664,15 +785,15 @@ export const Toast = React.memo(function Toast({
       const dismissVertically =
         !isHorizontal &&
         (placement === "top"
-          ? event.translationY < -32 || event.velocityY < -400
-          : event.translationY > 32 || event.velocityY > 400);
+          ? event.translationY < -30 || projectedY < -72
+          : event.translationY > 30 || projectedY > 72);
 
       if (dismissVertically) {
         const verticalTarget =
           placement === "top" ? -slideDistanceSV.value : slideDistanceSV.value;
         translateYDrag.value = withTiming(
           verticalTarget,
-          { duration: 160, easing: Easing.bezier(0.4, 0, 1, 1) },
+          { duration: 160, easing: TOAST_EASE_OUT },
           (finished) => {
             if (finished && onDismiss) {
               scheduleOnRN(onDismiss);
@@ -683,12 +804,12 @@ export const Toast = React.memo(function Toast({
       }
 
       translateX.value = withTiming(0, {
-        duration: ANIMATION_TIMING.transition,
-        easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+        duration: 180,
+        easing: TOAST_EASE_OUT,
       });
       translateYDrag.value = withTiming(0, {
-        duration: ANIMATION_TIMING.transition,
-        easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+        duration: 180,
+        easing: TOAST_EASE_OUT,
       });
     },
   });
@@ -696,33 +817,32 @@ export const Toast = React.memo(function Toast({
   const animatedStyle = useAnimatedStyle(() => {
     const travel =
       placement === "top" ? -slideDistanceSV.value : slideDistanceSV.value;
-    return {
-      opacity: interpolate(
+    const entranceY = travel * (1 - progress.value);
+    const currentY = entranceY + translateYDrag.value + stackY.value;
+    const currentScale = stackScale.value * (0.96 + progress.value * 0.04);
+    const currentOpacity =
+      interpolate(
         progress.value,
         [0, 0.22, 1],
         [0, 1, 1],
         Extrapolation.CLAMP,
-      ),
+      ) * stackOpacity.value;
+
+    return {
+      opacity: currentOpacity,
       transform: [
-        { translateY: travel * (1 - progress.value) + translateYDrag.value },
+        { translateY: currentY },
         { translateX: translateX.value },
-        { scale: 0.96 + progress.value * 0.04 },
+        { scale: currentScale },
       ],
     };
   }, webDeps([placement]));
-
-  const animatedIconStyle = useAnimatedStyle(() => {
-    const raw = Number.isFinite(rotateValue.value) ? rotateValue.value : 0;
-    const safeDeg = ((raw % 360) + 360) % 360;
-    return {
-      transform: [{ rotate: `${safeDeg.toFixed(1)}deg` }],
-    };
-  });
 
   const isSolid = toast.variant === "solid";
   const isFlat = toast.variant === "flat";
   const isOutlined = toast.variant === "outline";
   const isGlass = Boolean(toast.glass);
+  const isBrutal = components.surface.pressEffect === "offset";
 
   const surfaceBg = isGlass
     ? colors.glassSurfaceStrong
@@ -731,20 +851,34 @@ export const Toast = React.memo(function Toast({
       : colors.surface;
 
   const containerBg = isSolid ? tone.base : surfaceBg;
+  const isBorderlessTheme = components.borderWidth.default === 0;
   const borderColor = isGlass
     ? colors.glassBorder
     : isFlat || isSolid
       ? "transparent"
       : isOutlined
         ? resolveOutlineBorderColor(colors, components.surface, tone.base)
-        : colors.border;
+        : isBorderlessTheme
+          ? colors.borderMuted
+          : colors.border;
 
-  const borderWidth = isFlat || isSolid
-    ? 0
-    : isOutlined
-      ? components.borderWidth.strong
-      : components.borderWidth.default;
+  const borderWidth =
+    isFlat || isSolid
+      ? 0
+      : isOutlined
+        ? components.borderWidth.strong
+        : Math.max(components.borderWidth.default, 1);
   const onToneColor = getToastOnToneColor(toast.tone, colors);
+
+  const cardElevation: ViewStyle | undefined = isFlat
+    ? undefined
+    : isBrutal
+      ? shadows.md
+      : {
+          boxShadow: isDark
+            ? "0px 8px 24px rgba(0, 0, 0, 0.48)"
+            : "0px 8px 24px rgba(15, 23, 42, 0.12)",
+        };
 
   const itemContextValue = useMemo(
     () => ({ isSolid, tone, onToneColor }),
@@ -761,25 +895,42 @@ export const Toast = React.memo(function Toast({
     [toastHeight],
   );
 
+  const spinnerColor = isSolid ? onToneColor : tone.base;
+  const spinnerTrack = isSolid
+    ? withAlpha(onToneColor, 0.28)
+    : withAlpha(tone.base, 0.22);
+
+  const zIndex = 20 - index;
+  const elevation = Math.max(0, 10 - index);
+  const isMultiline = Boolean(toast.description || toast.banner || toast.content);
+
   return (
     <ToastItemContext.Provider value={itemContextValue}>
       <GestureDetector gesture={panGesture}>
         <Animated.View
           accessibilityRole="alert"
+          pointerEvents={index === 0 ? "auto" : "none"}
           style={[
             styles.toastCard,
             {
-              position: "relative",
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: placement === "top" ? 0 : undefined,
+              bottom: placement === "bottom" ? 0 : undefined,
+              zIndex,
+              elevation,
               borderRadius: radii.xl,
+              borderCurve: "continuous",
               borderWidth,
               borderColor,
               backgroundColor: containerBg,
               paddingVertical: spacing.md,
               paddingHorizontal: spacing.lg,
               gap: spacing.md,
-              alignItems: toast.banner ? "flex-start" : "center",
+              alignItems: isMultiline ? "flex-start" : "center",
             },
-            !isFlat ? shadows.lg : undefined,
+            cardElevation,
             animatedStyle,
             style,
           ]}
@@ -787,31 +938,45 @@ export const Toast = React.memo(function Toast({
           {...props}
         >
           {toast.media ? (
-            <View style={styles.mediaWrap}>{toast.media}</View>
+            <View style={[styles.mediaWrap, isMultiline && { marginTop: 1 }]}>
+              {toast.media}
+            </View>
           ) : (
-            <Animated.View
+            <View
               style={[
                 styles.iconBadge,
                 {
-                  borderRadius: radii.md,
+                  borderRadius: radii.full,
                   backgroundColor: isSolid
                     ? withAlpha(onToneColor, 0.22)
                     : tone.soft,
+                  marginTop: isMultiline ? 1 : 0,
                 },
-                isAsyncLoading ? animatedIconStyle : undefined,
               ]}
             >
-              {toast.icon ? (
-                renderIcon(toast.icon, isSolid ? onToneColor : tone.base, 18)
-              ) : (
-                <DefaultToastToneIcon
-                  tone={toast.tone}
-                  color={tone.base}
-                  isSolid={isSolid}
-                  onColor={onToneColor}
-                />
-              )}
-            </Animated.View>
+              <ToastIconTransition
+                key={isLoading ? "loading" : `${toast.tone}-done`}
+                animated
+              >
+                {isLoading ? (
+                  <Spinner
+                    size={18}
+                    strokeWidth={2.2}
+                    color={spinnerColor}
+                    trackColor={spinnerTrack}
+                  />
+                ) : toast.icon ? (
+                  renderIcon(toast.icon, isSolid ? onToneColor : tone.base, 18)
+                ) : (
+                  <DefaultToastToneIcon
+                    tone={toast.tone}
+                    color={tone.base}
+                    isSolid={isSolid}
+                    onColor={onToneColor}
+                  />
+                )}
+              </ToastIconTransition>
+            </View>
           )}
 
           <ToastContent onPress={onToggleExpand}>
@@ -846,17 +1011,23 @@ export const Toast = React.memo(function Toast({
           </ToastContent>
 
           {toast.action ? (
-            <ToastAction
-              label={toast.action.label}
-              onPress={() => {
-                triggerHaptic("selection");
-                toast.action?.onPress();
-                onDismiss?.();
-              }}
-            />
+            <View style={isMultiline ? { marginTop: 1 } : undefined}>
+              <ToastAction
+                label={toast.action.label}
+                onPress={() => {
+                  triggerHaptic("selection");
+                  toast.action?.onPress();
+                  onDismiss?.();
+                }}
+              />
+            </View>
           ) : null}
 
-          <ToastClose onPress={onDismiss} icon={toast.closeIcon} />
+          <ToastClose
+            onPress={onDismiss}
+            icon={toast.closeIcon}
+            style={isMultiline ? { marginTop: 1 } : undefined}
+          />
         </Animated.View>
       </GestureDetector>
     </ToastItemContext.Provider>
@@ -981,11 +1152,13 @@ export const ToastAction = React.memo(function ToastAction({
 export interface ToastCloseProps {
   onPress?: () => void;
   icon?: RenderIcon;
+  style?: StyleProp<ViewStyle>;
 }
 
 export const ToastClose = React.memo(function ToastClose({
   onPress,
   icon,
+  style,
 }: ToastCloseProps) {
   const { colors } = useTheme();
   const { isSolid, onToneColor } = React.useContext(ToastItemContext);
@@ -1015,6 +1188,7 @@ export const ToastClose = React.memo(function ToastClose({
             : "transparent",
           opacity: pressed ? 0.72 : 0.9,
         },
+        style,
       ]}
     >
       {icon ? (
@@ -1053,8 +1227,8 @@ const styles = StyleSheet.create({
     marginRight: 2,
   },
   iconBadge: {
-    width: 34,
-    height: 34,
+    width: 36,
+    height: 36,
     alignItems: "center",
     justifyContent: "center",
   },

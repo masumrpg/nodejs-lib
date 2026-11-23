@@ -1,58 +1,41 @@
-import {
-  Badge,
-  Box,
-  Card,
-  SpeedDial,
-  Text,
-} from "@masumdev/rn-ui";
-import { Plus, FileText, QrCode, Upload, Share } from "lucide-react-native";
+import { Box, SpeedDial, Text, useTheme } from "@masumdev/rn-ui";
+import { FileText, Plus, QrCode, Share2, Upload } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
-import { Section, type RnUiSectionContext } from "../shared";
+import { DemoCard, DemoReadout, Section, type RnUiSectionContext } from "../shared";
 
 export function SpeedDialSection(_props?: { ctx?: RnUiSectionContext }) {
+  const { colors, components, radii } = useTheme();
   const [lastAction, setLastAction] = useState<string>("None");
   const [dialOpen, setDialOpen] = useState(false);
 
   return (
     <Section title="SpeedDial">
       <Box gap="lg">
-        <Card outlined>
+        {/* Card 1: Expanding FAB Menu */}
+        <DemoCard
+          title="SpeedDial FAB Menu"
+          badge="Staggered Physics"
+          badgeTone="primary"
+          description="Expanding floating action menu with staggered spring timing, rotating plus icon, and haptic clicks."
+        >
           <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Expanding FAB Menu
-              </Text>
-              <Badge tone="primary">Spring Stagger</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Tap the floating action button to reveal secondary action pills with staggered spring animation.
-            </Text>
-
-            <Box p="md" bg="surfaceMuted" style={{ borderRadius: 8 }}>
-              <Text variant="caption" color="textMuted">
-                Last Triggered Action:{" "}
-                <Text variant="caption" weight="600" color="primary">
-                  {lastAction}
-                </Text>
-              </Text>
-            </Box>
+            <DemoReadout label="Last Triggered Action" value={lastAction} />
 
             {/* Embedded interactive preview container */}
             <View
               style={{
-                height: 240,
-                backgroundColor: "rgba(0,0,0,0.03)",
-                borderRadius: 12,
+                height: 340,
+                backgroundColor: colors.surfaceMuted,
+                borderRadius: radii.lg,
+                borderCurve: "continuous",
                 position: "relative",
                 overflow: "hidden",
-                borderWidth: 1,
-                borderColor: "rgba(0,0,0,0.06)",
+                borderWidth: components.borderWidth.default,
+                borderColor:
+                  components.borderWidth.default > 0
+                    ? colors.borderMuted
+                    : "transparent",
               }}
             >
               <Box p="md">
@@ -92,7 +75,7 @@ export function SpeedDialSection(_props?: { ctx?: RnUiSectionContext }) {
                   {
                     id: "share",
                     label: "Share Monorepo",
-                    icon: ({ color, size }) => <Share color={color} size={size} />,
+                    icon: ({ color, size }) => <Share2 color={color} size={size} />,
                     tone: "secondary",
                     onPress: () => setLastAction("Share Monorepo"),
                   },
@@ -100,7 +83,7 @@ export function SpeedDialSection(_props?: { ctx?: RnUiSectionContext }) {
               />
             </View>
           </Box>
-        </Card>
+        </DemoCard>
       </Box>
     </Section>
   );

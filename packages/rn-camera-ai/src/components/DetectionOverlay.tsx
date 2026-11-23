@@ -12,6 +12,8 @@ import {
   transformNormalizedPointToPixel,
   transformNormalizedToPixelBox,
 } from '../math/transforms';
+import { useCameraAITheme } from '../theme/context';
+import type { CameraAITheme } from '../theme/types';
 import type {
   BoundingBoxVariant,
   DetectionResult,
@@ -178,6 +180,8 @@ export interface DetectionOverlayProps {
   meshStyle?: FaceMeshStyleConfig;
   /** Unified declarative overlay theme configuration */
   overlayTheme?: OverlayThemeConfig;
+  /** Optional theme token binding override */
+  theme?: CameraAITheme;
   /** Custom per-detection bounding box renderer receiving pre-projected screen pixel coordinates */
   renderBox?: (params: RenderBoxParams) => React.ReactNode;
   /** Custom per-detection label badge renderer receiving pre-projected screen pixel coordinates */
@@ -918,11 +922,15 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
   showTesselation,
   meshStyle,
   overlayTheme,
+  theme,
   renderBox,
   renderLabel,
   renderLandmarkDot,
   style,
 }) => {
+  const contextTheme = useCameraAITheme();
+  const activeTheme = theme ?? contextTheme;
+
   if (viewDimensions.width <= 0 || viewDimensions.height <= 0) {
     return null;
   }
@@ -930,9 +938,13 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
   const resolvedShowBoxes = showBoxes ?? overlayTheme?.showBoxes ?? true;
   const resolvedBoxVariant: BoundingBoxVariant =
     boxVariant ?? overlayTheme?.boxVariant ?? 'solid';
-  const resolvedBoxColor = boxColor ?? overlayTheme?.boxColor ?? '#3da441';
+  const resolvedBoxColor =
+    boxColor ?? overlayTheme?.boxColor ?? activeTheme?.primary ?? '#3da441';
   const resolvedUnrecognizedColor =
-    unrecognizedBoxColor ?? overlayTheme?.unrecognizedBoxColor ?? '#f59e0b';
+    unrecognizedBoxColor ??
+    overlayTheme?.unrecognizedBoxColor ??
+    activeTheme?.warning ??
+    '#f59e0b';
   const resolvedBoxBg = boxBackgroundColor ?? overlayTheme?.boxBackgroundColor;
   const resolvedBoxBorderWidth = boxBorderWidth ?? overlayTheme?.boxBorderWidth ?? 2;
   const resolvedBoxBorderRadius = boxBorderRadius ?? overlayTheme?.boxBorderRadius ?? 8;
@@ -947,7 +959,11 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
   const resolvedLabelPosition: LabelBadgePosition =
     labelPosition ?? overlayTheme?.labelPosition ?? 'top-left';
   const resolvedLabelBg = labelBackgroundColor ?? overlayTheme?.labelBackgroundColor;
-  const resolvedLabelTextColor = labelTextColor ?? overlayTheme?.labelTextColor ?? '#ffffff';
+  const resolvedLabelTextColor =
+    labelTextColor ??
+    overlayTheme?.labelTextColor ??
+    activeTheme?.textLight ??
+    '#ffffff';
   const resolvedLabelStyle = labelStyle ?? overlayTheme?.labelStyle;
   const resolvedLabelTextStyle = labelTextStyle ?? overlayTheme?.labelTextStyle;
   const resolvedFormatLabel = formatLabel ?? overlayTheme?.formatLabel;
@@ -960,21 +976,30 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
     showTesselation ?? resolvedMeshConfig?.showTesselation ?? true;
   const resolvedShowDots = resolvedMeshConfig?.showDots ?? true;
   const resolvedLandmarkColor =
-    landmarkColor ?? resolvedMeshConfig?.dotColor ?? '#38bdf8';
+    landmarkColor ??
+    resolvedMeshConfig?.dotColor ??
+    activeTheme?.info ??
+    '#38bdf8';
   const resolvedLandmarkStyle = landmarkStyle ?? overlayTheme?.landmarkStyle;
 
   const lineScale = resolvedMeshConfig?.lineThickness ?? 1.0;
   const tesselationColor =
-    resolvedMeshConfig?.tesselationColor ?? 'rgba(56, 189, 248, 0.42)';
+    resolvedMeshConfig?.tesselationColor ??
+    (activeTheme ? `${activeTheme.info}6b` : 'rgba(56, 189, 248, 0.42)');
   const faceOvalColor =
-    resolvedMeshConfig?.faceOvalColor ?? 'rgba(56, 189, 248, 0.75)';
-  const eyeContourColor = resolvedMeshConfig?.eyeContourColor ?? '#22d3ee';
+    resolvedMeshConfig?.faceOvalColor ??
+    (activeTheme ? `${activeTheme.info}bf` : 'rgba(56, 189, 248, 0.75)');
+  const eyeContourColor =
+    resolvedMeshConfig?.eyeContourColor ?? activeTheme?.accent ?? '#22d3ee';
   const eyebrowContourColor =
-    resolvedMeshConfig?.eyebrowContourColor ?? 'rgba(125, 211, 252, 0.85)';
+    resolvedMeshConfig?.eyebrowContourColor ??
+    (activeTheme ? `${activeTheme.info}d9` : 'rgba(125, 211, 252, 0.85)');
   const lipOuterContourColor = resolvedMeshConfig?.lipOuterContourColor ?? '#34d399';
   const lipInnerContourColor = resolvedMeshConfig?.lipInnerContourColor ?? '#6ee7b7';
-  const noseContourColor = resolvedMeshConfig?.noseContourColor ?? '#38bdf8';
-  const eyeDotColor = resolvedMeshConfig?.eyeDotColor ?? '#22d3ee';
+  const noseContourColor =
+    resolvedMeshConfig?.noseContourColor ?? activeTheme?.info ?? '#38bdf8';
+  const eyeDotColor =
+    resolvedMeshConfig?.eyeDotColor ?? activeTheme?.accent ?? '#22d3ee';
   const denseMeshDotColor = resolvedMeshConfig?.dotColor ?? '#e0f2fe';
   const eyeDotRadius = resolvedMeshConfig?.eyeDotRadius ?? 2.4;
   const denseMeshDotRadius = resolvedMeshConfig?.dotRadius ?? MESH_DOT_RADIUS;

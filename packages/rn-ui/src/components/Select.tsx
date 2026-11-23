@@ -229,12 +229,17 @@ export const Select = React.memo(function Select({
 
   const menuWidth = Math.max(220, anchor?.width ?? windowWidth - spacing.md * 2);
   const estimatedHeight = Math.min(maxHeight, Math.max(64, options.length * 50 + 16));
-  const resolvedAnchor: AnchorMeasurement = anchor ?? {
-    x: spacing.md,
-    y: windowHeight * 0.25,
-    width: menuWidth,
-    height: selectHeights[size],
-  };
+  const resolvedAnchor: AnchorMeasurement = anchor
+    ? {
+        ...anchor,
+        height: Math.max(anchor.height ?? 0, selectHeights[size]),
+      }
+    : {
+        x: spacing.md,
+        y: windowHeight * 0.25,
+        width: menuWidth,
+        height: selectHeights[size],
+      };
   const coords = computeAnchoredPosition({
     anchor: resolvedAnchor,
     contentWidth: menuWidth,
@@ -266,6 +271,7 @@ export const Select = React.memo(function Select({
   const renderOption = useCallback(
     ({ item }: ListRenderItemInfo<SelectOption>) => {
       const active = item.value === currentValue;
+      const isMultiline = Boolean(item.description);
       return (
         <Pressable
           accessibilityRole="menuitem"
@@ -286,6 +292,7 @@ export const Select = React.memo(function Select({
               opacity: item.disabled ? 0.5 : 1,
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
+              alignItems: isMultiline ? "flex-start" : "center",
             },
           ]}
         >
@@ -303,24 +310,31 @@ export const Select = React.memo(function Select({
               </Text>
             ) : null}
           </View>
-          {active
-            ? checkIcon
-              ? renderIcon(checkIcon, colors.primary, 16)
-              : (
-                  <Svg
-                    width={16}
-                    height={16}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke={colors.primary}
-                    strokeWidth={2.2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <Path d="M20 6L9 17l-5-5" />
-                  </Svg>
-                )
-            : null}
+          {active ? (
+            <View
+              style={[
+                styles.optionCheckWrap,
+                isMultiline ? styles.topAlignedCheck : undefined,
+              ]}
+            >
+              {checkIcon
+                ? renderIcon(checkIcon, colors.primary, 16)
+                : (
+                    <Svg
+                      width={16}
+                      height={16}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke={colors.primary}
+                      strokeWidth={2.2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <Path d="M20 6L9 17l-5-5" />
+                    </Svg>
+                  )}
+            </View>
+          ) : null}
         </Pressable>
       );
     },
@@ -329,8 +343,9 @@ export const Select = React.memo(function Select({
 
   return (
     <>
-      <View ref={triggerRef} collapsable={false}>
+      <View collapsable={false}>
         <Pressable
+          ref={triggerRef}
           accessibilityRole="button"
           accessibilityLabel={accessibilityLabel ?? selectedOption?.label ?? placeholder}
           accessibilityState={{ disabled: isDisabled, expanded: open }}
@@ -349,6 +364,7 @@ export const Select = React.memo(function Select({
               height,
               paddingHorizontal,
               borderRadius: resolveControlRadius("rounded", size, radii),
+              borderCurve: "continuous",
               borderWidth: open
                 ? components.borderWidth.focus
                 : components.borderWidth.strong,
@@ -396,10 +412,7 @@ export const Select = React.memo(function Select({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Dismiss menu"
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: withAlpha("#0F172A", 0.16) },
-            ]}
+            style={StyleSheet.absoluteFill}
             onPress={() => {
               if (haptic) triggerHaptic("selection");
               closeMenu();
@@ -419,8 +432,13 @@ export const Select = React.memo(function Select({
                   ? colors.glassSurfaceStrong
                   : colors.surfaceRaised,
                 borderRadius: radii.lg,
-                borderWidth: components.borderWidth.default,
-                borderColor: glass ? colors.glassBorder : colors.border,
+                borderCurve: "continuous",
+                borderWidth: Math.max(1, components.borderWidth.default),
+                borderColor: glass
+                  ? colors.glassBorder
+                  : components.borderWidth.default > 0
+                    ? colors.border
+                    : colors.borderMuted,
               },
               shadows.lg,
               menuAnimatedStyle,
@@ -487,5 +505,15 @@ const styles = StyleSheet.create({
   optionTextContainer: {
     flex: 1,
     gap: 2,
+  },
+  optionCheckWrap: {
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  topAlignedCheck: {
+    marginTop: 1,
   },
 });

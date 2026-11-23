@@ -50,7 +50,33 @@ import {
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
 
-export type TabsVariant = "line" | "pill" | "soft";
+/**
+ * - `line`: underline indicator.
+ * - `pill`: raised surface pill inside a muted track.
+ * - `soft`: translucent tone-tinted pill.
+ * - `flush`: solid tone-filled capsule hugging a full-capsule track edge
+ *   (2px concentric inset) with high-contrast `on` label color.
+ */
+export type TabsVariant = "line" | "pill" | "soft" | "flush";
+
+const FLUSH_INSET = 2;
+
+const TRIGGER_METRICS: Record<
+  ComponentSize,
+  {
+    minHeight: number;
+    paddingVertical: number;
+    paddingHorizontal: number;
+    iconSize: number;
+    fontSize: number;
+  }
+> = {
+  xs: { minHeight: 28, paddingVertical: 4, paddingHorizontal: 10, iconSize: 12, fontSize: 12 },
+  sm: { minHeight: 34, paddingVertical: 6, paddingHorizontal: 12, iconSize: 14, fontSize: 13 },
+  md: { minHeight: 40, paddingVertical: 9, paddingHorizontal: 14, iconSize: 16, fontSize: 14 },
+  lg: { minHeight: 44, paddingVertical: 12, paddingHorizontal: 18, iconSize: 18, fontSize: 16 },
+  xl: { minHeight: 48, paddingVertical: 13, paddingHorizontal: 22, iconSize: 20, fontSize: 17 },
+};
 export type TabsTransition = "slide" | "fade" | "scale" | "none";
 
 export interface TabsProps
@@ -92,6 +118,9 @@ interface TabsContextValue {
 }
 
 const TabsContext = createContext<TabsContextValue | null>(null);
+const TabsListContext = createContext<{ fullWidth: boolean }>({
+  fullWidth: false,
+});
 
 function useTabsContext(): TabsContextValue {
   const context = useContext(TabsContext);
@@ -235,6 +264,8 @@ export const Tabs = React.memo(function Tabs({
 
 export interface TabsListProps {
   scrollable?: boolean;
+  /** Stretch triggers evenly across the available width (non-scrollable only). */
+  fullWidth?: boolean;
   style?: StyleProp<ViewStyle>;
   indicatorStyle?: StyleProp<ViewStyle>;
   children: ReactNode;
@@ -242,6 +273,7 @@ export interface TabsListProps {
 
 export const TabsList = React.memo(function TabsList({
   scrollable = false,
+  fullWidth = false,
   style,
   indicatorStyle,
   children,
@@ -296,12 +328,17 @@ export const TabsList = React.memo(function TabsList({
   const activeColor = resolveToneColors(tone, colors).solid;
   const isPill = variant === "pill";
   const isSoft = variant === "soft";
+  const isFlush = variant === "flush";
+  const stretch = fullWidth && !scrollable;
+  const listContextValue = useMemo(() => ({ fullWidth: stretch }), [stretch]);
 
   const listBg = glass
     ? colors.glassSurface
-    : isPill || isSoft
-      ? colors.surfaceMuted
-      : "transparent";
+    : isFlush
+      ? colors.backgroundMuted
+      : isPill || isSoft
+        ? colors.surfaceMuted
+        : "transparent";
 
   const pillActiveBg = glass
     ? colors.glassSurfaceStrong
@@ -314,9 +351,22 @@ export const TabsList = React.memo(function TabsList({
       accessibilityRole="tablist"
       style={[
         styles.listContainer,
+        stretch && styles.listStretch,
+        isFlush && {
+          backgroundColor: listBg,
+          borderRadius: radii.full,
+          borderCurve: "continuous",
+          padding: FLUSH_INSET,
+          borderWidth: glass
+            ? components.borderWidth.default
+            : components.borderWidth.hairline,
+          borderColor: glass ? colors.glassBorder : colors.border,
+          overflow: "hidden",
+        },
         isPill && {
           backgroundColor: listBg,
           borderRadius: radii.lg,
+          borderCurve: "continuous",
           padding: 4,
           borderWidth: glass ? components.borderWidth.default : 0,
           borderColor: glass ? colors.glassBorder : "transparent",
@@ -324,6 +374,7 @@ export const TabsList = React.memo(function TabsList({
         isSoft && {
           backgroundColor: listBg,
           borderRadius: radii.md,
+          borderCurve: "continuous",
           padding: 3,
           borderWidth: glass ? components.borderWidth.default : 0,
           borderColor: glass ? colors.glassBorder : "transparent",
@@ -343,14 +394,22 @@ export const TabsList = React.memo(function TabsList({
             bottom: 0,
             height: 2.5,
             backgroundColor: activeColor,
-            borderRadius: 2,
+            borderRadius: radii.full,
+          },
+          isFlush && {
+            top: FLUSH_INSET,
+            bottom: FLUSH_INSET,
+            backgroundColor: activeColor,
+            borderRadius: radii.full,
+            borderCurve: "continuous",
           },
           isPill && [
             {
               top: 4,
               bottom: 4,
               backgroundColor: pillActiveBg,
-              borderRadius: radii.md,
+              borderRadius: Math.max(radii.xs, radii.lg - 4),
+              borderCurve: "continuous",
               borderWidth: isDark ? components.borderWidth.hairline : 0,
               borderColor: isDark ? colors.border : "transparent",
             },
@@ -360,13 +419,16 @@ export const TabsList = React.memo(function TabsList({
             top: 3,
             bottom: 3,
             backgroundColor: withAlpha(activeColor, isDark ? 0.24 : 0.14),
-            borderRadius: radii.sm,
+            borderRadius: Math.max(radii.xs, radii.md - 3),
+            borderCurve: "continuous",
           },
           animatedIndicatorStyle,
           indicatorStyle,
         ]}
       />
-      {children}
+      <TabsListContext.Provider value={listContextValue}>
+        {children}
+      </TabsListContext.Provider>
     </View>
   );
 
@@ -417,6 +479,7 @@ export const TabsTrigger = React.memo(function TabsTrigger({
     unregisterTabLayout,
     registerTabKey,
   } = useTabsContext();
+  const { fullWidth } = useContext(TabsListContext);
 
   useEffect(() => {
     registerTabKey(value);
@@ -435,16 +498,18 @@ export const TabsTrigger = React.memo(function TabsTrigger({
     [registerTabLayout, value],
   );
 
-  const activeColor = resolveToneColors(tone, colors).solid;
-  const paddingVertical = size === "sm" ? 6 : size === "lg" ? 12 : 9;
-  const paddingHorizontal = size === "sm" ? 10 : size === "lg" ? 18 : 14;
-  const iconSize = size === "sm" ? 14 : size === "lg" ? 18 : 16;
-  const fontSize = size === "sm" ? 13 : size === "lg" ? 16 : 14;
+  const toneColors = resolveToneColors(tone, colors);
+  const activeColor = toneColors.solid;
+  const isFlush = variant === "flush";
+  const { minHeight, paddingVertical, paddingHorizontal, iconSize, fontSize } =
+    TRIGGER_METRICS[size] ?? TRIGGER_METRICS.md;
 
   const textColor = isSelected
-    ? variant === "line" || variant === "soft"
-      ? activeColor
-      : colors.text
+    ? isFlush
+      ? toneColors.on
+      : variant === "line" || variant === "soft"
+        ? activeColor
+        : colors.text
     : colors.textMuted;
 
   return (
@@ -458,10 +523,12 @@ export const TabsTrigger = React.memo(function TabsTrigger({
       style={[
         styles.trigger,
         {
+          minHeight,
           paddingVertical,
           paddingHorizontal,
           opacity: disabled ? 0.45 : 1,
         },
+        fullWidth && styles.triggerStretch,
         style,
       ]}
     >
@@ -487,7 +554,7 @@ export const TabsTrigger = React.memo(function TabsTrigger({
         <Badge
           size="sm"
           tone={isSelected ? tone : "secondary"}
-          variant={isSelected ? "filled" : "soft"}
+          variant={isSelected && !isFlush ? "filled" : "soft"}
         >
           {String(badge)}
         </Badge>
@@ -633,18 +700,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     position: "relative",
   },
+  listStretch: {
+    width: "100%",
+  },
   indicatorBase: {
     position: "absolute",
     left: 0,
     zIndex: 0,
   },
   trigger: {
-    minHeight: 40,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
     zIndex: 1,
+  },
+  triggerStretch: {
+    flex: 1,
   },
   content: {
     width: "100%",

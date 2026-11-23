@@ -117,6 +117,7 @@ The central coordinator component that renders native camera capture, executes f
 | `showBoxes` | `boolean` | `true` | Toggles bounding box visibility. |
 | `boxVariant` | `'solid' \| 'corners' \| 'dashed'` | `'solid'` | Visual style of bounding boxes. `'corners'` renders scanner brackets. |
 | `boxColor` | `string` | `'#3da441'` | Primary bounding box border & badge background color. |
+| `theme` | `CameraAITheme \| ThemeColorsLike` | `undefined` | Optional design system token binding. Automatically binds bounding boxes, mesh lines, document guides, laser sweeps, and fallback views to active theme colors. |
 | `landmarkColor` | `string` | `'#38bdf8'` | Accent color for facial keypoints and mesh vertex dots. |
 | `showLabels` | `boolean` | `true` | Toggles class or identity label badges. |
 | `showConfidence` | `boolean` | `true` | Displays confidence percentage inside the default label badge. |
@@ -168,6 +169,73 @@ The central coordinator component that renders native camera capture, executes f
   }}
 />
 ```
+
+---
+
+## 🎨 Design System Theme Token Binding (Optional)
+
+`@masumdev/rn-camera-ai` provides an optional, zero-dependency theme token binding layer. It allows all camera HUD overlays (bounding boxes, unrecognized face warnings, 468 mesh contour lines, document guide reticles, laser sweeps, and permission fallback cards) to automatically inherit tokens from `@masumdev/rn-ui` or any custom design system:
+
+### Option A: Local Binding via `theme` Prop
+
+Pass color tokens directly into `<CameraAI />`:
+
+```tsx
+import { CameraAI } from '@masumdev/rn-camera-ai';
+import { useTheme } from '@masumdev/rn-ui';
+
+export function CameraScreen() {
+  const { theme } = useTheme();
+
+  return (
+    <CameraAI
+      processor={detector}
+      theme={theme.colors} // Binds primary, warning, success, info, surface, border
+      style={{ flex: 1 }}
+    />
+  );
+}
+```
+
+### Option B: Global Tree Binding via `CameraAIThemeProvider`
+
+Wrap your application or camera feature tree in `<CameraAIThemeProvider>` to set the active theme globally:
+
+```tsx
+import {
+  CameraAIThemeProvider,
+  createCameraAIThemeFromTokens,
+} from '@masumdev/rn-camera-ai';
+import { ThemeProvider, useTheme } from '@masumdev/rn-ui';
+
+function CameraThemeBridge({ children }: { children: React.ReactNode }) {
+  const { theme } = useTheme();
+  const cameraTheme = React.useMemo(
+    () => createCameraAIThemeFromTokens(theme.colors),
+    [theme.colors]
+  );
+
+  return (
+    <CameraAIThemeProvider theme={cameraTheme}>
+      {children}
+    </CameraAIThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider defaultThemeName="cyber">
+      <CameraThemeBridge>
+        {/* All nested <CameraAI /> instances automatically use the cyber theme */}
+        <AppStack />
+      </CameraThemeBridge>
+    </ThemeProvider>
+  );
+}
+```
+
+- **Zero Coupling**: `@masumdev/rn-camera-ai` has zero dependencies on `@masumdev/rn-ui` and works 100% standalone.
+- **Worklet-Optimized**: Theme colors are pre-resolved and injected directly into the camera worklet thread, eliminating JS-thread recoloring overhead during theme shifts.
 
 ---
 

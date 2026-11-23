@@ -6,16 +6,15 @@ import { ChevronRight } from "lucide-react-native";
 import {
   Badge,
   Box,
-  Button,
   Card,
-  Input,
+  SearchBar,
   Text,
   useTheme,
   useThemeStyles,
   type ComponentTone,
 } from "@masumdev/rn-ui";
 import { SystemUIOverlay } from "../../components/system-ui-overlay";
-import { ScreenHeader } from "../../components/ScreenHeader";
+import { ScreenHeader, ScreenHeroHeader } from "../../components/ScreenHeader";
 import { useHeaderScroll } from "../../components/useHeaderScroll";
 
 export interface ComponentCatalogItem {
@@ -81,12 +80,6 @@ export const CATALOG_CATEGORIES: ComponentCategory[] = [
         description: "Maintains fixed proportion ratio for media & views.",
         tone: "primary",
       },
-      {
-        id: "keyboard-avoiding",
-        name: "KeyboardAvoiding",
-        description: "Responsive keyboard avoiding wrapper.",
-        tone: "primary",
-      },
     ],
   },
   {
@@ -111,7 +104,7 @@ export const CATALOG_CATEGORIES: ComponentCategory[] = [
       {
         id: "swipeable-item",
         name: "SwipeableItem",
-        description: "Swipeable list row with Reanimated spring actions.",
+        description: "Swipeable list row with momentum-driven reveal actions.",
         tone: "secondary",
       },
       {
@@ -184,7 +177,7 @@ export const CATALOG_CATEGORIES: ComponentCategory[] = [
       {
         id: "speed-dial",
         name: "SpeedDial",
-        description: "Expanding floating action group with staggered spring sub-actions.",
+        description: "Expanding floating action group with staggered sub-actions.",
         tone: "accent",
         isNew: true,
       },
@@ -309,16 +302,23 @@ export const CATALOG_CATEGORIES: ComponentCategory[] = [
     iconName: "Layers",
     items: [
       {
+        id: "side-navigation",
+        name: "SideNavigation",
+        description: "Gesture-dismiss drawer, compact rail, expanded sidebar, and floating dock.",
+        tone: "primary",
+        isNew: true,
+      },
+      {
         id: "tabs",
         name: "Tabs",
-        description: "Compound tab navigation with animated sliding indicator.",
+        description: "Compound tabs with line, pill, soft, and flush capsule variants.",
         tone: "warning",
         isNew: true,
       },
       {
         id: "segmented-control",
         name: "SegmentedControl",
-        description: "Cupertino sliding pill tab switcher with haptics.",
+        description: "Sliding surface or flush capsule switcher with haptics.",
         tone: "warning",
       },
       {
@@ -388,12 +388,6 @@ export const CATALOG_CATEGORIES: ComponentCategory[] = [
         id: "context-menu",
         name: "ContextMenu",
         description: "Long-press context menu popup.",
-        tone: "danger",
-      },
-      {
-        id: "command",
-        name: "Command",
-        description: "Command palette modal with fuzzy search.",
         tone: "danger",
       },
       {
@@ -471,17 +465,43 @@ export const CATALOG_CATEGORIES: ComponentCategory[] = [
   },
 ];
 
+const PRESET_DISPLAY_NAMES: Record<string, string> = {
+  default: "Default Clean",
+  minimal: "Minimal",
+  brutal: "Neo-Brutalism",
+  glass: "Vision Glass",
+  editorial: "Editorial",
+  cyber: "Cyberpunk",
+};
+
+const PRESET_DOT_COLORS: Record<string, string> = {
+  default: "#0284C7",
+  minimal: "#71717A",
+  brutal: "#8B5CF6",
+  glass: "#06B6D4",
+  editorial: "#D97706",
+  cyber: "#00F5FF",
+};
+
 export default function RnUiCatalogScreen() {
   const router = useRouter();
-  const { colors, spacing, themeName, availableThemes, setThemeName } =
-    useTheme();
+  const {
+    colors,
+    spacing,
+    radii,
+    components,
+    themeName,
+    availableThemes,
+    setThemeName,
+  } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useStyles();
   const [searchQuery, setSearchQuery] = React.useState("");
 
-  const { onScroll, headerStyle, scrollEventThrottle } = useHeaderScroll({
-    headerHeight: 170,
-  });
+  const { onScroll, scrollEventThrottle, isHeaderScrolled, showTitle } =
+    useHeaderScroll({
+      threshold: 55,
+    });
 
   const filteredCategories = React.useMemo(() => {
     if (!searchQuery.trim()) return CATALOG_CATEGORIES;
@@ -509,10 +529,9 @@ export default function RnUiCatalogScreen() {
 
       <ScreenHeader
         showBack
-        eyebrow="@masumdev/rn-ui"
         title="RN UI Catalog"
-        subtitle={`Select any component from ${totalComponents} UI primitives.`}
-        headerStyle={headerStyle}
+        showTitle={showTitle}
+        isScrolled={isHeaderScrolled}
       />
 
       <ScrollView
@@ -521,40 +540,90 @@ export default function RnUiCatalogScreen() {
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: spacing.md,
             paddingBottom: insets.bottom + spacing.xxl,
           },
         ]}
         showsVerticalScrollIndicator={false}
       >
+        <ScreenHeroHeader
+          eyebrow="@masumdev/rn-ui"
+          title="RN UI Catalog"
+          subtitle={`Select any component from ${totalComponents} UI primitives.`}
+        />
+
         {/* Search Bar */}
-        <Input
+        <SearchBar
           placeholder={`Search ${totalComponents} components...`}
           value={searchQuery}
           onChangeText={setSearchQuery}
+          onClear={() => setSearchQuery("")}
         />
 
         {/* Quick Multi-Theme Switcher */}
-        <Box row gap="sm" style={{ flexWrap: "wrap" }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.xxs,
+            paddingVertical: spacing.xs,
+            gap: spacing.sm,
+            alignItems: "center",
+          }}
+        >
           {availableThemes.map((presetKey) => {
+            const isActive = themeName === presetKey;
             const label =
-              presetKey === "minimal"
-                ? "Minimal (HeroUI)"
-                : presetKey === "brutal"
-                  ? "Neo-Brutalism"
-                  : "Default";
+              PRESET_DISPLAY_NAMES[presetKey] ??
+              presetKey.charAt(0).toUpperCase() + presetKey.slice(1);
+            const dotColor = PRESET_DOT_COLORS[presetKey] ?? colors.primary;
+
             return (
-              <Button
+              <Pressable
                 key={presetKey}
-                size="sm"
-                variant={themeName === presetKey ? "filled" : "outline"}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
                 onPress={() => setThemeName(presetKey)}
+                style={({ pressed }) => ({
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing.xs + 2,
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.xs + 2,
+                  borderRadius: radii.full,
+                  borderWidth: Math.max(components.borderWidth.default, 1),
+                  borderColor: isActive
+                    ? colors.primary
+                    : components.borderWidth.default > 0
+                      ? colors.border
+                      : colors.transparent,
+                  backgroundColor: isActive
+                    ? colors.primary
+                    : colors.surfaceRaised,
+                  opacity: pressed ? 0.75 : 1,
+                })}
               >
-                {label}
-              </Button>
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: isActive ? colors.onPrimary : dotColor,
+                  }}
+                />
+                <Text
+                  variant="labelSmall"
+                  weight={isActive ? "700" : "500"}
+                  style={{
+                    color: isActive ? colors.onPrimary : colors.text,
+                    includeFontPadding: false,
+                  }}
+                >
+                  {label}
+                </Text>
+              </Pressable>
             );
           })}
-        </Box>
+        </ScrollView>
 
         {/* Categories Grid */}
         <Box gap="xxl">
@@ -608,8 +677,8 @@ export default function RnUiCatalogScreen() {
                       >
                         <Box row style={{ alignItems: "center" }} gap="sm">
                           <Box flex={1} gap="xs">
-                            <Box row style={{ alignItems: "center" }} gap="xs">
-                              <Text variant="h3" style={{ fontSize: 16, includeFontPadding: false }}>
+                            <Box row wrap style={{ alignItems: "center" }} gap="xs">
+                              <Text variant="h3" style={{ fontSize: 16, includeFontPadding: false, flexShrink: 1 }}>
                                 {item.name}
                               </Text>
                               <Badge tone={item.tone || "secondary"} size="sm" style={{ alignSelf: "center" }}>
@@ -664,6 +733,7 @@ function useStyles() {
     cardPressable: {
       padding: theme.spacing.md,
       borderRadius: theme.radii.xl,
+      borderCurve: "continuous",
       overflow: "hidden",
     },
   }));

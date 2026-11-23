@@ -347,7 +347,9 @@ function ButtonComponent({
   );
 }
 
+markAsPressableTrigger(ButtonComponent);
 export const Button = markAsPressableTrigger(React.memo(ButtonComponent));
+Button.displayName = "Button";
 
 const styles = StyleSheet.create({
   fullWidth: {

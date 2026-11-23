@@ -1,20 +1,7 @@
-import {
-  Avatar,
-  AvatarBadge,
-  AvatarFallback,
-  AvatarFrame,
-  AvatarGroup,
-  AvatarGroupCount,
-  AvatarImage,
-  Badge,
-  Box,
-  Card,
-  Divider,
-  Text,
-} from "@masumdev/rn-ui";
+import { Avatar, AvatarBadge, AvatarFallback, AvatarFrame, AvatarGroup, AvatarGroupCount, AvatarImage, Box, Divider, Text } from "@masumdev/rn-ui";
 import { Crown, Flame, Sparkles } from "lucide-react-native";
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from "react-native-svg";
-import { SAMPLE_ASSETS, Section, type RnUiSectionContext } from "../shared";
+import { DemoCard, SAMPLE_ASSETS, Section, type RnUiSectionContext } from "../shared";
 
 // Custom SVG VIP Crown Ornate Frame (matching reference image)
 function VipOrnateFrameSvg({ size = 80 }: { size?: number }) {
@@ -150,22 +137,12 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
     <Section title="Avatar">
       <Box gap="xl">
         {/* Sizes and Status Badges */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Avatar Sizes & Status Badges
-              </Text>
-              <Badge tone="primary">sm, md, lg, xl</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Supports 4 predefined sizes (sm = 28px, md = 36px, lg = 44px, xl = 56px) with online, busy, away, and offline status indicators.
-            </Text>
+        <DemoCard
+          title="Avatar Sizes & Status Badges"
+          badge="Sizes"
+          badgeTone="primary"
+          description="Supports 4 predefined sizes (sm = 28px, md = 36px, lg = 44px, xl = 56px) with online, busy, away, and offline status indicators."
+        >
 
             <Box row gap="lg" center style={[styles.wrap, { alignItems: "flex-end" }]}>
               {/* Extra Large (XL) with Online Status */}
@@ -216,26 +193,15 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
                 </Text>
               </Box>
             </Box>
-          </Box>
-        </Card>
+        </DemoCard>
 
         {/* Shapes & Fallbacks */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Shapes & Broken Image Fallbacks
-              </Text>
-              <Badge tone="accent">Circle, Square, Rounded</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Configurable shapes (circle, square, rounded) with automatic fallback text when network image fails.
-            </Text>
+        <DemoCard
+          title="Shapes & Image Fallbacks"
+          badge="Shapes"
+          badgeTone="accent"
+          description="Configurable shapes (circle, square, rounded) with automatic fallback text when network image fails."
+        >
 
             <Box row gap="lg" center style={styles.wrap}>
               {/* Circle shape */}
@@ -282,26 +248,15 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
                 </Text>
               </Box>
             </Box>
-          </Box>
-        </Card>
+        </DemoCard>
 
         {/* Notification & Decor Badges */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Notification & Decor Badges
-              </Text>
-              <Badge tone="danger">Count, Status, Custom</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Flexible badge support: pass count numbers (e.g. 1, 99+), custom text, or custom decorative icon components.
-            </Text>
+        <DemoCard
+          title="Notification & Decor Badges"
+          badge="Badges"
+          badgeTone="danger"
+          description="Flexible badge support: count numbers (1, 99+), custom text, or decorative icon components."
+        >
 
             <Box row gap="xl" center style={[styles.wrap, { alignItems: "flex-end" }]}>
               {/* Message count 1 */}
@@ -376,26 +331,15 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
                 </Text>
               </Box>
             </Box>
-          </Box>
-        </Card>
+        </DemoCard>
 
         {/* Bordered, VIP & Premium Ring Variants */}
-        <Card outlined>
-          <Box gap="lg">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Ring, Bordered & Default Variants
-              </Text>
-              <Badge tone="accent">default, bordered, ring</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Elevate user profiles with clean default frames, bordered accents, and social story rings across all shapes.
-            </Text>
+        <DemoCard
+          title="Ring & Bordered Variants"
+          badge="Variants"
+          badgeTone="accent"
+          description="Elevate user profiles with clean default frames, bordered accents, and story rings."
+        >
 
             {/* Circular Frames */}
             <Box gap="xs">
@@ -526,26 +470,15 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
                 </Box>
               </Box>
             </Box>
-          </Box>
-        </Card>
+        </DemoCard>
 
         {/* Custom Ornate Frames & Overlays */}
-        <Card outlined>
-          <Box gap="lg">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Custom Ornate Frames & Overlays
-              </Text>
-              <Badge tone="warning">frame, &lt;AvatarFrame&gt;</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Create game/VIP style customized avatar frames using SVGs, custom components, or remote PNG frame assets.
-            </Text>
+        <DemoCard
+          title="Custom SVG & VIP Frames"
+          badge="VIP Frames"
+          badgeTone="warning"
+          description="Create customized avatar frames using SVGs or AvatarFrame wrappers."
+        >
 
             <Box row gap="xl" center style={styles.wrap}>
               {/* VIP Gold Ornate Crown Frame */}
@@ -595,26 +528,15 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
                 </Text>
               </Box>
             </Box>
-          </Box>
-        </Card>
+        </DemoCard>
 
         {/* Overlapping Avatar Groups */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Overlapping Avatar Groups
-              </Text>
-              <Badge tone="success">Avatar Group</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Stacked avatars with ring borders and remaining user counts.
-            </Text>
+        <DemoCard
+          title="Overlapping Avatar Groups"
+          badge="Group Stack"
+          badgeTone="success"
+          description="Stacked avatars with ring borders and remaining user counts."
+        >
 
             <Box gap="md">
               <Box gap="xs">
@@ -649,8 +571,7 @@ export function AvatarSection({ ctx }: { ctx: RnUiSectionContext }) {
                 </AvatarGroup>
               </Box>
             </Box>
-          </Box>
-        </Card>
+        </DemoCard>
       </Box>
     </Section>
   );

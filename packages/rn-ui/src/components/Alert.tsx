@@ -303,6 +303,7 @@ function AlertComponent({
           borderColor,
           borderWidth: resolvedBorderWidth,
           borderRadius: radii.lg,
+          borderCurve: "continuous",
           padding: spacing.lg,
           gap: spacing.md,
           overflow: hasActiveShadow(feedbackShadow) ? "visible" : "hidden",
@@ -384,6 +385,7 @@ function AlertComponent({
           style={({ pressed }) => [
             styles.closeBtn,
             {
+              borderRadius: radii.full,
               backgroundColor: pressed
                 ? withAlpha(iconColor, 0.15)
                 : colors.transparent,
@@ -418,6 +420,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   iconWrap: {
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
     marginTop: 2,
   },
   bodyWrap: {
@@ -432,8 +439,9 @@ const styles = StyleSheet.create({
   closeBtn: {
     width: 24,
     height: 24,
-    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
+    marginTop: 2,
   },
 });

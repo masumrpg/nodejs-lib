@@ -132,6 +132,96 @@ export function createHardShadows(
   };
 }
 
+export function createGlowShadows(color: string): ThemeShadows {
+  return {
+    none: ZERO_SHADOW,
+    sm: {
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.16,
+      shadowRadius: 8,
+      elevation: 2,
+      boxShadow: `0px 2px 10px 0px ${color}`,
+    },
+    md: {
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.22,
+      shadowRadius: 18,
+      elevation: 4,
+      boxShadow: `0px 6px 20px 0px ${color}`,
+    },
+    lg: {
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: 0.28,
+      shadowRadius: 28,
+      elevation: 8,
+      boxShadow: `0px 12px 32px 0px ${color}`,
+    },
+  };
+}
+
+export function createPaperShadows(color: string): ThemeShadows {
+  return {
+    none: ZERO_SHADOW,
+    sm: {
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 3,
+      elevation: 1,
+      boxShadow: `0px 1px 3px 0px ${color}`,
+    },
+    md: {
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      elevation: 2,
+      boxShadow: `0px 2px 6px 0px ${color}`,
+    },
+    lg: {
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.10,
+      shadowRadius: 16,
+      elevation: 4,
+      boxShadow: `0px 4px 16px 0px ${color}`,
+    },
+  };
+}
+
+export function createNeonGlowShadows(color: string): ThemeShadows {
+  return {
+    none: ZERO_SHADOW,
+    sm: {
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.40,
+      shadowRadius: 8,
+      elevation: 3,
+      boxShadow: `0px 0px 8px 0px ${color}`,
+    },
+    md: {
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.45,
+      shadowRadius: 14,
+      elevation: 6,
+      boxShadow: `0px 0px 14px 0px ${color}`,
+    },
+    lg: {
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.50,
+      shadowRadius: 22,
+      elevation: 10,
+      boxShadow: `0px 0px 22px 0px ${color}`,
+    },
+  };
+}
+
 const components: ThemeComponents = {
   touchTarget: {
     min: 44,

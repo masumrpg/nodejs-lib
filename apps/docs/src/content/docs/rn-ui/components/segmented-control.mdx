@@ -53,12 +53,13 @@ const options = [
     selectedIndex: { type: 'number', description: 'Controlled selected index.' },
     defaultIndex: { type: 'number', default: '0', description: 'Initial uncontrolled index.' },
     onChange: { type: '(index: number, value: string) => void', description: 'Callback when segment changes.' },
+    variant: { type: '"surface" | "flush"', default: '"surface"', description: 'Visual style: surface track or flush container-hugging capsule.' },
     size: { type: 'ComponentSize', default: '"md"', description: 'Size preset (sm, md, lg).' },
     tone: { type: 'ComponentTone', default: '"primary"', description: 'Color tone.' },
     disabled: { type: 'boolean', default: 'false', description: 'Disable all segments.' },
     haptic: { type: 'boolean', default: 'true', description: 'Enable haptic feedback on tab change.' },
     glass: { type: 'boolean', default: 'false', description: 'Enable translucent frosted glass background styling.' },
-    animated: { type: 'boolean', default: 'true', description: 'Enable fluid sliding spring worklet indicator animation.' },
+    animated: { type: 'boolean', default: 'true', description: 'Enable fluid sliding worklet indicator animation.' },
   }}
 />
 

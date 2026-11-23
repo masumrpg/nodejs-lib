@@ -26,6 +26,7 @@ import { triggerHaptic } from "../utils/haptics";
 import { getLocaleData, LocaleConfig, type LocaleInput } from "../utils/locale";
 import { Button } from "./Button";
 import { Calendar } from "./Calendar";
+import { SegmentedControl } from "./SegmentedControl";
 import { Text } from "./Text";
 import { minTouchHitSlop, webDeps, type BaseHapticProps } from "./types";
 
@@ -159,6 +160,15 @@ const AnimatedWheelItem = React.memo(function AnimatedWheelItem({
     const distance = Math.abs(scrollY.value - itemPosition);
     const normalizedDistance = itemHeight > 0 ? distance / itemHeight : 0;
 
+    // Fast-path early exit for off-screen rows (beyond visible window + 1 row buffer)
+    // Avoids running 3D rotateX and perspective calculations on 100+ off-screen items per frame
+    if (normalizedDistance > 3.2) {
+      return {
+        opacity: 0,
+        transform: [{ perspective: 600 }, { rotateX: "0deg" }, { scale: 0.85 }],
+      };
+    }
+
     const opacity = interpolate(
       normalizedDistance,
       [0, 1, 2, 3],
@@ -212,7 +222,9 @@ const AnimatedWheelItem = React.memo(function AnimatedWheelItem({
   );
 });
 
-export function WheelPickerColumn<T = string | number>({
+export const WheelPickerColumn = React.memo(function WheelPickerColumn<
+  T = string | number,
+>({
   items,
   selectedValue,
   onValueChange,
@@ -387,7 +399,9 @@ export function WheelPickerColumn<T = string | number>({
       </Animated.ScrollView>
     </View>
   );
-}
+}) as <T = string | number>(
+  props: WheelPickerColumnProps<T>,
+) => React.ReactElement | null;
 
 export interface DatePickerProps extends BaseHapticProps {
   value?: Date;
@@ -1013,6 +1027,7 @@ export const DatePickerCard = React.memo(function DatePickerCard({
         styles.card,
         {
           borderRadius: radii.xl,
+          borderCurve: "continuous",
           backgroundColor: colors.surface,
           borderWidth: components.borderWidth.default,
           borderColor: colors.border,
@@ -1030,83 +1045,20 @@ export const DatePickerCard = React.memo(function DatePickerCard({
 
         <View style={styles.cardHeaderActions}>
           {showVariantToggle && supportsCalendarVariant ? (
-            <View
-              style={[
-                styles.variantSwitch,
-                {
-                  backgroundColor: colors.backgroundMuted,
-                  borderRadius: radii.full,
-                  borderWidth: components.borderWidth.hairline,
-                  borderColor: colors.border,
-                },
+            <SegmentedControl
+              variant="flush"
+              size="xs"
+              haptic={haptic}
+              values={[
+                { label: localeData.wheel, value: "wheel" },
+                { label: localeData.calendar, value: "calendar" },
               ]}
-            >
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: currentVariant === "wheel" }}
-                hitSlop={minTouchHitSlop(24)}
-                onPress={() => {
-                  if (haptic) triggerHaptic("selection");
-                  setCurrentVariant("wheel");
-                }}
-                style={[
-                  styles.variantChip,
-                  {
-                    borderRadius: radii.full,
-                    backgroundColor:
-                      currentVariant === "wheel" ? colors.primary : "transparent",
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.variantText,
-                    {
-                      color:
-                        currentVariant === "wheel"
-                          ? colors.onPrimary
-                          : colors.textMuted,
-                    },
-                  ]}
-                >
-                  {localeData.wheel}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: currentVariant === "calendar" }}
-                hitSlop={minTouchHitSlop(24)}
-                onPress={() => {
-                  if (haptic) triggerHaptic("selection");
-                  setCurrentVariant("calendar");
-                }}
-                style={[
-                  styles.variantChip,
-                  {
-                    borderRadius: radii.full,
-                    backgroundColor:
-                      currentVariant === "calendar"
-                        ? colors.primary
-                        : "transparent",
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.variantText,
-                    {
-                      color:
-                        currentVariant === "calendar"
-                          ? colors.onPrimary
-                          : colors.textMuted,
-                    },
-                  ]}
-                >
-                  {localeData.calendar}
-                </Text>
-              </Pressable>
-            </View>
+              selectedIndex={currentVariant === "calendar" ? 1 : 0}
+              onChange={(_, next) =>
+                setCurrentVariant(next === "calendar" ? "calendar" : "wheel")
+              }
+              style={styles.variantSwitch}
+            />
           ) : null}
 
           {onClose ? (
@@ -1356,9 +1308,10 @@ export const DatePickerInput = React.memo(function DatePickerInput({
           styles.inputTrigger,
           {
             borderRadius: radii.md,
+            borderCurve: "continuous",
             borderWidth: components.borderWidth.default,
             borderColor: colors.border,
-            backgroundColor: colors.surface,
+            backgroundColor: colors.input,
             paddingHorizontal: spacing.md,
             opacity: disabled ? 0.6 : 1,
           },
@@ -1531,16 +1484,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   variantSwitch: {
-    flexDirection: "row",
-    padding: 2,
-  },
-  variantChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  variantText: {
-    fontSize: 11,
-    fontWeight: "700",
+    width: 148,
   },
   closeButton: {
     padding: 4,

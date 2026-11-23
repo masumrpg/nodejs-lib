@@ -16,6 +16,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
   Bubble,
+  BubbleContent,
   Button,
   Card,
   Chip,
@@ -490,5 +491,52 @@ describe("typography, primitives & data display components", () => {
       (n) => n.type === "anim-view" && n.props?.accessibilityElementsHidden === false,
     )[0];
     expect(openMask).toBeDefined();
+  });
+
+  it("renders short BubbleContent with WhatsApp-style asymmetric rounded corners instead of pill ends", () => {
+    const { container } = renderUI(
+      wrap(
+        React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(
+            Bubble,
+            { align: "start", tone: "secondary", variant: "soft" },
+            React.createElement(
+              BubbleContent,
+              { testID: "bubble-incoming" },
+              "Hai!",
+            ),
+          ),
+          React.createElement(
+            Bubble,
+            { align: "end", tone: "primary", variant: "filled" },
+            React.createElement(
+              BubbleContent,
+              { testID: "bubble-outgoing" },
+              "Ok!",
+            ),
+          ),
+        ),
+      ),
+    );
+
+    const incoming = findAllNodes(
+      container,
+      (n) => n.props?.testID === "bubble-incoming",
+    )[0];
+    const outgoing = findAllNodes(
+      container,
+      (n) => n.props?.testID === "bubble-outgoing",
+    )[0];
+    const inStyle =
+      (incoming?.props?.style as Record<string, unknown> | undefined) ?? {};
+    const outStyle =
+      (outgoing?.props?.style as Record<string, unknown> | undefined) ?? {};
+
+    expect(Number(inStyle.borderRadius)).toBeLessThanOrEqual(16);
+    expect(inStyle.borderBottomLeftRadius).toBe(lightTheme.radii.xs);
+    expect(Number(outStyle.borderRadius)).toBeLessThanOrEqual(16);
+    expect(outStyle.borderBottomRightRadius).toBe(lightTheme.radii.xs);
   });
 });

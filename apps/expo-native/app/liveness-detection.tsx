@@ -38,6 +38,7 @@ import {
   createTFLiteFaceRecognizer,
   type TFLiteFaceRecognizer,
 } from "@masumdev/rn-camera-ai-tflite";
+import { useTheme } from "@masumdev/rn-ui";
 
 const FACE_DETECTOR_MODEL_ASSET = require("../assets/models/face_detection_full_range.tflite");
 const FACE_MESH_MODEL_ASSET = require("../assets/models/face_landmark.tflite");
@@ -86,6 +87,7 @@ const CHALLENGE_STEPS: readonly ChallengeStepSpec[] = [
 export default function FaceLivenessDetectionScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { theme } = useTheme();
 
   const [recognizer, setRecognizer] = useState<TFLiteFaceRecognizer | null>(
     null
@@ -297,8 +299,10 @@ export default function FaceLivenessDetectionScreen(): React.JSX.Element {
     () => ({
       showBoxes: boxStyleMode !== "off",
       boxVariant: resolvedBoxVariant,
-      boxColor: liveness?.isLive ? EMERALD_ACCENT : AMBER_ACCENT,
-      unrecognizedBoxColor: liveness?.isLive ? EMERALD_ACCENT : AMBER_ACCENT,
+      boxColor: liveness?.isLive ? theme.colors.success : theme.colors.warning,
+      unrecognizedBoxColor: liveness?.isLive
+        ? theme.colors.success
+        : theme.colors.warning,
       cornerLength: 26,
       cornerThickness: 3.5,
       boxBorderWidth: 2,
@@ -321,17 +325,17 @@ export default function FaceLivenessDetectionScreen(): React.JSX.Element {
         showDots: meshMode !== "off",
         lineThickness: 1.0,
         faceOvalColor: liveness?.isLive
-          ? "rgba(34, 197, 94, 0.85)"
-          : "rgba(245, 158, 11, 0.85)",
-        eyeContourColor: "#22d3ee",
-        eyebrowContourColor: "rgba(168, 85, 247, 0.9)",
-        lipOuterContourColor: "#34d399",
-        lipInnerContourColor: "#6ee7b7",
-        noseContourColor: "#38bdf8",
-        tesselationColor: "rgba(168, 85, 247, 0.38)",
+          ? `${theme.colors.success}d9`
+          : `${theme.colors.warning}d9`,
+        eyeContourColor: theme.colors.accent,
+        eyebrowContourColor: `${theme.colors.info ?? theme.colors.accent}e6`,
+        lipOuterContourColor: theme.colors.primary,
+        lipInnerContourColor: theme.colors.success,
+        noseContourColor: theme.colors.info ?? theme.colors.accent,
+        tesselationColor: `${theme.colors.info ?? theme.colors.accent}61`,
       },
     }),
-    [boxStyleMode, liveness?.isLive, meshMode, resolvedBoxVariant]
+    [boxStyleMode, liveness?.isLive, meshMode, resolvedBoxVariant, theme.colors]
   );
 
   const passivePct = liveness ? Math.round(liveness.passiveScore * 100) : 0;

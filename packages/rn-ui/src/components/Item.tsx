@@ -15,10 +15,12 @@ import { Text, type TextProps } from "./Text";
 export type ItemVariant = "default" | "outline" | "muted";
 export type ItemSize = "xs" | "sm" | "md";
 export type ItemMediaVariant = "default" | "icon" | "image";
+export type ItemAlignItems = "center" | "flex-start" | "start";
 
 interface ItemContextValue {
   size: ItemSize;
   variant: ItemVariant;
+  alignItems?: "center" | "flex-start";
 }
 
 const ItemContext = createContext<ItemContextValue | null>(null);
@@ -26,20 +28,28 @@ const ItemContext = createContext<ItemContextValue | null>(null);
 export interface ItemGroupProps extends ViewProps {
   size?: ItemSize;
   variant?: ItemVariant;
+  alignItems?: ItemAlignItems;
   style?: StyleProp<ViewStyle>;
 }
 
 export const ItemGroup = React.memo(function ItemGroup({
   size = "md",
   variant = "default",
+  alignItems = "start",
   style,
+  children,
   ...props
 }: ItemGroupProps) {
   const { spacing } = useTheme();
   const gap =
     size === "xs" ? spacing.sm : size === "sm" ? spacing.md : spacing.lg;
 
-  const contextValue = useMemo(() => ({ size, variant }), [size, variant]);
+  const resolvedAlign: "center" | "flex-start" =
+    alignItems === "center" ? "center" : "flex-start";
+  const contextValue = useMemo(
+    () => ({ size, variant, alignItems: resolvedAlign }),
+    [size, variant, resolvedAlign],
+  );
 
   return (
     <ItemContext.Provider value={contextValue}>
@@ -53,7 +63,9 @@ export const ItemGroup = React.memo(function ItemGroup({
           style,
         ]}
         {...props}
-      />
+      >
+        {children}
+      </View>
     </ItemContext.Provider>
   );
 });
@@ -89,6 +101,7 @@ export const ItemSeparator = React.memo(function ItemSeparator({
 export interface ItemProps extends Omit<PressableProps, "style"> {
   variant?: ItemVariant;
   size?: ItemSize;
+  alignItems?: ItemAlignItems;
   style?:
     | StyleProp<ViewStyle>
     | ((state: { pressed: boolean }) => StyleProp<ViewStyle>);
@@ -97,18 +110,35 @@ export interface ItemProps extends Omit<PressableProps, "style"> {
 export const Item = React.memo(function Item({
   variant,
   size,
+  alignItems,
   disabled,
   onPress,
   onLongPress,
   style,
+  children,
   ...props
 }: ItemProps) {
   const { colors, components, radii, spacing, isDark } = useTheme();
   const group = useContext(ItemContext);
   const resolvedVariant = variant ?? group?.variant ?? "default";
   const resolvedSize = size ?? group?.size ?? "md";
+  const resolvedAlign =
+    alignItems === "center"
+      ? "center"
+      : alignItems === "start"
+        ? "flex-start"
+        : (group?.alignItems ?? "flex-start");
   const isTonalOutline = components.surface.outlineStyle === "tonal";
   const isTonalItemOutline = resolvedVariant === "outline" && isTonalOutline;
+
+  const itemContextValue = useMemo(
+    () => ({
+      size: resolvedSize,
+      variant: resolvedVariant,
+      alignItems: resolvedAlign,
+    }),
+    [resolvedSize, resolvedVariant, resolvedAlign],
+  );
 
   const paddingX =
     resolvedSize === "xs"
@@ -150,8 +180,8 @@ export const Item = React.memo(function Item({
         ? colors.surfaceMuted
         : colors.transparent,
     flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
+    alignItems: resolvedAlign,
+    flexWrap: "nowrap",
     gap,
     opacity: isDisabled ? 0.5 : 1,
   };
@@ -159,35 +189,51 @@ export const Item = React.memo(function Item({
   if (!isInteractive) {
     const staticStyle =
       typeof style === "function" ? style({ pressed: false }) : style;
-    return <View style={[baseStyle, staticStyle]} {...(props as ViewProps)} />;
+    const resolvedChildren =
+      typeof children === "function" ? children({ pressed: false }) : children;
+    return (
+      <ItemContext.Provider value={itemContextValue}>
+        <View style={[baseStyle, staticStyle]} {...(props as ViewProps)}>
+          {resolvedChildren}
+        </View>
+      </ItemContext.Provider>
+    );
   }
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled: isDisabled }}
-      disabled={isDisabled}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      style={({ pressed }) => [
-        baseStyle,
-        { opacity: isDisabled ? 0.5 : pressed ? 0.78 : 1 },
-        typeof style === "function" ? style({ pressed }) : style,
-      ]}
-      {...props}
-    />
+    <ItemContext.Provider value={itemContextValue}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isDisabled }}
+        disabled={isDisabled}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        style={({ pressed }) => [
+          baseStyle,
+          { opacity: isDisabled ? 0.5 : pressed ? 0.78 : 1 },
+          typeof style === "function" ? style({ pressed }) : style,
+        ]}
+        {...props}
+      >
+        {children}
+      </Pressable>
+    </ItemContext.Provider>
   );
 });
 
 export interface ItemMediaProps extends ViewProps {
   variant?: ItemMediaVariant;
   size?: ItemSize;
+  align?: "start" | "center" | "flex-start";
+  boxed?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
 export const ItemMedia = React.memo(function ItemMedia({
   variant = "default",
   size,
+  align,
+  boxed,
   style,
   ...props
 }: ItemMediaProps) {
@@ -196,22 +242,36 @@ export const ItemMedia = React.memo(function ItemMedia({
   const resolvedSize = size ?? group?.size ?? "md";
   const boxDimension =
     resolvedSize === "xs" ? 28 : resolvedSize === "sm" ? 34 : 40;
-  const hasBox = variant === "image" || variant === "icon";
+  const isTopAligned =
+    align === "start" ||
+    align === "flex-start" ||
+    (align === undefined &&
+      (group?.alignItems === "flex-start" ||
+        (group?.alignItems as string) === "start"));
+  const isBoxed =
+    boxed !== undefined
+      ? boxed
+      : variant === "image" || (variant === "icon" && !isTopAligned);
+  const hasBox = variant === "image" || isBoxed;
+  const opticalTopOffset =
+    resolvedSize === "xs" ? 1 : resolvedSize === "sm" ? 2 : 2;
 
   return (
     <View
       style={[
         {
-          width: hasBox ? boxDimension : undefined,
+          width: boxDimension,
           height: hasBox ? boxDimension : undefined,
           flexShrink: 0,
           alignItems: "center",
-          justifyContent: "center",
+          justifyContent: isTopAligned && !hasBox ? "flex-start" : "center",
+          alignSelf: isTopAligned ? "flex-start" : "center",
+          marginTop: isTopAligned ? opticalTopOffset : 0,
           overflow: variant === "image" ? "hidden" : undefined,
           borderRadius:
             variant === "image"
               ? radii.sm
-              : variant === "icon"
+              : hasBox
                 ? radii.md
                 : undefined,
           backgroundColor: hasBox
@@ -291,14 +351,23 @@ export const ItemDescription = React.memo(function ItemDescription({
 });
 
 export interface ItemActionsProps extends ViewProps {
+  align?: "start" | "center" | "flex-start";
   style?: StyleProp<ViewStyle>;
 }
 
 export const ItemActions = React.memo(function ItemActions({
+  align,
   style,
   ...props
 }: ItemActionsProps) {
   const { spacing } = useTheme();
+  const group = useContext(ItemContext);
+  const isTopAligned =
+    align === "start" ||
+    align === "flex-start" ||
+    (align === undefined &&
+      (group?.alignItems === "flex-start" ||
+        (group?.alignItems as string) === "start"));
 
   return (
     <View
@@ -306,6 +375,8 @@ export const ItemActions = React.memo(function ItemActions({
         {
           flexDirection: "row",
           alignItems: "center",
+          alignSelf: isTopAligned ? "flex-start" : "center",
+          marginTop: isTopAligned ? 2 : 0,
           gap: spacing.sm,
         },
         style,

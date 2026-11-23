@@ -33,6 +33,7 @@ import {
 } from "./types";
 
 export type AccordionVariant = "outline" | "flat" | "ghost";
+export type AccordionIconAlign = "start" | "center" | "auto";
 
 export interface AccordionItem {
   id: string;
@@ -40,6 +41,7 @@ export interface AccordionItem {
   content: React.ReactNode;
   subtitle?: React.ReactNode;
   icon?: RenderIcon;
+  iconAlign?: AccordionIconAlign;
   disabled?: boolean;
 }
 
@@ -86,6 +88,7 @@ export interface AccordionProps
   animationDuration?: number;
   animationComponents?: AccordionAnimationComponents;
   indicator?: AccordionIndicator;
+  iconAlign?: AccordionIconAlign;
   itemStyle?: StyleProp<ViewStyle>;
   headerStyle?: StyleProp<ViewStyle>;
   titleStyle?: StyleProp<TextStyle>;
@@ -238,6 +241,7 @@ export const Accordion = React.memo(function Accordion({
   animationDuration = 240,
   animationComponents,
   indicator,
+  iconAlign = "auto",
   itemStyle,
   headerStyle,
   titleStyle,
@@ -319,6 +323,11 @@ export const Accordion = React.memo(function Accordion({
             ? components.borderWidth.default
             : borderWidth;
 
+        const resolvedAlign = item.iconAlign ?? iconAlign;
+        const isTopAligned =
+          resolvedAlign === "start" ||
+          (resolvedAlign === "auto" && item.subtitle !== undefined);
+
         return (
           <View
             key={item.id}
@@ -345,6 +354,7 @@ export const Accordion = React.memo(function Accordion({
                 {
                   padding: spacing.lg,
                   gap: spacing.md,
+                  alignItems: isTopAligned ? "flex-start" : "center",
                   backgroundColor:
                     pressed && !itemDisabled
                       ? colors.backgroundMuted
@@ -353,13 +363,20 @@ export const Accordion = React.memo(function Accordion({
                 headerStyle,
               ]}
             >
-              {item.icon
-                ? renderIcon(
+              {item.icon ? (
+                <View
+                  style={[
+                    styles.iconWrap,
+                    isTopAligned ? styles.topAlignedIcon : undefined,
+                  ]}
+                >
+                  {renderIcon(
                     item.icon,
                     expanded ? colors.primary : colors.textMuted,
                     20,
-                  )
-                : null}
+                  )}
+                </View>
+              ) : null}
 
               <View style={[styles.headerTextWrap, { gap: spacing.xxs }]}>
                 {typeof item.title === "string" || typeof item.title === "number" ? (
@@ -394,7 +411,12 @@ export const Accordion = React.memo(function Accordion({
                 ) : null}
               </View>
 
-              <View style={styles.indicatorWrap}>
+              <View
+                style={[
+                  styles.indicatorWrap,
+                  isTopAligned ? styles.topAlignedIndicator : undefined,
+                ]}
+              >
                 {shouldAnimate ? (
                   <AnimatedIndicator
                     expanded={expanded}
@@ -486,11 +508,25 @@ const styles = StyleSheet.create({
   headerTextWrap: {
     flex: 1,
   },
+  iconWrap: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  topAlignedIcon: {
+    marginTop: 4,
+  },
   indicatorWrap: {
     width: 24,
     height: 24,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
+  },
+  topAlignedIndicator: {
+    marginTop: 2,
   },
   contentMask: {
     overflow: "hidden",

@@ -710,24 +710,26 @@ export const ComboboxItem = React.memo(function ComboboxItem({
         )}
       </View>
 
-      {isSelected
-        ? checkIcon
-          ? renderIcon(checkIcon, colors.primary, 16)
-          : (
-              <Svg
-                width={16}
-                height={16}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke={colors.primary}
-                strokeWidth={2.2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <Path d="M20 6L9 17l-5-5" />
-              </Svg>
-            )
-        : null}
+      {isSelected ? (
+        <View style={styles.checkWrap}>
+          {checkIcon ? (
+            renderIcon(checkIcon, colors.primary, 16)
+          ) : (
+            <Svg
+              width={16}
+              height={16}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={colors.primary}
+              strokeWidth={2.2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <Path d="M20 6L9 17l-5-5" />
+            </Svg>
+          )}
+        </View>
+      ) : null}
     </Pressable>
   );
 });
@@ -799,6 +801,13 @@ const styles = StyleSheet.create({
   },
   itemContent: {
     flex: 1,
+  },
+  checkWrap: {
+    width: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
   empty: {
     alignItems: "center",

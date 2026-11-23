@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
   NativeSyntheticEvent,
   NativeScrollEvent,
@@ -9,35 +9,46 @@ import {
 export interface UseHeaderScrollOptions {
   headerHeight?: number;
   threshold?: number;
+  bgThreshold?: number;
 }
 
 export interface UseHeaderScrollResult {
   onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   headerStyle: StyleProp<ViewStyle>;
   scrollEventThrottle: number;
+  isHeaderScrolled: boolean;
+  showTitle: boolean;
   isHeaderVisible: boolean;
 }
 
 /**
- * Custom hook to detect scroll direction and animate header visibility:
- * - Scroll Down -> Hides header by translating completely upwards off-screen
- * - Scroll Up -> Reveals header by translating back into view
- * - Scroll Top (y <= 10) -> Keeps header fully visible
+ * Hook to track scroll offset for modern minimalist headers:
+ * - Detects when user begins scrolling (> 12px) to apply semi-transparent frosted background (Gemini style)
+ * - Detects when the user scrolls past the hero title to reveal the compact title
  */
 export function useHeaderScroll(
-  _options: UseHeaderScrollOptions = {},
+  options: UseHeaderScrollOptions = {},
 ): UseHeaderScrollResult {
+  const bgThreshold = options.bgThreshold ?? 12;
+  const threshold = options.threshold ?? 50;
+  const [isHeaderScrolled, setIsHeaderScrolled] = useState(false);
+  const [showTitle, setShowTitle] = useState(false);
+
   const onScroll = useCallback(
-    (_event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      // Header stays static in place
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const y = event.nativeEvent.contentOffset.y;
+      setIsHeaderScrolled(y > bgThreshold);
+      setShowTitle(y > threshold);
     },
-    [],
+    [bgThreshold, threshold],
   );
 
   return {
     onScroll,
     headerStyle: undefined,
     scrollEventThrottle: 16,
+    isHeaderScrolled,
+    showTitle,
     isHeaderVisible: true,
   };
 }

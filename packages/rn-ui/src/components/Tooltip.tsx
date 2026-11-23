@@ -19,6 +19,7 @@ import {
 } from "react-native";
 import Animated, {
   Easing,
+  cancelAnimation,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -35,7 +36,6 @@ import {
 import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
-  ANIMATION_TIMING,
   isPressableTriggerElement,
   minTouchHitSlop,
   resolveToneColors,
@@ -73,6 +73,8 @@ export interface TooltipProps
   duration?: number;
   delayLongPress?: number;
   dismissOnPressOut?: boolean;
+  overlay?: boolean;
+  overlayStyle?: StyleProp<ViewStyle>;
   visible?: boolean;
   onOpenChange?: (open: boolean) => void;
   style?: StyleProp<ViewStyle>;
@@ -82,6 +84,193 @@ export interface TooltipProps
 }
 
 const ARROW_SIZE = 7;
+const TOOLTIP_EASING = Easing.bezier(0.23, 1, 0.32, 1);
+
+interface TooltipPortalOverlayProps {
+  isOpen: boolean;
+  shouldAnimate: boolean;
+  overlay: boolean;
+  overlayStyle?: StyleProp<ViewStyle>;
+  screenWidth: number;
+  resolvedPosition: "top" | "bottom" | "left" | "right";
+  layoutPlacement: {
+    top: number;
+    left: number;
+    arrowOffsetX: number;
+    arrowOffsetY: number;
+  };
+  tonePalette: { bg: string; fg: string; border: string };
+  arrow: boolean;
+  tooltipSize: { width: number; height: number };
+  onBalloonLayout: (event: LayoutChangeEvent) => void;
+  onClose: () => void;
+  content: ReactNode;
+  contentStyle?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
+}
+
+const TooltipPortalOverlay = React.memo(function TooltipPortalOverlay({
+  isOpen,
+  shouldAnimate,
+  overlay,
+  overlayStyle,
+  screenWidth,
+  resolvedPosition,
+  layoutPlacement,
+  tonePalette,
+  arrow,
+  tooltipSize,
+  onBalloonLayout,
+  onClose,
+  content,
+  contentStyle,
+  textStyle,
+}: TooltipPortalOverlayProps) {
+  const { colors, components, radii, shadows, spacing, isDark } = useTheme();
+  const animProgress = useSharedValue(isOpen && !shouldAnimate ? 1 : 0);
+
+  useEffect(() => {
+    if (!shouldAnimate) {
+      animProgress.value = isOpen ? 1 : 0;
+      return;
+    }
+    animProgress.value = withTiming(isOpen ? 1 : 0, {
+      duration: isOpen ? 180 : 130,
+      easing: TOOLTIP_EASING,
+    });
+    return () => {
+      cancelAnimation(animProgress);
+    };
+  }, [animProgress, isOpen, shouldAnimate]);
+
+  const backdropAnimatedStyle = useAnimatedStyle(
+    () => ({ opacity: animProgress.value }),
+    webDeps([]),
+  );
+
+  const animatedTooltipStyle = useAnimatedStyle(() => {
+    const shiftX =
+      resolvedPosition === "left" ? 6 : resolvedPosition === "right" ? -6 : 0;
+    const shiftY =
+      resolvedPosition === "top" ? 6 : resolvedPosition === "bottom" ? -6 : 0;
+
+    return {
+      opacity: animProgress.value,
+      transform: [
+        { translateX: (1 - animProgress.value) * shiftX },
+        { translateY: (1 - animProgress.value) * shiftY },
+        { scale: 0.94 + animProgress.value * 0.06 },
+      ],
+    };
+  }, webDeps([resolvedPosition]));
+
+  const backdropColor = withAlpha(colors.overlay, isDark ? 0.35 : 0.2);
+  const balloonElevation: ViewStyle = shadows.md;
+
+  return (
+    <>
+      <Animated.View
+        pointerEvents={isOpen ? "auto" : "none"}
+        style={[
+          StyleSheet.absoluteFill,
+          overlay ? { backgroundColor: backdropColor } : undefined,
+          backdropAnimatedStyle,
+          overlayStyle,
+        ]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss tooltip"
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+        />
+      </Animated.View>
+
+      <Animated.View
+        onLayout={onBalloonLayout}
+        style={[
+          styles.balloon,
+          {
+            top: layoutPlacement.top,
+            left: layoutPlacement.left,
+            maxWidth: Math.min(280, screenWidth - spacing.md * 2),
+            backgroundColor: tonePalette.bg,
+            borderColor: tonePalette.border,
+            borderWidth: Math.max(components.borderWidth.default, 1),
+            borderRadius: radii.md,
+            borderCurve: "continuous",
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.xs + 3,
+          },
+          balloonElevation,
+          animatedTooltipStyle,
+          contentStyle,
+        ]}
+      >
+        {typeof content === "string" || typeof content === "number" ? (
+          <Text
+            variant="caption"
+            weight="600"
+            style={[{ color: tonePalette.fg }, textStyle]}
+          >
+            {content}
+          </Text>
+        ) : (
+          content
+        )}
+
+        {arrow && tooltipSize.width > 0 ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.arrowBase,
+              resolvedPosition === "top" && {
+                bottom: -ARROW_SIZE,
+                left: layoutPlacement.arrowOffsetX - ARROW_SIZE,
+                borderTopColor: tonePalette.bg,
+                borderTopWidth: ARROW_SIZE,
+                borderLeftWidth: ARROW_SIZE,
+                borderRightWidth: ARROW_SIZE,
+                borderLeftColor: "transparent",
+                borderRightColor: "transparent",
+              },
+              resolvedPosition === "bottom" && {
+                top: -ARROW_SIZE,
+                left: layoutPlacement.arrowOffsetX - ARROW_SIZE,
+                borderBottomColor: tonePalette.bg,
+                borderBottomWidth: ARROW_SIZE,
+                borderLeftWidth: ARROW_SIZE,
+                borderRightWidth: ARROW_SIZE,
+                borderLeftColor: "transparent",
+                borderRightColor: "transparent",
+              },
+              resolvedPosition === "left" && {
+                right: -ARROW_SIZE,
+                top: layoutPlacement.arrowOffsetY - ARROW_SIZE,
+                borderLeftColor: tonePalette.bg,
+                borderLeftWidth: ARROW_SIZE,
+                borderTopWidth: ARROW_SIZE,
+                borderBottomWidth: ARROW_SIZE,
+                borderTopColor: "transparent",
+                borderBottomColor: "transparent",
+              },
+              resolvedPosition === "right" && {
+                left: -ARROW_SIZE,
+                top: layoutPlacement.arrowOffsetY - ARROW_SIZE,
+                borderRightColor: tonePalette.bg,
+                borderRightWidth: ARROW_SIZE,
+                borderTopWidth: ARROW_SIZE,
+                borderBottomWidth: ARROW_SIZE,
+                borderTopColor: "transparent",
+                borderBottomColor: "transparent",
+              },
+            ]}
+          />
+        ) : null}
+      </Animated.View>
+    </>
+  );
+});
 
 export const Tooltip = React.memo(function Tooltip({
   content,
@@ -94,6 +283,8 @@ export const Tooltip = React.memo(function Tooltip({
   duration = 0,
   delayLongPress = 320,
   dismissOnPressOut = false,
+  overlay = true,
+  overlayStyle,
   visible: controlledVisible,
   onOpenChange,
   glass = false,
@@ -104,7 +295,7 @@ export const Tooltip = React.memo(function Tooltip({
   textStyle,
   children,
 }: TooltipProps) {
-  const { colors, components, radii, shadows, spacing, isDark } = useTheme();
+  const { colors, spacing, isDark } = useTheme();
   const portalStore = usePortalContext();
   const reducedMotion = useReducedMotion();
   const shouldAnimate = animated && !reducedMotion;
@@ -119,14 +310,12 @@ export const Tooltip = React.memo(function Tooltip({
 
   const shouldMount = useDelayedUnmount(
     isOpen,
-    shouldAnimate ? 130 : 0,
+    shouldAnimate ? 140 : 0,
   );
 
   const triggerRef = useRef<React.ComponentRef<typeof View>>(null);
   const delayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const durationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const animProgress = useSharedValue(isOpen ? 1 : 0);
 
   const clearTimers = useCallback(() => {
     if (delayTimerRef.current) {
@@ -155,30 +344,31 @@ export const Tooltip = React.memo(function Tooltip({
   }, [clearTimers, setOpenState]);
 
   const measureAndShow = useCallback(() => {
+    clearTimers();
     measureAnchorNode(
       triggerRef,
       (rect) => {
         setAnchor(rect);
-
-        const activate = () => {
-          if (haptic) triggerHaptic("light");
-          setOpenState(true);
-          if (duration > 0) {
-            durationTimerRef.current = setTimeout(() => {
-              setOpenState(false);
-            }, duration);
-          }
-        };
-
-        if (delay > 0) {
-          delayTimerRef.current = setTimeout(activate, delay);
-        } else {
-          activate();
-        }
       },
       portalStore?.getHostRef("root"),
     );
-  }, [delay, duration, haptic, portalStore, setOpenState]);
+
+    const activate = () => {
+      if (haptic) triggerHaptic("light");
+      setOpenState(true);
+      if (duration > 0) {
+        durationTimerRef.current = setTimeout(() => {
+          setOpenState(false);
+        }, duration);
+      }
+    };
+
+    if (delay > 0) {
+      delayTimerRef.current = setTimeout(activate, delay);
+    } else {
+      activate();
+    }
+  }, [clearTimers, delay, duration, haptic, portalStore, setOpenState]);
 
   useEffect(() => {
     if (isOpen && !anchor) {
@@ -192,36 +382,24 @@ export const Tooltip = React.memo(function Tooltip({
     }
   }, [anchor, isOpen, portalStore]);
 
-  useEffect(() => {
-    if (isOpen && anchor) {
-      animProgress.value = shouldAnimate
-        ? withTiming(1, {
-            duration: ANIMATION_TIMING.transition,
-            easing: Easing.bezier(...ANIMATION_TIMING.bezier),
-          })
-        : 1;
-    } else {
-      animProgress.value = shouldAnimate
-        ? withTiming(0, {
-            duration: 120,
-            easing: Easing.bezier(...ANIMATION_TIMING.bezier),
-          })
-        : 0;
-    }
-  }, [anchor, animProgress, isOpen, shouldAnimate]);
-
   useEffect(() => clearTimers, [clearTimers]);
 
+  const effectiveAnchor: AnchorMeasurement = anchor ?? {
+    x: screenWidth / 2 - 40,
+    y: screenHeight * 0.35,
+    width: 80,
+    height: 40,
+  };
+
   const resolvedPosition = (() => {
-    if (!anchor) return position === "auto" ? "top" : position;
     const estW = tooltipSize.width || 160;
     const estH = tooltipSize.height || 44;
     const gap = ARROW_SIZE + 8;
 
-    const spaceTop = anchor.y;
-    const spaceBottom = screenHeight - (anchor.y + anchor.height);
-    const spaceLeft = anchor.x;
-    const spaceRight = screenWidth - (anchor.x + anchor.width);
+    const spaceTop = effectiveAnchor.y;
+    const spaceBottom = screenHeight - (effectiveAnchor.y + effectiveAnchor.height);
+    const spaceLeft = effectiveAnchor.x;
+    const spaceRight = screenWidth - (effectiveAnchor.x + effectiveAnchor.width);
 
     if (position === "auto") {
       if (spaceTop >= estH + gap) return "top";
@@ -255,10 +433,6 @@ export const Tooltip = React.memo(function Tooltip({
   })();
 
   const layoutPlacement = (() => {
-    if (!anchor) {
-      return { top: -9999, left: -9999, arrowOffsetX: 0, arrowOffsetY: 0 };
-    }
-
     const w = tooltipSize.width || 140;
     const h = tooltipSize.height || 40;
     const pad = spacing.md;
@@ -269,14 +443,14 @@ export const Tooltip = React.memo(function Tooltip({
     let arrowOffsetX = 0;
     let arrowOffsetY = 0;
 
-    const centerX = anchor.x + anchor.width / 2;
-    const centerY = anchor.y + anchor.height / 2;
+    const centerX = effectiveAnchor.x + effectiveAnchor.width / 2;
+    const centerY = effectiveAnchor.y + effectiveAnchor.height / 2;
 
     if (resolvedPosition === "top" || resolvedPosition === "bottom") {
       top =
         resolvedPosition === "top"
-          ? anchor.y - h - gap
-          : anchor.y + anchor.height + gap;
+          ? effectiveAnchor.y - h - gap
+          : effectiveAnchor.y + effectiveAnchor.height + gap;
       left = Math.max(
         pad,
         Math.min(centerX - w / 2, screenWidth - w - pad),
@@ -288,8 +462,8 @@ export const Tooltip = React.memo(function Tooltip({
     } else {
       left =
         resolvedPosition === "left"
-          ? anchor.x - w - gap
-          : anchor.x + anchor.width + gap;
+          ? effectiveAnchor.x - w - gap
+          : effectiveAnchor.x + effectiveAnchor.width + gap;
       top = Math.max(
         pad,
         Math.min(centerY - h / 2, screenHeight - h - pad),
@@ -312,26 +486,31 @@ export const Tooltip = React.memo(function Tooltip({
       };
     }
     if (tone === "default") {
-      return isDark
-        ? {
-            bg: colors.surfaceRaised,
-            fg: colors.text,
-            border: colors.border,
-          }
-        : {
-            bg: "#0F172A",
-            fg: "#F8FAFC",
-            border: "#1E293B",
-          };
+      if (isDark) {
+        return {
+          bg: colors.surfaceRaised,
+          fg: colors.text,
+          border: colors.border,
+        };
+      }
+      return {
+        bg: colors.text,
+        fg: colors.background,
+        border: withAlpha(colors.text, 0.12),
+      };
     }
     if (tone === "dark") {
-      return { bg: "#0F172A", fg: "#F8FAFC", border: "#1E293B" };
+      return {
+        bg: isDark ? colors.surfaceRaised : "#0F172A",
+        fg: isDark ? colors.text : "#F8FAFC",
+        border: isDark ? colors.border : "#1E293B",
+      };
     }
     if (tone === "light") {
       return {
-        bg: "#FFFFFF",
-        fg: "#0F172A",
-        border: withAlpha("#0F172A", 0.14),
+        bg: isDark ? colors.backgroundMuted : "#FFFFFF",
+        fg: isDark ? colors.textMuted : "#0F172A",
+        border: colors.border,
       };
     }
     const resolved = resolveToneColors(tone, colors);
@@ -341,22 +520,6 @@ export const Tooltip = React.memo(function Tooltip({
       border: resolved.border,
     };
   })();
-
-  const animatedTooltipStyle = useAnimatedStyle(() => {
-    const shiftX =
-      resolvedPosition === "left" ? 6 : resolvedPosition === "right" ? -6 : 0;
-    const shiftY =
-      resolvedPosition === "top" ? 6 : resolvedPosition === "bottom" ? -6 : 0;
-
-    return {
-      opacity: animProgress.value,
-      transform: [
-        { translateX: (1 - animProgress.value) * shiftX },
-        { translateY: (1 - animProgress.value) * shiftY },
-        { scale: 0.94 + animProgress.value * 0.06 },
-      ],
-    };
-  }, webDeps([resolvedPosition]));
 
   const handlePress = useCallback(() => {
     if (triggerMode !== "press") return;
@@ -389,7 +552,7 @@ export const Tooltip = React.memo(function Tooltip({
     );
   }, []);
 
-  const canShowPortal = (shouldMount || isOpen) && anchor !== null;
+  const canShowPortal = shouldMount || isOpen;
   const isPressableChild = isPressableTriggerElement(children);
 
   return (
@@ -399,7 +562,7 @@ export const Tooltip = React.memo(function Tooltip({
         collapsable={false}
         style={[styles.triggerWrapper, style]}
         onLayout={() => {
-          if (isOpen && !anchor) {
+          if (isOpen) {
             measureAnchorNode(
               triggerRef,
               (rect) => {
@@ -447,94 +610,23 @@ export const Tooltip = React.memo(function Tooltip({
 
       {canShowPortal ? (
         <Portal layer="tooltip">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Dismiss tooltip"
-            style={StyleSheet.absoluteFill}
-            onPress={close}
+          <TooltipPortalOverlay
+            isOpen={isOpen}
+            shouldAnimate={shouldAnimate}
+            overlay={overlay}
+            overlayStyle={overlayStyle}
+            screenWidth={screenWidth}
+            resolvedPosition={resolvedPosition}
+            layoutPlacement={layoutPlacement}
+            tonePalette={tonePalette}
+            arrow={arrow}
+            tooltipSize={tooltipSize}
+            onBalloonLayout={handleBalloonLayout}
+            onClose={close}
+            content={content}
+            contentStyle={contentStyle}
+            textStyle={textStyle}
           />
-
-          <Animated.View
-            onLayout={handleBalloonLayout}
-            style={[
-              styles.balloon,
-              {
-                top: layoutPlacement.top,
-                left: layoutPlacement.left,
-                maxWidth: Math.min(280, screenWidth - spacing.md * 2),
-                backgroundColor: tonePalette.bg,
-                borderColor: tonePalette.border,
-                borderWidth: components.borderWidth.default,
-                borderRadius: radii.md,
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.xs + 3,
-              },
-              shadows.md,
-              animatedTooltipStyle,
-              contentStyle,
-            ]}
-          >
-            {typeof content === "string" || typeof content === "number" ? (
-              <Text
-                variant="caption"
-                weight="600"
-                style={[{ color: tonePalette.fg }, textStyle]}
-              >
-                {content}
-              </Text>
-            ) : (
-              content
-            )}
-
-            {arrow && tooltipSize.width > 0 ? (
-              <View
-                pointerEvents="none"
-                style={[
-                  styles.arrowBase,
-                  resolvedPosition === "top" && {
-                    bottom: -ARROW_SIZE,
-                    left: layoutPlacement.arrowOffsetX - ARROW_SIZE,
-                    borderTopColor: tonePalette.bg,
-                    borderTopWidth: ARROW_SIZE,
-                    borderLeftWidth: ARROW_SIZE,
-                    borderRightWidth: ARROW_SIZE,
-                    borderLeftColor: "transparent",
-                    borderRightColor: "transparent",
-                  },
-                  resolvedPosition === "bottom" && {
-                    top: -ARROW_SIZE,
-                    left: layoutPlacement.arrowOffsetX - ARROW_SIZE,
-                    borderBottomColor: tonePalette.bg,
-                    borderBottomWidth: ARROW_SIZE,
-                    borderLeftWidth: ARROW_SIZE,
-                    borderRightWidth: ARROW_SIZE,
-                    borderLeftColor: "transparent",
-                    borderRightColor: "transparent",
-                  },
-                  resolvedPosition === "left" && {
-                    right: -ARROW_SIZE,
-                    top: layoutPlacement.arrowOffsetY - ARROW_SIZE,
-                    borderLeftColor: tonePalette.bg,
-                    borderLeftWidth: ARROW_SIZE,
-                    borderTopWidth: ARROW_SIZE,
-                    borderBottomWidth: ARROW_SIZE,
-                    borderTopColor: "transparent",
-                    borderBottomColor: "transparent",
-                  },
-                  resolvedPosition === "right" && {
-                    left: -ARROW_SIZE,
-                    top: layoutPlacement.arrowOffsetY - ARROW_SIZE,
-                    borderRightColor: tonePalette.bg,
-                    borderRightWidth: ARROW_SIZE,
-                    borderTopWidth: ARROW_SIZE,
-                    borderBottomWidth: ARROW_SIZE,
-                    borderTopColor: "transparent",
-                    borderBottomColor: "transparent",
-                  },
-                ]}
-              />
-            ) : null}
-          </Animated.View>
         </Portal>
       ) : null}
     </>

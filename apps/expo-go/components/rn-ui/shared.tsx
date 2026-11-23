@@ -1,7 +1,19 @@
-import { Box, Text } from "@masumdev/rn-ui";
+import {
+  Badge,
+  Box,
+  Card,
+  Text,
+  useTheme,
+  type ComponentTone,
+  type ThemeRadii,
+} from "@masumdev/rn-ui";
 import { ChevronRight } from "lucide-react-native";
 import React from "react";
-import { View, StyleSheet } from "react-native";
+import {
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -18,7 +30,9 @@ export const SAMPLE_ASSETS = {
   avatarName: "Ma'sum",
   avatarInitials: "MS",
   bannerImageUrl:
-    "https://blog.bankmega.com/wp-content/uploads/2025/07/Taman-Langit-Pangalengan-menawarkan-pemandangan-alam-menakjubkan-1170x784.jpg",
+    "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1000&q=80",
+  galleryImageUrl:
+    "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&w=800&q=80",
 };
 
 export function Section({
@@ -83,6 +97,7 @@ export function ColorBox({
   label: string;
   value: string;
 }) {
+  const { colors, radii, components } = useTheme();
   return (
     <View
       style={{
@@ -92,8 +107,9 @@ export function ColorBox({
         gap: 8,
         paddingVertical: 6,
         paddingHorizontal: 8,
-        borderRadius: 8,
-        backgroundColor: "rgba(150, 150, 150, 0.06)",
+        borderRadius: radii.md,
+        borderCurve: "continuous",
+        backgroundColor: colors.surfaceMuted,
       }}
     >
       <View
@@ -108,10 +124,11 @@ export function ColorBox({
           style={{
             width: 20,
             height: 20,
-            borderRadius: 4,
+            borderRadius: radii.xs,
+            borderCurve: "continuous",
             backgroundColor: color,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: "rgba(0,0,0,0.1)",
+            borderWidth: Math.max(components.borderWidth.hairline, 0.5),
+            borderColor: colors.borderMuted,
           }}
         />
         <Text variant="bodySmall" weight="500">
@@ -122,6 +139,177 @@ export function ColorBox({
         {value}
       </Text>
     </View>
+  );
+}
+
+type DemoRadius = Exclude<keyof ThemeRadii, "none">;
+type DemoSurfaceTone = ComponentTone | "muted" | "raised" | "input";
+
+const SOFT_TONE_KEY: Record<
+  ComponentTone,
+  | "primarySoft"
+  | "secondarySoft"
+  | "accentSoft"
+  | "successSoft"
+  | "warningSoft"
+  | "dangerSoft"
+  | "infoSoft"
+> = {
+  default: "secondarySoft",
+  primary: "primarySoft",
+  secondary: "secondarySoft",
+  accent: "accentSoft",
+  success: "successSoft",
+  warning: "warningSoft",
+  danger: "dangerSoft",
+  info: "infoSoft",
+};
+
+/**
+ * Theme-reactive inner panel / preview tile for demos.
+ * Radius, border width, and tonal fill all come from the active preset, so it
+ * renders 0px borderless + generous squircle in Minimal, hairline in Default,
+ * and ink-bordered boxy in Neo-Brutalism. Never hardcode radii in sections.
+ */
+export function DemoSurface({
+  children,
+  tone = "muted",
+  radius = "lg",
+  padded = true,
+  bordered = true,
+  style,
+}: {
+  children?: React.ReactNode;
+  tone?: DemoSurfaceTone;
+  radius?: DemoRadius;
+  padded?: boolean;
+  bordered?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const { colors, radii, components, spacing } = useTheme();
+  const backgroundColor =
+    tone === "muted"
+      ? colors.surfaceMuted
+      : tone === "raised"
+        ? colors.surfaceRaised
+        : tone === "input"
+          ? colors.input
+          : colors[SOFT_TONE_KEY[tone]];
+  return (
+    <View
+      style={[
+        {
+          backgroundColor,
+          borderRadius: radii[radius],
+          borderCurve: "continuous",
+          borderWidth: bordered ? components.borderWidth.default : 0,
+          borderColor: colors.borderMuted,
+          overflow: "hidden",
+        },
+        padded ? { padding: spacing.md } : null,
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
+
+/**
+ * Standard demo card anatomy: overflow-safe title + badge header, optional
+ * description, consistent body gap, and optional footer slot.
+ */
+export function DemoCard({
+  title,
+  badge,
+  badgeTone = "primary",
+  description,
+  footer,
+  children,
+  style,
+}: {
+  title: string;
+  badge?: string;
+  badgeTone?: ComponentTone;
+  description?: string;
+  footer?: React.ReactNode;
+  children?: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <Card outlined style={style}>
+      <Box gap="md">
+        <Box gap="xs">
+          <Box row gap="sm" style={{ alignItems: "flex-start" }}>
+            <Text
+              variant="subtitle"
+              weight="700"
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              {title}
+            </Text>
+            {badge ? (
+              <Badge
+                tone={badgeTone}
+                variant="soft"
+                size="sm"
+                style={{ flexShrink: 0, marginTop: 2 }}
+              >
+                {badge}
+              </Badge>
+            ) : null}
+          </Box>
+          {description ? (
+            <Text variant="bodySmall" color="textMuted">
+              {description}
+            </Text>
+          ) : null}
+        </Box>
+        {children}
+        {footer}
+      </Box>
+    </Card>
+  );
+}
+
+/** Compact live-state readout bar (selected values, counters, callbacks). */
+export function DemoReadout({
+  label,
+  value,
+  tone = "muted",
+}: {
+  label: string;
+  value: React.ReactNode;
+  tone?: DemoSurfaceTone;
+}) {
+  return (
+    <DemoSurface
+      tone={tone}
+      radius="md"
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        paddingVertical: 10,
+      }}
+    >
+      <Text variant="caption" color="textMuted" style={{ flexShrink: 0 }}>
+        {label}
+      </Text>
+      {typeof value === "string" || typeof value === "number" ? (
+        <Text
+          variant="labelSmall"
+          weight="600"
+          numberOfLines={1}
+          style={{ flexShrink: 1, fontVariant: ["tabular-nums"] }}
+        >
+          {value}
+        </Text>
+      ) : (
+        value
+      )}
+    </DemoSurface>
   );
 }
 

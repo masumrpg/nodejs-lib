@@ -1,15 +1,4 @@
-import {
-  AspectRatio,
-  Avatar,
-  AvatarBadge,
-  AvatarFallback,
-  AvatarImage,
-  Badge,
-  Box,
-  Button,
-  Card,
-  Text,
-} from "@masumdev/rn-ui";
+import { AspectRatio, Avatar, AvatarBadge, AvatarFallback, AvatarImage, Badge, Box, Button, Text } from "@masumdev/rn-ui";
 import {
   CheckCircle2,
   Info,
@@ -26,7 +15,12 @@ import {
 } from "lucide-react-native";
 import React from "react";
 import { Image, View } from "react-native";
-import { SAMPLE_ASSETS, Section, type RnUiSectionContext } from "../shared";
+import {
+  DemoCard,
+  SAMPLE_ASSETS,
+  Section,
+  type RnUiSectionContext,
+} from "../shared";
 
 export function ToastSection({ ctx }: { ctx: RnUiSectionContext }) {
   const { icon, toast } = ctx;
@@ -45,7 +39,7 @@ export function ToastSection({ ctx }: { ctx: RnUiSectionContext }) {
       tone: "info",
       variant: "subtle",
       progress: 0,
-      icon: icon(Loader),
+      loading: true,
       duration: 0,
     });
 
@@ -56,7 +50,7 @@ export function ToastSection({ ctx }: { ctx: RnUiSectionContext }) {
           title: "Downloading Update...",
           description: `firmware_v2.4.bin (${progress}%)`,
           progress,
-          icon: icon(Loader),
+          loading: true,
         });
       } else {
         clearInterval(interval);
@@ -65,6 +59,7 @@ export function ToastSection({ ctx }: { ctx: RnUiSectionContext }) {
           title: "Download Complete",
           description: "firmware_v2.4.bin is ready to install.",
           tone: "success",
+          loading: false,
           progress: undefined,
           icon: icon(CheckCircle2),
           duration: 3500,
@@ -75,7 +70,7 @@ export function ToastSection({ ctx }: { ctx: RnUiSectionContext }) {
                 title: "Installing...",
                 description: "Applying firmware update.",
                 tone: "info",
-                icon: icon(Loader),
+                loading: true,
               });
             },
           },
@@ -97,6 +92,7 @@ export function ToastSection({ ctx }: { ctx: RnUiSectionContext }) {
             source={{
               uri: SAMPLE_ASSETS.bannerImageUrl,
             }}
+            style={{ width: "100%", height: "100%" }}
             resizeMode="cover"
           />
         </AspectRatio>
@@ -165,7 +161,7 @@ export function ToastSection({ ctx }: { ctx: RnUiSectionContext }) {
       description: "Syncing configuration with cloud database...",
       tone: "info",
       variant: "subtle",
-      icon: icon(Loader),
+      loading: true,
       duration: 0,
     });
 
@@ -176,6 +172,7 @@ export function ToastSection({ ctx }: { ctx: RnUiSectionContext }) {
         description: "Cloud synchronization finished successfully.",
         tone: "success",
         variant: "outline",
+        loading: false,
         icon: icon(CheckCircle2),
         duration: 3500,
         action: {
@@ -266,64 +263,64 @@ export function ToastSection({ ctx }: { ctx: RnUiSectionContext }) {
   };
 
   return (
-    <Section title="Toast Notification">
-      <Card outlined>
-        <Box gap="lg">
-          <Text color="textMuted">
-            Programmatic toast notifications with smooth top slide-in/out transitions, swipe-to-dismiss gestures, live progress bars, rich media avatars, and action callbacks.
-          </Text>
+    <Section title="Toast">
+      <Box gap="lg">
+        {/* Card 1: Top Slide-In Progress & Rich Content */}
+        <DemoCard
+          title="HeroUI Toast Notifications"
+          badge="Top Slide-In"
+          badgeTone="primary"
+          description="Programmatic toasts with smooth top slide-in physics, swipe-to-dismiss, live progress updates, and spinner-to-check transitions."
+        >
+          <Box gap="md">
+            <Box gap="xs">
+              <Text variant="caption" weight="600" color="textMuted">
+                Progress & Media Banners
+              </Text>
+              <Box row style={{ flexWrap: "wrap", gap: 8 }}>
+                <Button
+                  variant="filled"
+                  tone="primary"
+                  leftIcon={icon(Download)}
+                  loading={downloading}
+                  onPress={handleDownloadProgressToast}
+                >
+                  Live Download Progress
+                </Button>
 
-          {/* Progress & Rich Content */}
-          <Box gap="xs">
-            <Text variant="labelSmall" color="textMuted">
-              Live Progress & Rich Media
-            </Text>
-            <Box row style={{ flexWrap: "wrap", gap: 8 }}>
-              <Button
-                variant="filled"
-                tone="primary"
-                leftIcon={icon(Download)}
-                loading={downloading}
-                onPress={handleDownloadProgressToast}
-              >
-                Live Download Progress
-              </Button>
+                <Button
+                  variant="outline"
+                  tone="accent"
+                  leftIcon={icon(ImageIcon)}
+                  onPress={handleImageBannerToast}
+                >
+                  16:9 Image Banner
+                </Button>
 
-              <Button
-                variant="outline"
-                tone="accent"
-                leftIcon={icon(ImageIcon)}
-                onPress={handleImageBannerToast}
-              >
-                16:9 Image Banner
-              </Button>
+                <Button
+                  variant="outline"
+                  tone="primary"
+                  leftIcon={icon(ImageIcon)}
+                  onPress={handleMediaAvatarToast}
+                >
+                  Media Avatar Toast
+                </Button>
 
-              <Button
-                variant="outline"
-                tone="primary"
-                leftIcon={icon(ImageIcon)}
-                onPress={handleMediaAvatarToast}
-              >
-                Media Avatar Toast
-              </Button>
-
-              <Button
-                variant="outline"
-                tone="secondary"
-                leftIcon={icon(Layers)}
-                onPress={handleCustomContentToast}
-              >
-                Custom Badge Content
-              </Button>
+                <Button
+                  variant="outline"
+                  tone="secondary"
+                  leftIcon={icon(Layers)}
+                  onPress={handleCustomContentToast}
+                >
+                  Custom Content
+                </Button>
+              </Box>
             </Box>
-          </Box>
 
-          {/* Async & Interactive Actions */}
-          <Box gap="xs">
-            <Text variant="labelSmall" color="textMuted">
-              Async & Interactive Actions
-            </Text>
-            <Box row style={{ flexWrap: "wrap", gap: 8 }}>
+            <Box gap="xs">
+              <Text variant="caption" weight="600" color="textMuted">
+                Async State Transition (Spinner to Upright Complete)
+              </Text>
               <Button
                 variant="outline"
                 tone="info"
@@ -331,65 +328,81 @@ export function ToastSection({ ctx }: { ctx: RnUiSectionContext }) {
                 loading={loading}
                 onPress={handleAsyncPromiseToast}
               >
-                Async State (Load → Done)
-              </Button>
-
-              <Button
-                variant="outline"
-                tone="accent"
-                leftIcon={icon(RotateCcw)}
-                onPress={handleActionUndoToast}
-              >
-                Action (Undo)
-              </Button>
-
-              <Button
-                variant="outline"
-                tone="danger"
-                leftIcon={icon(ArrowRight)}
-                onPress={handleActionRetryToast}
-              >
-                Action (Retry)
+                Async State (Load -&gt; Done)
               </Button>
             </Box>
           </Box>
+        </DemoCard>
 
-          {/* Border Variants */}
-          <Box gap="xs">
-            <Text variant="labelSmall" color="textMuted">
-              Border Variants & Styling
-            </Text>
-            <Box row style={{ flexWrap: "wrap", gap: 8 }}>
-              <Button
-                variant="outline"
-                tone="primary"
-                leftIcon={icon(CheckCircle2)}
-                onPress={showOutlinedToast}
-              >
-                Outlined (Border)
-              </Button>
+        {/* Card 2: Interactive Actions & Variants */}
+        <DemoCard
+          title="Interactive Actions & Border Treatments"
+          badge="Undo & Retry"
+          badgeTone="secondary"
+          description="Action button callbacks, inline undo triggers, and outlined, flat, or subtle border treatments."
+        >
+          <Box gap="md">
+            <Box gap="xs">
+              <Text variant="caption" weight="600" color="textMuted">
+                Interactive Action Callbacks
+              </Text>
+              <Box row style={{ flexWrap: "wrap", gap: 8 }}>
+                <Button
+                  variant="outline"
+                  tone="accent"
+                  leftIcon={icon(RotateCcw)}
+                  onPress={handleActionUndoToast}
+                >
+                  Action (Undo)
+                </Button>
 
-              <Button
-                variant="outline"
-                tone="secondary"
-                leftIcon={icon(Sparkles)}
-                onPress={showFlatToast}
-              >
-                Flat (Borderless)
-              </Button>
+                <Button
+                  variant="outline"
+                  tone="danger"
+                  leftIcon={icon(ArrowRight)}
+                  onPress={handleActionRetryToast}
+                >
+                  Action (Retry)
+                </Button>
+              </Box>
+            </Box>
 
-              <Button
-                variant="outline"
-                tone="warning"
-                leftIcon={icon(ShieldAlert)}
-                onPress={showSubtleToast}
-              >
-                Subtle (Soft)
-              </Button>
+            <Box gap="xs">
+              <Text variant="caption" weight="600" color="textMuted">
+                Border Variants & Styling
+              </Text>
+              <Box row style={{ flexWrap: "wrap", gap: 8 }}>
+                <Button
+                  variant="outline"
+                  tone="primary"
+                  leftIcon={icon(CheckCircle2)}
+                  onPress={showOutlinedToast}
+                >
+                  Outlined
+                </Button>
+
+                <Button
+                  variant="outline"
+                  tone="secondary"
+                  leftIcon={icon(Sparkles)}
+                  onPress={showFlatToast}
+                >
+                  Flat (Borderless)
+                </Button>
+
+                <Button
+                  variant="outline"
+                  tone="warning"
+                  leftIcon={icon(ShieldAlert)}
+                  onPress={showSubtleToast}
+                >
+                  Subtle
+                </Button>
+              </Box>
             </Box>
           </Box>
-        </Box>
-      </Card>
+        </DemoCard>
+      </Box>
     </Section>
   );
 }

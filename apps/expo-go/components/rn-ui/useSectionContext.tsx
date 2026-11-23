@@ -38,7 +38,6 @@ export function useSectionContext() {
   const [selectValue, setSelectValue] = React.useState("react-native");
   const [framework, setFramework] = React.useState("expo");
   const [activeStep, setActiveStep] = React.useState(2);
-  const [commandVisible, setCommandVisible] = React.useState(false);
   const [selectedDate, setSelectedDate] = React.useState("2026-08-23");
   const [monthCursor, setMonthCursor] = React.useState("2026-08");
 
@@ -122,8 +121,6 @@ export function useSectionContext() {
     setFramework,
     activeStep,
     setActiveStep,
-    commandVisible,
-    setCommandVisible,
     selectedDate,
     setSelectedDate,
     monthCursor,

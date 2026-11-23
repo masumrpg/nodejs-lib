@@ -138,7 +138,6 @@ export const SignaturePad = React.forwardRef<SignaturePadRef, SignaturePadProps>
 
     const panConfig = useMemo(
       () => ({
-        minDistance: 0,
         shouldCancelWhenOutside: false,
         onBegin: (event: { x: number; y: number }) => {
           "worklet";
@@ -214,6 +213,7 @@ export const SignaturePad = React.forwardRef<SignaturePadRef, SignaturePadProps>
             height,
             backgroundColor: activeBgColor,
             borderRadius: radii.lg,
+            borderCurve: "continuous",
             borderWidth: components.borderWidth.default,
             borderColor: colors.border,
           },

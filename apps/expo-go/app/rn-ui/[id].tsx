@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import { useTheme, useThemeStyles } from "@masumdev/rn-ui";
 import { SystemUIOverlay } from "../../components/system-ui-overlay";
-import { ScreenHeader } from "../../components/ScreenHeader";
+import { ScreenHeader, ScreenHeroHeader } from "../../components/ScreenHeader";
 import { useHeaderScroll } from "../../components/useHeaderScroll";
 import { useSectionContext } from "../../components/rn-ui/useSectionContext";
 import {
@@ -36,7 +36,6 @@ import {
   InputOTPSection,
   InputSection,
   ItemSection,
-  KeyboardAvoidingSection,
   RatingSection,
   SwitchSection,
   RadioGroupSection,
@@ -46,7 +45,6 @@ import {
   StepperSection,
   TextareaSection,
   SelectSection,
-  CommandSection,
   PopoverSection,
   PaginationSection,
   BreadcrumbSection,
@@ -66,6 +64,7 @@ import {
   SearchBarSection,
   TooltipSection,
   SpeedDialSection,
+  SideNavigationSection,
 } from "../../components/rn-ui";
 
 export default function RnUiComponentDetailScreen() {
@@ -75,9 +74,10 @@ export default function RnUiComponentDetailScreen() {
   const styles = useStyles();
   const ctx = useSectionContext();
 
-  const { onScroll, headerStyle, scrollEventThrottle } = useHeaderScroll({
-    headerHeight: 220,
-  });
+  const { onScroll, scrollEventThrottle, isHeaderScrolled, showTitle } =
+    useHeaderScroll({
+      threshold: 50,
+    });
 
   const renderComponentShowcase = () => {
     switch (id) {
@@ -94,8 +94,6 @@ export default function RnUiComponentDetailScreen() {
         return <DividerSection ctx={ctx} />;
       case "aspect-ratio":
         return <AspectRatioSection ctx={ctx} />;
-      case "keyboard-avoiding":
-        return <KeyboardAvoidingSection ctx={ctx} />;
 
       // Typography & Content
       case "text":
@@ -176,8 +174,6 @@ export default function RnUiComponentDetailScreen() {
         return <DropdownMenuSection ctx={ctx} />;
       case "context-menu":
         return <ContextMenuSection ctx={ctx} />;
-      case "command":
-        return <CommandSection ctx={ctx} />;
       case "toast":
         return <ToastSection ctx={ctx} />;
 
@@ -219,6 +215,10 @@ export default function RnUiComponentDetailScreen() {
         return <TooltipSection ctx={ctx} />;
       case "speed-dial":
         return <SpeedDialSection ctx={ctx} />;
+      case "side-navigation":
+      case "side-nav":
+      case "sidebar":
+        return <SideNavigationSection ctx={ctx} />;
 
       default:
         return <ButtonsSection ctx={ctx} />;
@@ -236,9 +236,9 @@ export default function RnUiComponentDetailScreen() {
 
       <ScreenHeader
         showBack
-        eyebrow={`@masumdev/rn-ui/${id || "component"}`}
         title={formattedTitle}
-        headerStyle={headerStyle}
+        showTitle={showTitle}
+        isScrolled={isHeaderScrolled}
       />
 
       <ScrollView
@@ -247,12 +247,16 @@ export default function RnUiComponentDetailScreen() {
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: spacing.md,
             paddingBottom: insets.bottom + spacing.xxl,
           },
         ]}
         showsVerticalScrollIndicator={false}
       >
+        <ScreenHeroHeader
+          eyebrow={`@masumdev/rn-ui/${id || "component"}`}
+          title={formattedTitle}
+        />
+
         {/* Component Showcase Body */}
         {renderComponentShowcase()}
       </ScrollView>

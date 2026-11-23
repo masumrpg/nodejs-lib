@@ -62,7 +62,7 @@ export const pillExample = `import { Tabs, TabsList, TabsTrigger, TabsContent, T
   <TabsContent value="month"><Text>Monthly summary</Text></TabsContent>
 </Tabs>`;
 
-`Tabs` provides an accessible, compound tab navigation primitive with zero-bounce spring indicator transitions, supporting line, pill capsule, and soft tint styling.
+`Tabs` provides an accessible, compound tab navigation primitive with zero-bounce timing worklet indicator transitions, supporting line, pill capsule, soft tint, and container-flush styling.
 
 ## Usage
 
@@ -81,7 +81,7 @@ export const pillExample = `import { Tabs, TabsList, TabsTrigger, TabsContent, T
     value: { type: 'string', description: 'Controlled active tab identifier.' },
     defaultValue: { type: 'string', default: '""', description: 'Initial active tab identifier.' },
     onValueChange: { type: '(value: string) => void', description: 'Callback invoked when active tab changes.' },
-    variant: { type: '"line" | "pill" | "soft"', default: '"line"', description: 'Visual structure of the tabs and active indicator.' },
+    variant: { type: '"line" | "pill" | "soft" | "flush"', default: '"line"', description: 'Visual structure of the tabs and active indicator.' },
     tone: { type: 'ComponentTone', default: '"primary"', description: 'Semantic color intent for active indicator and text.' },
     size: { type: 'ComponentSize', default: '"md"', description: 'Dimension scale preset (sm, md, lg).' },
     haptic: { type: 'boolean', default: 'true', description: 'Enable tactile haptic feedback on tab selection.' },
@@ -95,6 +95,7 @@ export const pillExample = `import { Tabs, TabsList, TabsTrigger, TabsContent, T
 
 <TypeTable
   type={{
+    fullWidth: { type: 'boolean', default: 'false', description: 'Distribute triggers evenly across the full width of the container.' },
     style: { type: 'StyleProp<ViewStyle>', description: 'Style overrides for the tab list container.' },
     indicatorStyle: { type: 'StyleProp<ViewStyle>', description: 'Style overrides for the sliding indicator.' },
     children: { type: 'ReactNode', required: true, description: 'TabsTrigger elements.' },

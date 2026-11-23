@@ -32,6 +32,7 @@ import {
   MODEL_INPUT_WIDTH,
   MODEL_LABEL_OFFSET,
 } from "../src/constants/cocoLabels";
+import { useTheme } from "@masumdev/rn-ui";
 
 const EMERALD_ACCENT = "#3da441";
 const THRESHOLD_PRESETS: readonly number[] = [0.35, 0.5, 0.7];
@@ -52,6 +53,12 @@ function renderEmptyOverlay(): React.ReactNode {
 export default function ObjectDetectionScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { theme } = useTheme();
+
+  const isMinimal = theme.components.borderWidth.default === 0;
+  const cardBorderWidth = theme.components.borderWidth.default;
+  const cardRadius = theme.radii.lg ?? 16;
+  const pillRadius = theme.radii.full ?? 9999;
 
   const [detector, setDetector] = useState<TFLiteObjectDetector | undefined>(
     undefined,
@@ -245,7 +252,17 @@ export default function ObjectDetectionScreen(): React.JSX.Element {
         pointerEvents="box-none"
         style={[styles.topOverlay, { paddingTop: insets.top + 12 }]}
       >
-        <View style={styles.headerCard}>
+        <View
+          style={[
+            styles.headerCard,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+              borderWidth: cardBorderWidth,
+              borderRadius: cardRadius,
+            },
+          ]}
+        >
           <View style={styles.titleRow}>
             <Pressable
               accessibilityRole="button"
@@ -253,18 +270,32 @@ export default function ObjectDetectionScreen(): React.JSX.Element {
               onPress={handleBackToMenu}
               style={({ pressed }) => [
                 styles.backButton,
+                {
+                  backgroundColor: theme.colors.surfaceRaised ?? theme.colors.surface,
+                  borderRadius: pillRadius,
+                },
                 pressed && styles.buttonPressed,
               ]}
             >
-              <ArrowLeft size={16} color="#f8fafc" />
+              <ArrowLeft size={16} color={theme.colors.text} />
             </Pressable>
 
-            <View style={styles.brandMark}>
-              <Eye size={16} color={EMERALD_ACCENT} />
+            <View
+              style={[
+                styles.brandMark,
+                {
+                  backgroundColor: `${theme.colors.primary}18`,
+                  borderRadius: 8,
+                },
+              ]}
+            >
+              <Eye size={16} color={theme.colors.primary} />
             </View>
             <View style={styles.titleTextGroup}>
-              <Text style={styles.title}>Camera AI Demo</Text>
-              <Text style={styles.subtitle}>
+              <Text style={[styles.title, { color: theme.colors.text }]}>
+                Camera AI Demo
+              </Text>
+              <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
                 SSD MobileNet v1 ({MODEL_INPUT_WIDTH}x{MODEL_INPUT_HEIGHT})
               </Text>
             </View>
@@ -275,10 +306,21 @@ export default function ObjectDetectionScreen(): React.JSX.Element {
               onPress={handleToggleBoxVariant}
               style={({ pressed }) => [
                 styles.boxStyleToggle,
+                {
+                  backgroundColor: theme.colors.surfaceRaised ?? theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  borderWidth: isMinimal ? 0 : 1,
+                  borderRadius: pillRadius,
+                },
                 pressed && styles.buttonPressed,
               ]}
             >
-              <Text style={styles.boxStyleToggleText}>
+              <Text
+                style={[
+                  styles.boxStyleToggleText,
+                  { color: theme.colors.primary },
+                ]}
+              >
                 {boxVariant === "corners" ? "Corners" : "Solid Box"}
               </Text>
             </Pressable>
@@ -388,13 +430,23 @@ export default function ObjectDetectionScreen(): React.JSX.Element {
         pointerEvents="box-none"
         style={[styles.bottomOverlay, { paddingBottom: insets.bottom + 14 }]}
       >
-        <View style={styles.controlCard}>
+        <View
+          style={[
+            styles.controlCard,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+              borderWidth: cardBorderWidth,
+              borderRadius: cardRadius,
+            },
+          ]}
+        >
           {/* Live Detections Summary */}
           <View style={styles.summaryHeader}>
-            <Text style={styles.summaryTitle}>
+            <Text style={[styles.summaryTitle, { color: theme.colors.text }]}>
               Detections ({detections.length})
             </Text>
-            <Text style={styles.summaryMeta}>
+            <Text style={[styles.summaryMeta, { color: theme.colors.textMuted }]}>
               {isActive
                 ? `Live ${liveFps.toFixed(1)} / ${TARGET_FPS} FPS`
                 : "Paused"}
@@ -404,15 +456,31 @@ export default function ObjectDetectionScreen(): React.JSX.Element {
           <View style={styles.detectionChipsRow}>
             {topDetections.length > 0 ? (
               topDetections.map((item) => (
-                <View key={item.id} style={styles.detectionChip}>
-                  <Text style={styles.detectionChipLabel}>{item.label}</Text>
-                  <Text style={styles.detectionChipScore}>
+                <View
+                  key={item.id}
+                  style={[
+                    styles.detectionChip,
+                    {
+                      backgroundColor: theme.colors.surfaceRaised ?? theme.colors.surface,
+                      borderRadius: pillRadius,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.detectionChipLabel, { color: theme.colors.text }]}>
+                    {item.label}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.detectionChipScore,
+                      { color: theme.colors.primary },
+                    ]}
+                  >
                     {Math.round(item.confidence * 100)}%
                   </Text>
                 </View>
               ))
             ) : (
-              <Text style={styles.emptyDetectionsText}>
+              <Text style={[styles.emptyDetectionsText, { color: theme.colors.textMuted }]}>
                 {isActive
                   ? modelStatus === "ready"
                     ? "No objects above threshold"
@@ -425,8 +493,10 @@ export default function ObjectDetectionScreen(): React.JSX.Element {
           {/* Confidence Threshold Presets */}
           <View style={styles.thresholdRow}>
             <View style={styles.thresholdLabelGroup}>
-              <SlidersHorizontal size={14} color="#94a3b8" />
-              <Text style={styles.thresholdLabel}>Threshold</Text>
+              <SlidersHorizontal size={14} color={theme.colors.textMuted} />
+              <Text style={[styles.thresholdLabel, { color: theme.colors.textMuted }]}>
+                Threshold
+              </Text>
             </View>
             <View style={styles.presetButtons}>
               {THRESHOLD_PRESETS.map((preset) => {
@@ -439,14 +509,28 @@ export default function ObjectDetectionScreen(): React.JSX.Element {
                     onPress={() => handleSelectThreshold(preset)}
                     style={({ pressed }) => [
                       styles.presetButton,
-                      selected && styles.presetButtonSelected,
+                      {
+                        backgroundColor: selected
+                          ? theme.colors.primary
+                          : theme.colors.surfaceRaised ?? theme.colors.surface,
+                        borderColor: selected
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                        borderWidth: isMinimal && !selected ? 0 : 1,
+                        borderRadius: pillRadius,
+                      },
                       pressed && styles.buttonPressed,
                     ]}
                   >
                     <Text
                       style={[
                         styles.presetText,
-                        selected && styles.presetTextSelected,
+                        {
+                          color: selected
+                            ? theme.colors.onPrimary ?? "#ffffff"
+                            : theme.colors.text,
+                          fontWeight: selected ? "700" : "500",
+                        },
                       ]}
                     >
                       {Math.round(preset * 100)}%
@@ -467,16 +551,24 @@ export default function ObjectDetectionScreen(): React.JSX.Element {
               onPress={handleToggleActive}
               style={({ pressed }) => [
                 styles.actionButton,
-                isActive ? styles.actionButtonActive : styles.actionButtonMuted,
+                isActive
+                  ? [styles.actionButtonActive, { backgroundColor: theme.colors.primary }]
+                  : styles.actionButtonMuted,
+                { borderRadius: pillRadius },
                 pressed && styles.buttonPressed,
               ]}
             >
               {isActive ? (
-                <Pause size={16} color="#ffffff" />
+                <Pause size={16} color={theme.colors.onPrimary ?? "#ffffff"} />
               ) : (
                 <Play size={16} color="#ffffff" />
               )}
-              <Text style={styles.actionButtonText}>
+              <Text
+                style={[
+                  styles.actionButtonText,
+                  isActive ? { color: theme.colors.onPrimary ?? "#ffffff" } : null,
+                ]}
+              >
                 {isActive ? "Pause" : "Resume"}
               </Text>
             </Pressable>
@@ -488,12 +580,18 @@ export default function ObjectDetectionScreen(): React.JSX.Element {
               style={({ pressed }) => [
                 styles.actionButton,
                 styles.actionButtonSecondary,
+                {
+                  backgroundColor: theme.colors.surfaceRaised ?? theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  borderWidth: isMinimal ? 0 : 1,
+                  borderRadius: pillRadius,
+                },
                 pressed && styles.buttonPressed,
               ]}
             >
-              <SwitchCamera size={16} color="#f8fafc" />
-              <Text style={styles.actionButtonText}>
-                {cameraPosition === "back" ? "Back Camera" : "Front Camera"}
+              <SwitchCamera size={16} color={theme.colors.text} />
+              <Text style={[styles.actionButtonText, { color: theme.colors.text }]}>
+                Flip
               </Text>
             </Pressable>
           </View>

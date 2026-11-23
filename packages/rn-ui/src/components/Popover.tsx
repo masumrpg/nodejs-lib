@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import Animated, {
   Easing,
+  cancelAnimation,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -23,17 +24,20 @@ import {
   computeAnchoredPosition,
   measureAnchorNode,
   useDelayedUnmount,
+  withAlpha,
   type AnchorMeasurement,
+  type AnchoredRectResult,
 } from "../utils";
 import { triggerHaptic } from "../utils/haptics";
 import {
-  ANIMATION_TIMING,
   isPressableTriggerElement,
   minTouchHitSlop,
   webDeps,
   type BaseGlassProps,
   type BaseHapticProps,
 } from "./types";
+
+const POPOVER_EASING = Easing.bezier(0.23, 1, 0.32, 1);
 
 export interface PopoverProps extends BaseHapticProps {
   open?: boolean;
@@ -97,11 +101,9 @@ export const Popover = React.memo(function Popover({
         triggerRef,
         (rect) => {
           setAnchor(rect);
-          setOpen(true);
         },
         portalStore?.getHostRef("root"),
       );
-      return;
     }
     setOpen(nextOpen);
   }, [currentOpen, portalStore, setOpen]);
@@ -220,8 +222,148 @@ export interface PopoverContentProps extends BaseGlassProps {
   align?: "start" | "center" | "end";
   side?: "top" | "bottom";
   sideOffset?: number;
+  overlay?: boolean;
+  overlayStyle?: StyleProp<ViewStyle>;
   style?: StyleProp<ViewStyle>;
 }
+
+interface PopoverPortalOverlayProps {
+  isOpen: boolean;
+  reducedMotion: boolean;
+  coords: AnchoredRectResult;
+  resolvedWidth: number;
+  maxHeight: number;
+  glass: boolean;
+  overlay: boolean;
+  overlayStyle?: StyleProp<ViewStyle>;
+  style?: StyleProp<ViewStyle>;
+  haptic: boolean;
+  onClose: () => void;
+  children?: React.ReactNode;
+}
+
+const PopoverPortalOverlay = React.memo(function PopoverPortalOverlay({
+  isOpen,
+  reducedMotion,
+  coords,
+  resolvedWidth,
+  maxHeight,
+  glass,
+  overlay,
+  overlayStyle,
+  style,
+  haptic,
+  onClose,
+  children,
+}: PopoverPortalOverlayProps) {
+  const { colors, components, radii, shadows, spacing, isDark } = useTheme();
+  const progress = useSharedValue(isOpen && reducedMotion ? 1 : 0);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      progress.value = isOpen ? 1 : 0;
+      return;
+    }
+    progress.value = withTiming(isOpen ? 1 : 0, {
+      duration: isOpen ? 200 : 150,
+      easing: POPOVER_EASING,
+    });
+    return () => {
+      cancelAnimation(progress);
+    };
+  }, [isOpen, progress, reducedMotion]);
+
+  const isTopPlacement = coords.resolvedPlacement === "top";
+  const backdropAnimatedStyle = useAnimatedStyle(
+    () => ({ opacity: progress.value }),
+    webDeps([]),
+  );
+  const contentAnimatedStyle = useAnimatedStyle(
+    () => ({
+      opacity: progress.value,
+      transform: [
+        {
+          translateY: isTopPlacement
+            ? (1 - progress.value) * 6
+            : (1 - progress.value) * -6,
+        },
+        { scale: 0.96 + progress.value * 0.04 },
+      ],
+    }),
+    webDeps([isTopPlacement]),
+  );
+
+  const isBrutal = components.surface.pressEffect === "offset";
+  const backdropColor = isDark
+    ? withAlpha("#000000", 0.38)
+    : withAlpha("#0F172A", 0.16);
+  const cardElevation: ViewStyle = isBrutal
+    ? shadows.lg
+    : {
+        boxShadow: isDark
+          ? "0px 10px 28px rgba(0, 0, 0, 0.52)"
+          : "0px 8px 24px rgba(15, 23, 42, 0.14)",
+      };
+
+  return (
+    <>
+      <Animated.View
+        pointerEvents={isOpen ? "auto" : "none"}
+        style={[
+          StyleSheet.absoluteFill,
+          overlay ? { backgroundColor: backdropColor } : undefined,
+          backdropAnimatedStyle,
+          overlayStyle,
+        ]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss popover"
+          style={StyleSheet.absoluteFill}
+          onPress={() => {
+            if (haptic) triggerHaptic("selection");
+            onClose();
+          }}
+        />
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.content,
+          {
+            top: coords.top,
+            left: coords.left,
+            width: resolvedWidth,
+            maxHeight,
+            borderRadius: radii.lg,
+            borderCurve: "continuous",
+            borderWidth: Math.max(components.borderWidth.default, 1),
+            borderColor: glass
+              ? colors.glassBorder
+              : components.borderWidth.default > 0
+                ? colors.border
+                : colors.borderMuted,
+            backgroundColor: glass
+              ? colors.glassSurfaceStrong
+              : colors.surfaceRaised,
+            padding: spacing.md,
+          },
+          cardElevation,
+          contentAnimatedStyle,
+          style,
+        ]}
+      >
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          {children}
+        </ScrollView>
+      </Animated.View>
+    </>
+  );
+});
 
 export const PopoverContent = React.memo(function PopoverContent({
   children,
@@ -231,37 +373,17 @@ export const PopoverContent = React.memo(function PopoverContent({
   side = "bottom",
   sideOffset = 8,
   glass = false,
+  overlay = true,
+  overlayStyle,
   style,
 }: PopoverContentProps) {
   const context = React.useContext(PopoverContext);
-  const { colors, components, radii, shadows, spacing } = useTheme();
+  const { spacing } = useTheme();
   const reducedMotion = useReducedMotion();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
   const isOpen = Boolean(context?.open);
-  const shouldMount = useDelayedUnmount(
-    isOpen,
-    reducedMotion ? 0 : ANIMATION_TIMING.transition,
-  );
-  const progress = useSharedValue(isOpen ? 1 : 0);
-
-  useEffect(() => {
-    if (isOpen) {
-      progress.value = reducedMotion
-        ? 1
-        : withTiming(1, {
-            duration: ANIMATION_TIMING.transition,
-            easing: Easing.bezier(...ANIMATION_TIMING.bezier),
-          });
-    } else {
-      progress.value = reducedMotion
-        ? 0
-        : withTiming(0, {
-            duration: 120,
-            easing: Easing.bezier(...ANIMATION_TIMING.bezier),
-          });
-    }
-  }, [isOpen, progress, reducedMotion]);
+  const shouldMount = useDelayedUnmount(isOpen, reducedMotion ? 0 : 160);
 
   const resolvedWidth = Math.min(width, Math.max(180, windowWidth - spacing.lg * 2));
   const resolvedAnchor: AnchorMeasurement = context?.anchor ?? {
@@ -282,76 +404,34 @@ export const PopoverContent = React.memo(function PopoverContent({
     viewportPadding: spacing.md,
   });
 
-  const isTopPlacement = coords.resolvedPlacement === "top";
-  const animatedStyle = useAnimatedStyle(
-    () => ({
-      opacity: progress.value,
-      transform: [
-        {
-          translateY: isTopPlacement
-            ? (1 - progress.value) * 6
-            : (1 - progress.value) * -6,
-        },
-        { scale: 0.96 + progress.value * 0.04 },
-      ],
-    }),
-    webDeps([isTopPlacement]),
-  );
-
   if (!shouldMount && !isOpen) return null;
 
-  const portalBody = (
-    <>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Dismiss popover"
-        style={StyleSheet.absoluteFill}
-        onPress={() => {
-          if (context?.haptic) triggerHaptic("selection");
-          context?.setOpen(false);
-        }}
-      />
-
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            top: coords.top,
-            left: coords.left,
-            width: resolvedWidth,
-            maxHeight,
-            borderRadius: radii.lg,
-            borderWidth: components.borderWidth.default,
-            borderColor: glass ? colors.glassBorder : colors.border,
-            backgroundColor: glass
-              ? colors.glassSurfaceStrong
-              : colors.surfaceRaised,
-            padding: spacing.md,
-          },
-          shadows.lg,
-          animatedStyle,
-          style,
-        ]}
-      >
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-        >
-          {children}
-        </ScrollView>
-      </Animated.View>
-    </>
+  const overlayNode = (
+    <PopoverPortalOverlay
+      isOpen={isOpen}
+      reducedMotion={Boolean(reducedMotion)}
+      coords={coords}
+      resolvedWidth={resolvedWidth}
+      maxHeight={maxHeight}
+      glass={glass}
+      overlay={overlay}
+      overlayStyle={overlayStyle}
+      style={style}
+      haptic={Boolean(context?.haptic)}
+      onClose={() => context?.setOpen(false)}
+    >
+      {children}
+    </PopoverPortalOverlay>
   );
 
   return (
     <Portal layer="popover">
       {context ? (
         <PopoverContext.Provider value={context}>
-          {portalBody}
+          {overlayNode}
         </PopoverContext.Provider>
       ) : (
-        portalBody
+        overlayNode
       )}
     </Portal>
   );

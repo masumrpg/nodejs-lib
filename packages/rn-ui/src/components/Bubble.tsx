@@ -163,6 +163,8 @@ export const BubbleContent = React.memo(function BubbleContent({
   const bubbleShadow = !isGhost
     ? shadows[components.surface.feedbackShadow]
     : shadows.none;
+  const baseRadius = Math.min(radii.lg, 16);
+  const tailRadius = radii.xs;
 
   const finalContainerStyle: ViewStyle = isGhost
     ? {
@@ -175,8 +177,13 @@ export const BubbleContent = React.memo(function BubbleContent({
       }
     : {
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm + spacing.xxs,
-        borderRadius: radii.xl,
+        paddingVertical: spacing.sm,
+        minWidth: 44,
+        borderRadius: baseRadius,
+        borderCurve: "continuous",
+        ...(align === "end"
+          ? { borderBottomRightRadius: tailRadius }
+          : { borderBottomLeftRadius: tailRadius }),
         borderWidth:
           variant === "outline"
             ? isTonalOutline

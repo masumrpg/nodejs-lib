@@ -172,9 +172,9 @@ export default function App() {
   }}
 />
 
-## Built-in Design Presets & Neo-Brutalism / Minimal Support
+## Built-in Design Presets (Default, Minimal, Neo-Brutalism, Vision Glass, Editorial & Cyber)
 
-`@masumdev/rn-ui` ships three reactive Light + Dark presets out of the box via `builtInThemePresets` (`default`, `minimal`, `brutal`):
+`@masumdev/rn-ui` ships six reactive Light + Dark presets out of the box via `builtInThemePresets` (`default`, `minimal`, `brutal`, `glass`, `editorial`, `cyber`):
 
 ```tsx
 import {
@@ -187,7 +187,7 @@ import {
 
 export function AppRoot() {
   return (
-    <ThemeProvider presets={builtInThemePresets} defaultThemeName="minimal">
+    <ThemeProvider presets={builtInThemePresets} defaultThemeName="glass">
       <PresetSwitcher />
     </ThemeProvider>
   );
@@ -219,6 +219,9 @@ function PresetSwitcher() {
 - **`defaultThemePreset` (`"default"`)**: Crisp `1px`–`1.5px` unified `colors.border` outlines across Light and Dark modes (via `components.surface.outlineBorderColor = "border"`, with `"tone"` opt-in for tone-tinted outlines) paired with soft diffused shadows (`subtleShadows`).
 - **`minimalThemePreset` (`"minimal"`)**: HeroUI Native-inspired `0px` borderless surfaces separated by background stepping (`#F4F4F5`/`#FFFFFF` in Light, OLED `#000000`/`#18181B` in Dark) and pill radii. Sets `components.surface.outlineStyle = "tonal"`, automatically turning `variant="outline"` buttons, icon buttons, badges, chips, bubbles, alerts, and steppers into `0px` borderless tonal surface fills while keeping `1.5px` strokes on form selection indicators (`Checkbox`, `RadioGroup`, `Switch`) and focus/invalid rings.
 - **`neoBrutalismThemePreset` (`"brutal"`)**: Chunky `2px`–`2.5px` solid ink borders, razor-sharp zero-blur hard-offset shadows via `createHardShadows()` + React Native `boxShadow` across Android/iOS/Web, and mechanical offset press-down motion (`components.surface.pressEffect = "offset"`).
+- **`visionGlassThemePreset` (`"glass"`)**: Apple VisionOS & iOS 18 Control Center-inspired liquid ambient frosted glass depth. Translucent frosted surfaces (`rgba(255, 255, 255, 0.72)` / `rgba(22, 30, 49, 0.70)`), delicate specular highlight borders, soft ambient glow drop shadows (`createGlowShadows()`), generous modern squircle radii (`md: 16px`, `lg: 22px`, `xl: 28px`), and vibrant cosmic neon accents.
+- **`editorialThemePreset` (`"editorial"`)**: Warm editorial papercraft inspired by Monocle, Notion, Substack, and fine print publications. Warm linen & cream parchment paper surfaces (`#FBF9F5`), deep espresso ink typography (`#292524`), terracotta rust (`#9A3412`), olive sage, classic book proportions (`radii.md = 8px`), deckle hairline borders, and warm diffuse paper drop shadows (`createPaperShadows()`). In Dark mode, presents aged bookbinding leather and basalt stone (`#1C1917` & `#262320`).
+- **`cyberThemePreset` (`"cyber"`)**: High-tech Sci-Fi HUD and hacker console aesthetic inspired by Bloomberg terminal, Matrix, and Cyberpunk 2077. Cosmic pitch-void background (`#030712`), high-contrast electric laser cyan wireframe borders (`#00F5FF`), sharp razor-chamfer corners (`radii.md = 2px`), high-intensity radial laser neon glow shadows (`createNeonGlowShadows()`), and mechanical click action. In Light mode, presents precision cleanroom whiteout lab styling (`#F8FAFC`).
 
 ## Using the `useTheme` Hook
 

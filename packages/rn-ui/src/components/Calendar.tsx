@@ -121,6 +121,46 @@ export const CalendarArrow = React.memo(function CalendarArrow({
   );
 });
 
+function areDayPropsEqual(prev: CustomDayProps, next: CustomDayProps): boolean {
+  if (prev.date?.dateString !== next.date?.dateString) return false;
+  if (prev.state !== next.state) return false;
+  if (prev.haptic !== next.haptic) return false;
+
+  const prevMarking = prev.marking;
+  const nextMarking = next.marking;
+
+  if (prevMarking === nextMarking) return true;
+  if (!prevMarking && !nextMarking) return true;
+  if (!prevMarking || !nextMarking) return false;
+
+  if (Boolean(prevMarking.selected) !== Boolean(nextMarking.selected)) return false;
+  if (Boolean(prevMarking.disabled) !== Boolean(nextMarking.disabled)) return false;
+  if (Boolean(prevMarking.marked) !== Boolean(nextMarking.marked)) return false;
+  if (prevMarking.color !== nextMarking.color) return false;
+  if (prevMarking.textColor !== nextMarking.textColor) return false;
+  if (prevMarking.dotColor !== nextMarking.dotColor) return false;
+  if (Boolean(prevMarking.startingDay) !== Boolean(nextMarking.startingDay)) return false;
+  if (Boolean(prevMarking.endingDay) !== Boolean(nextMarking.endingDay)) return false;
+  if (Boolean(prevMarking.isMiddle) !== Boolean(nextMarking.isMiddle)) return false;
+
+  const prevDots = prevMarking.dots;
+  const nextDots = nextMarking.dots;
+  if (prevDots !== nextDots) {
+    if (!prevDots || !nextDots) return false;
+    if (prevDots.length !== nextDots.length) return false;
+    for (let i = 0; i < prevDots.length; i++) {
+      if (
+        prevDots[i]?.key !== nextDots[i]?.key ||
+        prevDots[i]?.color !== nextDots[i]?.color
+      ) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 export const CalendarDayButton = React.memo(function CalendarDayButton({
   date,
   state = "",
@@ -282,7 +322,7 @@ export const CalendarDayButton = React.memo(function CalendarDayButton({
       ) : null}
     </Pressable>
   );
-});
+}, areDayPropsEqual);
 
 export const Calendar = React.memo(function Calendar({
   style,
@@ -472,6 +512,7 @@ export const Calendar = React.memo(function Calendar({
         {
           backgroundColor: colors.surface,
           borderRadius: radii.lg,
+          borderCurve: "continuous",
           borderWidth: components.borderWidth.default,
           borderColor: colors.border,
         },
@@ -818,7 +859,7 @@ const styles = StyleSheet.create({
   arrowCircle: {
     width: 30,
     height: 30,
-    borderRadius: 15,
+    borderRadius: 9999,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -868,12 +909,12 @@ const styles = StyleSheet.create({
   multiDot: {
     width: 3.5,
     height: 3.5,
-    borderRadius: 2,
+    borderRadius: 9999,
   },
   singleDot: {
     width: 4,
     height: 4,
-    borderRadius: 2,
+    borderRadius: 9999,
   },
   overlay: {
     position: "absolute",

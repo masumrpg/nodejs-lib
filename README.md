@@ -17,7 +17,7 @@ Welcome to the **Masum Dev** monorepo. This workspace houses high-performance op
 ├── packages/                  # Open-source packages & libraries (@masumdev/*)
 │   ├── markforge/             # Multi-format document publishing engine & CLI (PDF, DOCX, HTML, TXT)
 │   ├── tscheck/               # TypeScript & AST code auditing engine & interactive CLI
-│   ├── rn-ui/                 # Typed flat UI kit for React Native & Expo (63+ components, design tokens)
+│   ├── rn-ui/                 # Typed flat UI kit for React Native & Expo (63+ components, worklet pickers & calendars)
 │   ├── rn-camera-ai/          # Zero-JS-thread VisionCamera v5 AI preview, 468 Face Mesh & overlay engine
 │   ├── rn-camera-ai-tflite/   # Fast-TFLite GPU adapter (Object Detection, Face Recognition & e-KYC Liveness)
 │   ├── rn-camera-ai-mlkit/    # Google ML Kit v2 adapter (Zero-copy YUV OCR & Structured Entity Extraction)

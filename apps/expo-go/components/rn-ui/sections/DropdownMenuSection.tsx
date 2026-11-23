@@ -1,7 +1,6 @@
 import {
   Box,
   Button,
-  Card,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -11,150 +10,149 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
   Text,
-  Badge,
 } from "@masumdev/rn-ui";
 import {
   ChevronDown,
-  RefreshCw,
   Copy,
-  SlidersHorizontal,
+  FolderInput,
+  Pencil,
+  RefreshCw,
+  Settings,
   Trash2,
   User,
-  Settings,
-  Grid,
-  Eye,
 } from "lucide-react-native";
-import React from "react";
-import { Section, type RnUiSectionContext } from "../shared";
+import { useState } from "react";
+import { DemoCard, DemoReadout, Section, type RnUiSectionContext } from "../shared";
 
 export function DropdownMenuSection({ ctx }: { ctx: RnUiSectionContext }) {
-  const { icon, setAlertDialogVisible } = ctx;
-
-  const [compactMenu, setCompactMenu] = React.useState(false);
-  const [showGrid, setShowGrid] = React.useState(true);
-  const [showHidden, setShowHidden] = React.useState(false);
+  const { icon } = ctx;
+  const [showLineNumbers, setShowLineNumbers] = useState(true);
+  const [autoSave, setAutoSave] = useState(true);
+  const [lastAction, setLastAction] = useState("None");
 
   return (
-    <Section title="Dropdown Menu">
-      <Card outlined>
-        <Box gap="lg">
-          <Text color="textMuted">
-            Tap-triggered contextual menu cards with alignment options, icons, shortcut keys, toggle checkboxes, and destructive actions.
-          </Text>
+    <Section title="DropdownMenu">
+      <Box gap="lg">
+        {/* Card 1: Document Context Menu */}
+        <DemoCard
+          title="Document Actions Menu"
+          badge="Shortcuts & Checkboxes"
+          badgeTone="primary"
+          description="Contextual floating menu with shortcuts, icons, dividers, checkbox items, and destructive actions."
+        >
+          <Box gap="md">
+            <Box row gap="sm" style={{ alignItems: "center" }}>
+              <DropdownMenu>
+                <DropdownMenuTrigger>
+                  <Button
+                    variant="filled"
+                    tone="primary"
+                    rightIcon={icon(ChevronDown)}
+                  >
+                    Document Actions
+                  </Button>
+                </DropdownMenuTrigger>
 
-          {/* Trigger 1: Action Menu Button */}
-          <Box gap="xs">
-            <Text variant="labelSmall" color="textMuted">
-              Standard Action Menu
-            </Text>
-            <DropdownMenu>
-              <DropdownMenuTrigger>
-                <Button
-                  variant="filled"
-                  tone="primary"
-                  rightIcon={icon(ChevronDown)}
-                >
-                  Options Menu
-                </Button>
-              </DropdownMenuTrigger>
+                <DropdownMenuContent width={230} align="start">
+                  <DropdownMenuLabel>File Actions</DropdownMenuLabel>
 
-              <DropdownMenuContent width={220} align="start">
-                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuItem leftIcon={icon(RefreshCw)}>
-                  <Text variant="bodySmall">Refresh Feed</Text>
-                  <DropdownMenuShortcut>⌘R</DropdownMenuShortcut>
-                </DropdownMenuItem>
+                  <DropdownMenuItem
+                    leftIcon={icon(Copy)}
+                    onPress={() => setLastAction("Duplicated document")}
+                  >
+                    <Text variant="bodySmall">Duplicate</Text>
+                    <DropdownMenuShortcut>⌘D</DropdownMenuShortcut>
+                  </DropdownMenuItem>
 
-                <DropdownMenuItem leftIcon={icon(Copy)}>
-                  <Text variant="bodySmall">Duplicate Page</Text>
-                  <DropdownMenuShortcut>⌘D</DropdownMenuShortcut>
-                </DropdownMenuItem>
+                  <DropdownMenuItem
+                    leftIcon={icon(Pencil)}
+                    onPress={() => setLastAction("Renamed document")}
+                  >
+                    <Text variant="bodySmall">Rename</Text>
+                    <DropdownMenuShortcut>⌘R</DropdownMenuShortcut>
+                  </DropdownMenuItem>
 
-                <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    leftIcon={icon(FolderInput)}
+                    onPress={() => setLastAction("Moved to folder")}
+                  >
+                    <Text variant="bodySmall">Move to...</Text>
+                  </DropdownMenuItem>
 
-                <DropdownMenuLabel>Account</DropdownMenuLabel>
-                <DropdownMenuItem leftIcon={icon(User)}>
-                  <Text variant="bodySmall">Profile Info</Text>
-                </DropdownMenuItem>
-                <DropdownMenuItem leftIcon={icon(Settings)}>
-                  <Text variant="bodySmall">Settings</Text>
-                </DropdownMenuItem>
+                  <DropdownMenuSeparator />
 
-                <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Editor Preferences</DropdownMenuLabel>
 
-                <DropdownMenuItem
-                  variant="destructive"
-                  leftIcon={icon(Trash2)}
-                  onPress={() => setAlertDialogVisible(true)}
-                >
-                  <Text variant="bodySmall">Delete Item</Text>
-                  <DropdownMenuShortcut>Del</DropdownMenuShortcut>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuCheckboxItem
+                    checked={showLineNumbers}
+                    onCheckedChange={setShowLineNumbers}
+                  >
+                    Line Numbers
+                  </DropdownMenuCheckboxItem>
+
+                  <DropdownMenuCheckboxItem
+                    checked={autoSave}
+                    onCheckedChange={setAutoSave}
+                  >
+                    Auto-Save Cloud
+                  </DropdownMenuCheckboxItem>
+
+                  <DropdownMenuSeparator />
+
+                  <DropdownMenuItem
+                    variant="destructive"
+                    leftIcon={icon(Trash2)}
+                    onPress={() => setLastAction("Deleted document")}
+                  >
+                    <Text variant="bodySmall">Delete File</Text>
+                    <DropdownMenuShortcut>⌫</DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger>
+                  <Button
+                    variant="outline"
+                    tone="secondary"
+                    rightIcon={icon(ChevronDown)}
+                  >
+                    Account
+                  </Button>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent width={200} align="end">
+                  <DropdownMenuLabel>Ma'sum (@masumdev)</DropdownMenuLabel>
+                  <DropdownMenuItem
+                    leftIcon={icon(User)}
+                    onPress={() => setLastAction("Opened Profile")}
+                  >
+                    <Text variant="bodySmall">Profile</Text>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    leftIcon={icon(Settings)}
+                    onPress={() => setLastAction("Opened Settings")}
+                  >
+                    <Text variant="bodySmall">Settings</Text>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    leftIcon={icon(RefreshCw)}
+                    onPress={() => setLastAction("Refreshed Session")}
+                  >
+                    <Text variant="bodySmall">Refresh Token</Text>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </Box>
+
+            <DemoReadout
+              label="Last Action Selected"
+              value={lastAction}
+            />
           </Box>
-
-          {/* Trigger 2: View Preferences Filter Menu */}
-          <Box gap="xs">
-            <Text variant="labelSmall" color="textMuted">
-              View Preferences (Checkboxes)
-            </Text>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger>
-                <Button
-                  variant="outline"
-                  tone="accent"
-                  leftIcon={icon(SlidersHorizontal)}
-                  rightIcon={icon(ChevronDown)}
-                >
-                  View Controls
-                </Button>
-              </DropdownMenuTrigger>
-
-              <DropdownMenuContent width={240} align="start">
-                <DropdownMenuLabel>Toggle Views</DropdownMenuLabel>
-                <DropdownMenuCheckboxItem
-                  leftIcon={icon(Grid)}
-                  checked={showGrid}
-                  onCheckedChange={setShowGrid}
-                >
-                  Show Grid Lines
-                </DropdownMenuCheckboxItem>
-
-                <DropdownMenuCheckboxItem
-                  leftIcon={icon(Eye)}
-                  checked={showHidden}
-                  onCheckedChange={setShowHidden}
-                >
-                  Show Hidden Files
-                </DropdownMenuCheckboxItem>
-
-                <DropdownMenuCheckboxItem
-                  leftIcon={icon(SlidersHorizontal)}
-                  checked={compactMenu}
-                  onCheckedChange={setCompactMenu}
-                >
-                  Compact Spacing
-                </DropdownMenuCheckboxItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </Box>
-
-          {/* Status Indicators */}
-          <Box row style={{ flexWrap: "wrap", gap: 8 }}>
-            <Badge tone={showGrid ? "primary" : "secondary"}>
-              {`Grid: ${showGrid ? "ON" : "OFF"}`}
-            </Badge>
-            <Badge tone={showHidden ? "warning" : "secondary"}>
-              {`Hidden: ${showHidden ? "ON" : "OFF"}`}
-            </Badge>
-            <Badge tone={compactMenu ? "accent" : "secondary"}>
-              {`Compact: ${compactMenu ? "ON" : "OFF"}`}
-            </Badge>
-          </Box>
-        </Box>
-      </Card>
+        </DemoCard>
+      </Box>
     </Section>
   );
 }

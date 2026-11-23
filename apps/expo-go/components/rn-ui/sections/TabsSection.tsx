@@ -1,222 +1,193 @@
-import {
-  Badge,
-  Box,
-  Card,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-  Text,
-} from "@masumdev/rn-ui";
-import { User, Activity, Settings, Bell, ShieldCheck } from "lucide-react-native";
+import { Box, Tabs, TabsContent, TabsList, TabsTrigger, Text } from "@masumdev/rn-ui";
+import { Activity, Bell, Settings, ShieldCheck, User } from "lucide-react-native";
 import { useState } from "react";
-import { Section, type RnUiSectionContext } from "../shared";
+import {
+  DemoCard,
+  DemoReadout,
+  DemoSurface,
+  Section,
+  type RnUiSectionContext,
+} from "../shared";
 
 export function TabsSection(_props?: { ctx?: RnUiSectionContext }) {
-  const [activeTab1, setActiveTab1] = useState("profile");
-  const [activeTab2, setActiveTab2] = useState("activity");
-  const [activeTab3, setActiveTab3] = useState("security");
+  const [activeTabFlush, setActiveTabFlush] = useState("overview");
+  const [activeTabVariant, setActiveTabVariant] = useState("profile");
+  const [activeTabSoft, setActiveTabSoft] = useState("security");
+  const [tabTone, _setTabTone] = useState<"primary" | "success" | "accent">("primary");
 
   return (
     <Section title="Tabs">
       <Box gap="lg">
-        {/* 1. Classic Line Variant with Sliding Underline */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Underline Tabs
-              </Text>
-              <Badge tone="primary">Slide Transition</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Smooth underline indicator sliding between active tabs with directional slide content transition.
-            </Text>
+        {/* 1. Flush Solid Capsule Variant (Featured) */}
+        <DemoCard
+          title="Flush Solid Capsule"
+          badge='variant="flush"'
+          badgeTone="primary"
+          description="Edge-hugging solid capsule indicator with continuous curvature and high-contrast label color."
+        >
+          <Tabs
+            value={activeTabFlush}
+            onValueChange={setActiveTabFlush}
+            variant="flush"
+            tone={tabTone}
+            transition="slide"
+          >
+            <TabsList fullWidth>
+              <TabsTrigger
+                value="overview"
+                icon={({ color, size }) => <User color={color} size={size} />}
+              >
+                Overview
+              </TabsTrigger>
+              <TabsTrigger
+                value="activity"
+                icon={({ color, size }) => <Activity color={color} size={size} />}
+                badge="3"
+              >
+                Activity
+              </TabsTrigger>
+              <TabsTrigger
+                value="settings"
+                icon={({ color, size }) => <Settings color={color} size={size} />}
+              >
+                Settings
+              </TabsTrigger>
+            </TabsList>
 
-            <Tabs
-              value={activeTab1}
-              onValueChange={setActiveTab1}
-              variant="line"
-              transition="slide"
-            >
-              <TabsList>
-                <TabsTrigger
-                  value="profile"
-                  icon={({ color, size }) => <User color={color} size={size} />}
-                >
-                  Profile
-                </TabsTrigger>
-                <TabsTrigger
-                  value="activity"
-                  icon={({ color, size }) => <Activity color={color} size={size} />}
-                  badge="3"
-                >
-                  Activity
-                </TabsTrigger>
-                <TabsTrigger
-                  value="settings"
-                  icon={({ color, size }) => <Settings color={color} size={size} />}
-                >
-                  Settings
-                </TabsTrigger>
-              </TabsList>
+            <TabsContent value="overview">
+              <DemoSurface tone="muted" style={{ gap: 6 }}>
+                <Text weight="600">Workspace Overview</Text>
+                <Text color="textMuted" variant="bodySmall">
+                  Production environment active with 12 microservices running smoothly.
+                </Text>
+              </DemoSurface>
+            </TabsContent>
 
-              <TabsContent value="profile">
-                <Box p="md" bg="surfaceMuted" style={{ borderRadius: 8 }} gap="xs">
-                  <Text weight="600">User Profile Overview</Text>
-                  <Text color="textMuted" variant="bodySmall">
-                    Account owner: Ma'sum (masum@example.com).
-                  </Text>
-                </Box>
-              </TabsContent>
+            <TabsContent value="activity">
+              <DemoSurface tone="muted" style={{ gap: 6 }}>
+                <Text weight="600">Recent Deployment Logs</Text>
+                <Text color="textMuted" variant="bodySmall">
+                  Version 0.7.0 deployed successfully by Ma'sum 8 minutes ago.
+                </Text>
+              </DemoSurface>
+            </TabsContent>
 
-              <TabsContent value="activity">
-                <Box p="md" bg="surfaceMuted" style={{ borderRadius: 8 }} gap="xs">
-                  <Text weight="600">Recent Account Activity</Text>
-                  <Text color="textMuted" variant="bodySmall">
-                    Last session authenticated 5 minutes ago.
-                  </Text>
-                </Box>
-              </TabsContent>
+            <TabsContent value="settings">
+              <DemoSurface tone="muted" style={{ gap: 6 }}>
+                <Text weight="600">Security & Key Access</Text>
+                <Text color="textMuted" variant="bodySmall">
+                  API tokens scoped to read/write access. Auto-rotation enabled.
+                </Text>
+              </DemoSurface>
+            </TabsContent>
+          </Tabs>
 
-              <TabsContent value="settings">
-                <Box p="md" bg="surfaceMuted" style={{ borderRadius: 8 }} gap="xs">
-                  <Text weight="600">Preferences & Configuration</Text>
-                  <Text color="textMuted" variant="bodySmall">
-                    Notification channels and privacy settings.
-                  </Text>
-                </Box>
-              </TabsContent>
-            </Tabs>
-          </Box>
-        </Card>
+          <DemoReadout label="Active Flush Tab" value={activeTabFlush} />
+        </DemoCard>
 
-        {/* 2. Cupertino Capsule Pill Variant */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Pill Capsule Tabs
-              </Text>
-              <Badge tone="accent">Scale Transition</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Enclosed segmented capsule container with subtle content scale transition.
-            </Text>
+        {/* 2. Classic Line & Pill Variants */}
+        <DemoCard
+          title="Underline & Pill Variants"
+          badge='variant="line" | "pill"'
+          badgeTone="secondary"
+          description="Directional underline slide or raised pill switcher with theme-aware elevation."
+        >
+          <Tabs
+            value={activeTabVariant}
+            onValueChange={setActiveTabVariant}
+            variant="pill"
+            tone="accent"
+            transition="scale"
+          >
+            <TabsList>
+              <TabsTrigger value="profile">Profile</TabsTrigger>
+              <TabsTrigger value="billing" badge="Pro">
+                Billing
+              </TabsTrigger>
+              <TabsTrigger value="notifications">Alerts</TabsTrigger>
+            </TabsList>
 
-            <Tabs
-              value={activeTab2}
-              onValueChange={setActiveTab2}
-              variant="pill"
-              tone="accent"
-              transition="scale"
-            >
-              <TabsList>
-                <TabsTrigger value="activity">Overview</TabsTrigger>
-                <TabsTrigger value="notifications">Alerts</TabsTrigger>
-                <TabsTrigger value="reports">Reports</TabsTrigger>
-              </TabsList>
+            <TabsContent value="profile">
+              <DemoSurface tone="muted" style={{ gap: 6 }}>
+                <Text weight="600">Account Owner</Text>
+                <Text color="textMuted" variant="bodySmall">
+                  Ma'sum (masum@example.com) — Administrator role.
+                </Text>
+              </DemoSurface>
+            </TabsContent>
 
-              <TabsContent value="activity">
-                <Box p="md" bg="surfaceMuted" style={{ borderRadius: 8 }} gap="xs">
-                  <Text weight="600">Monthly Overview Panel</Text>
-                  <Text color="textMuted" variant="bodySmall">
-                    Aggregated key performance indicators.
-                  </Text>
-                </Box>
-              </TabsContent>
+            <TabsContent value="billing">
+              <DemoSurface tone="muted" style={{ gap: 6 }}>
+                <Text weight="600">Subscription Plan</Text>
+                <Text color="textMuted" variant="bodySmall">
+                  Enterprise tier active with annual billing cycle.
+                </Text>
+              </DemoSurface>
+            </TabsContent>
 
-              <TabsContent value="notifications">
-                <Box p="md" bg="surfaceMuted" style={{ borderRadius: 8 }} gap="xs">
-                  <Text weight="600">System Notifications</Text>
-                  <Text color="textMuted" variant="bodySmall">
-                    All workspace services operating normally.
-                  </Text>
-                </Box>
-              </TabsContent>
+            <TabsContent value="notifications">
+              <DemoSurface tone="muted" style={{ gap: 6 }}>
+                <Text weight="600">Channel Alerts</Text>
+                <Text color="textMuted" variant="bodySmall">
+                  Email and push notifications enabled for high-priority alerts.
+                </Text>
+              </DemoSurface>
+            </TabsContent>
+          </Tabs>
 
-              <TabsContent value="reports">
-                <Box p="md" bg="surfaceMuted" style={{ borderRadius: 8 }} gap="xs">
-                  <Text weight="600">Generated Reports</Text>
-                  <Text color="textMuted" variant="bodySmall">
-                    Quarterly statement ready for download.
-                  </Text>
-                </Box>
-              </TabsContent>
-            </Tabs>
-          </Box>
-        </Card>
+          <DemoReadout label="Pill Tab Selection" value={activeTabVariant} />
+        </DemoCard>
 
         {/* 3. Soft Tint Variant */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Soft Tint Tabs
-              </Text>
-              <Badge tone="success">Fade Transition</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Soft tinted active tab indicator with pure crossfade content transition.
-            </Text>
+        <DemoCard
+          title="Soft Tint Indicator"
+          badge='variant="soft"'
+          badgeTone="success"
+          description="Translucent tinted indicator with smooth crossfade content transition."
+        >
+          <Tabs
+            value={activeTabSoft}
+            onValueChange={setActiveTabSoft}
+            variant="soft"
+            tone="success"
+            transition="fade"
+          >
+            <TabsList>
+              <TabsTrigger
+                value="security"
+                icon={({ color, size }) => <ShieldCheck color={color} size={size} />}
+              >
+                Security
+              </TabsTrigger>
+              <TabsTrigger
+                value="notifications"
+                icon={({ color, size }) => <Bell color={color} size={size} />}
+              >
+                Notifications
+              </TabsTrigger>
+            </TabsList>
 
-            <Tabs
-              value={activeTab3}
-              onValueChange={setActiveTab3}
-              variant="soft"
-              tone="success"
-              transition="fade"
-            >
-              <TabsList>
-                <TabsTrigger
-                  value="security"
-                  icon={({ color, size }) => <ShieldCheck color={color} size={size} />}
-                >
-                  Security
-                </TabsTrigger>
-                <TabsTrigger
-                  value="billing"
-                  icon={({ color, size }) => <Bell color={color} size={size} />}
-                >
-                  Billing
-                </TabsTrigger>
-              </TabsList>
+            <TabsContent value="security">
+              <DemoSurface tone="muted" style={{ gap: 6 }}>
+                <Text weight="600">Hardware Key Authentication</Text>
+                <Text color="textMuted" variant="bodySmall">
+                  FIDO2 WebAuthn key registered as primary 2FA factor.
+                </Text>
+              </DemoSurface>
+            </TabsContent>
 
-              <TabsContent value="security">
-                <Box p="md" bg="surfaceMuted" style={{ borderRadius: 8 }} gap="xs">
-                  <Text weight="600">Two-Factor Authentication Active</Text>
-                  <Text color="textMuted" variant="bodySmall">
-                    Hardware key registered for identity verification.
-                  </Text>
-                </Box>
-              </TabsContent>
+            <TabsContent value="notifications">
+              <DemoSurface tone="muted" style={{ gap: 6 }}>
+                <Text weight="600">Incident Alerts</Text>
+                <Text color="textMuted" variant="bodySmall">
+                  Critical webhook dispatched to incident management team.
+                </Text>
+              </DemoSurface>
+            </TabsContent>
+          </Tabs>
 
-              <TabsContent value="billing">
-                <Box p="md" bg="surfaceMuted" style={{ borderRadius: 8 }} gap="xs">
-                  <Text weight="600">Subscription Status</Text>
-                  <Text color="textMuted" variant="bodySmall">
-                    Enterprise tier active with annual billing.
-                  </Text>
-                </Box>
-              </TabsContent>
-            </Tabs>
-          </Box>
-        </Card>
+          <DemoReadout label="Soft Tab Selection" value={activeTabSoft} />
+        </DemoCard>
       </Box>
     </Section>
   );
