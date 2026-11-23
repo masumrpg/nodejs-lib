@@ -253,6 +253,13 @@ mock.module("react-native", () => ({
       right: 0,
       bottom: 0,
     },
+    absoluteFillObject: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    },
   },
 }));
 
@@ -332,18 +339,34 @@ mock.module("react-native-reanimated", () => ({
   cubicBezier: () => "cubic-bezier(0.23, 1, 0.32, 1)",
 }));
 
-mock.module("react-native-gesture-handler", () => ({
-  GestureHandlerRootView: MockView,
-  GestureDetector: (props: {
-    gesture?: unknown;
-    children?: React.ReactNode;
-  }) =>
-    React.createElement(
-      "rngh-detector",
-      { "data-gesture": props.gesture },
-      props.children,
-    ),
-  usePanGesture: (config?: Record<string, unknown>) => {
+mock.module("react-native-gesture-handler", () => {
+  const createMockGesture = () => {
+    const obj: Record<string, unknown> = {};
+    obj.activeOffsetX = () => obj;
+    obj.activeOffsetY = () => obj;
+    obj.failOffsetX = () => obj;
+    obj.failOffsetY = () => obj;
+    obj.onUpdate = () => obj;
+    obj.onEnd = () => obj;
+    obj.onStart = () => obj;
+    return obj;
+  };
+
+  return {
+    GestureHandlerRootView: MockView,
+    Gesture: {
+      Pan: createMockGesture,
+    },
+    GestureDetector: (props: {
+      gesture?: unknown;
+      children?: React.ReactNode;
+    }) =>
+      React.createElement(
+        "rngh-detector",
+        { "data-gesture": props.gesture },
+        props.children,
+      ),
+    usePanGesture: (config?: Record<string, unknown>) => {
     const checkOffsetArray = (value: unknown, propName: string) => {
       if (!Array.isArray(value)) return;
       const start = Number(value[0]);
@@ -398,7 +421,8 @@ mock.module("react-native-gesture-handler", () => ({
     kind: "simultaneous",
     gestures,
   }),
-}));
+};
+});
 
 mock.module("react-native-worklets", () => ({
   runOnJS: <T extends (...args: unknown[]) => unknown>(fn: T) => fn,

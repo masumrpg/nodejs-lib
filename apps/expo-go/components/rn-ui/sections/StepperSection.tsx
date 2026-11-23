@@ -1,121 +1,159 @@
-import { Stepper, Card, Box, Text } from "@masumdev/rn-ui";
+import { Box, Stepper, Text } from "@masumdev/rn-ui";
 import { Minus, Plus } from "lucide-react-native";
-import React from "react";
-import { Section, type RnUiSectionContext } from "../shared";
+import { useState } from "react";
+import {
+  DemoCard,
+  DemoReadout,
+  DemoSurface,
+  Section,
+  type RnUiSectionContext,
+} from "../shared";
 
 export function StepperSection({ ctx }: { ctx: RnUiSectionContext }) {
   const { icon } = ctx;
-  const [val, setVal] = React.useState(3);
+  const [cartCount, setCartCount] = useState(3);
+  const [guestsCount, setGuestsCount] = useState(2);
 
   return (
     <Section title="Stepper">
-      <Card outlined>
-        <Box gap="lg">
-          <Text color="textMuted">
-            Numeric stepper control with 4px internal padding, concentric inner radii, glassmorphism, haptics, and custom icons.
-          </Text>
+      <Box gap="lg">
+        {/* Card 1: E-Commerce Quantity Row */}
+        <DemoCard
+          title="E-Commerce Stepper"
+          badge="Interactive Row"
+          badgeTone="primary"
+          description="Numeric counter with concentric inner radii, smooth button press states, and boundary bounds."
+        >
+          <Box gap="md">
+            <DemoSurface radius="md">
+              <Box
+                row
+                wrap
+                gap="sm"
+                style={{
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Box gap="xxs" style={{ flexShrink: 1 }}>
+                  <Text variant="label" weight="600">
+                    Order Quantity
+                  </Text>
+                  <Text variant="caption" color="textMuted">
+                    Select number of items to checkout
+                  </Text>
+                </Box>
 
-          {/* 1. Left Label + Right Stepper Row (E-Commerce Cart Style) */}
-          <Box gap="xs">
-            <Text variant="labelSmall" color="textSubtle">
-              Left Label + Right Stepper Row
-            </Text>
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{
-                justifyContent: "space-between",
-                alignItems: "center",
-                backgroundColor: "rgba(255, 255, 255, 0.03)",
-                padding: 12,
-                borderRadius: 12,
-              }}
-            >
-              <Box gap="xxs" style={{ flexShrink: 1 }}>
-                <Text variant="label">Item Quantity</Text>
-                <Text variant="bodySmall" color="textMuted">
-                  Select quantity to order
-                </Text>
+                <Stepper
+                  value={cartCount}
+                  min={1}
+                  max={10}
+                  onValueChange={setCartCount}
+                  decrementIcon={icon(Minus)}
+                  incrementIcon={icon(Plus)}
+                />
               </Box>
+            </DemoSurface>
 
-              <Stepper
-                value={val}
-                min={1}
-                max={10}
-                onValueChange={setVal}
-                decrementIcon={icon(Minus)}
-                incrementIcon={icon(Plus)}
-              />
-            </Box>
-          </Box>
+            <DemoSurface radius="md">
+              <Box
+                row
+                wrap
+                gap="sm"
+                style={{
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Box gap="xxs" style={{ flexShrink: 1 }}>
+                  <Text variant="label" weight="600">
+                    Hotel Guests
+                  </Text>
+                  <Text variant="caption" color="textMuted">
+                    Adults per master suite
+                  </Text>
+                </Box>
 
-          {/* 2. Standalone Default Input Stepper */}
-          <Box gap="xs">
-            <Text variant="labelSmall" color="textSubtle">
-              Standalone Input Stepper (No Overlap)
-            </Text>
-            <Stepper
-              value={val}
-              min={1}
-              max={10}
-              onValueChange={setVal}
-              decrementIcon={icon(Minus)}
-              incrementIcon={icon(Plus)}
+                <Stepper
+                  variant="soft"
+                  value={guestsCount}
+                  min={1}
+                  max={6}
+                  onValueChange={setGuestsCount}
+                  decrementIcon={icon(Minus)}
+                  incrementIcon={icon(Plus)}
+                />
+              </Box>
+            </DemoSurface>
+
+            <DemoReadout
+              label="Reservation Total"
+              value={`Items: ${cartCount} • Guests: ${guestsCount}`}
             />
           </Box>
+        </DemoCard>
 
-          {/* 3. Soft & Glass Variants */}
-          <Box gap="xs">
-            <Text variant="labelSmall" color="textSubtle">
-              Soft & Glassmorphism Variants
-            </Text>
-            <Box gap="sm">
-              <Stepper
-                variant="soft"
-                value={val}
-                min={1}
-                max={10}
-                onValueChange={setVal}
-              />
-              <Stepper
-                glass
-                value={val}
-                min={1}
-                max={10}
-                onValueChange={setVal}
-              />
+        {/* Card 2: Variants & Sizes */}
+        <DemoCard
+          title="Stepper Variants & Sizes"
+          badge="sm • md • lg"
+          badgeTone="secondary"
+          description="Filled, soft, and glassmorphism styling across compact, medium, and large dimensions."
+        >
+          <Box gap="md">
+            <Box gap="xs">
+              <Text variant="caption" weight="600" color="textMuted">
+                Glassmorphism & Soft Variants
+              </Text>
+              <Box row gap="sm" style={{ flexWrap: "wrap" }}>
+                <Stepper
+                  variant="soft"
+                  value={cartCount}
+                  min={1}
+                  max={10}
+                  onValueChange={setCartCount}
+                />
+                <Stepper
+                  glass
+                  value={cartCount}
+                  min={1}
+                  max={10}
+                  onValueChange={setCartCount}
+                />
+              </Box>
+            </Box>
+
+            <Box gap="xs">
+              <Text variant="caption" weight="600" color="textMuted">
+                Control Sizes (sm, md, lg)
+              </Text>
+              <Box row gap="sm" style={{ flexWrap: "wrap", alignItems: "center" }}>
+                <Stepper
+                  size="sm"
+                  value={cartCount}
+                  min={1}
+                  max={10}
+                  onValueChange={setCartCount}
+                />
+                <Stepper
+                  size="md"
+                  value={cartCount}
+                  min={1}
+                  max={10}
+                  onValueChange={setCartCount}
+                />
+                <Stepper
+                  size="lg"
+                  value={cartCount}
+                  min={1}
+                  max={10}
+                  onValueChange={setCartCount}
+                />
+              </Box>
             </Box>
           </Box>
-
-          {/* 4. Sizes */}
-          <Box gap="xs">
-            <Text variant="labelSmall" color="textSubtle">
-              Stepper Sizes (sm, md, lg)
-            </Text>
-            <Box gap="sm">
-              <Stepper
-                size="sm"
-                value={val}
-                min={1}
-                max={10}
-                onValueChange={setVal}
-              />
-              <Stepper
-                size="lg"
-                value={val}
-                min={1}
-                max={10}
-                onValueChange={setVal}
-              />
-            </Box>
-          </Box>
-
-          <Text variant="caption" color="textMuted">
-            Current Quantity: {val}
-          </Text>
-        </Box>
-      </Card>
+        </DemoCard>
+      </Box>
     </Section>
   );
 }

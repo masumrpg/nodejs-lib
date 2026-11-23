@@ -1,7 +1,12 @@
-import { Box, Button, Card, FloatingActionButton, Text } from "@masumdev/rn-ui";
-import { Edit3, Plus, Trash } from "lucide-react-native";
+import { Box, Button, FloatingActionButton } from "@masumdev/rn-ui";
+import { Edit3, Plus, Trash2 } from "lucide-react-native";
 import * as React from "react";
-import { Section, type RnUiSectionContext } from "../shared";
+import {
+  DemoCard,
+  DemoSurface,
+  Section,
+  type RnUiSectionContext,
+} from "../shared";
 
 export function FloatingActionButtonSection({
   ctx,
@@ -13,56 +18,68 @@ export function FloatingActionButtonSection({
   const [extended, setExtended] = React.useState(true);
 
   return (
-    <Section title="Floating Action Button">
-      <Card>
-        <Box gap="md">
-          <Text color="textMuted">
-            Reanimated FAB for Expo React Native by Ma'sum in 2026.
-          </Text>
+    <Section title="FloatingActionButton">
+      <Box gap="lg">
+        <DemoCard
+          title="Floating Action Controls"
+          badge="extended • placement"
+          badgeTone="primary"
+          description="Floating action button with animated label expansion and smooth enter/exit scaling."
+        >
+          <Box gap="md">
+            <Box row gap="sm">
+              <Button
+                size="sm"
+                variant={visible ? "filled" : "outline"}
+                tone="primary"
+                onPress={() => setVisible((value) => !value)}
+              >
+                {visible ? "Hide FAB" : "Show FAB"}
+              </Button>
+              <Button
+                size="sm"
+                variant={extended ? "filled" : "outline"}
+                tone="secondary"
+                onPress={() => setExtended((value) => !value)}
+              >
+                {extended ? "Collapse Label" : "Extend Label"}
+              </Button>
+            </Box>
 
-          <Box row gap="sm">
-            <Button
-              size="sm"
-              variant={visible ? "filled" : "outline"}
-              onPress={() => setVisible((value) => !value)}
+            <DemoSurface
+              tone="muted"
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-around",
+                paddingVertical: 20,
+              }}
             >
-              Toggle
-            </Button>
-            <Button
-              size="sm"
-              variant={extended ? "filled" : "outline"}
-              tone="secondary"
-              onPress={() => setExtended((value) => !value)}
-            >
-              Extended
-            </Button>
+              <FloatingActionButton
+                placement="none"
+                visible={visible}
+                icon={icon(Plus)}
+                label="Create Project"
+                extended={extended}
+              />
+              <FloatingActionButton
+                placement="none"
+                visible={visible}
+                icon={icon(Edit3)}
+                tone="accent"
+                variant="soft"
+              />
+              <FloatingActionButton
+                placement="none"
+                visible={visible}
+                icon={icon(Trash2)}
+                tone="danger"
+                variant="outline"
+              />
+            </DemoSurface>
           </Box>
-
-          <Box row gap="md" center style={{ minHeight: 76 }}>
-            <FloatingActionButton
-              placement="none"
-              visible={visible}
-              icon={icon(Plus)}
-              label="Create"
-              extended={extended}
-            />
-            <FloatingActionButton
-              placement="none"
-              visible={visible}
-              icon={icon(Edit3)}
-              tone="accent"
-              variant="soft"
-            />
-            <FloatingActionButton
-              placement="none"
-              visible={visible}
-              icon={icon(Trash)}
-              tone="danger"
-              variant="outline"
-            />
-          </Box>
-        </Box>
-      </Card>
+        </DemoCard>
+      </Box>
     </Section>
   );
 }

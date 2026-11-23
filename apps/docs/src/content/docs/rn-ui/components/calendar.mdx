@@ -63,3 +63,12 @@ export function CalendarExample() {
     onTodayPress: { type: '() => void', description: 'Optional callback triggered when the "Today" button is pressed.' },
   }}
 />
+
+## Performance & Day Memoization
+
+Rendering a full monthly calendar involves 42 day cells (6 weeks x 7 days) rendered simultaneously. To ensure responsive 60–120 FPS interaction:
+
+- **Custom Equality Comparator (`areDayPropsEqual`)**: `CalendarDayButton` implements a specialized shallow comparator with `React.memo`. When a date is pressed or modified, only the **2 affected day cells** (the previously selected day and the newly selected day) re-render. The other 40 days skip rendering completely.
+- **Cascading Performance**: `ExpandableCalendar` and `WeekCalendar` inherit this comparator, ensuring week-to-month expansion gestures and agenda scrolling remain smooth on mobile devices.
+- **Memoized Marked Dates**: Always memoize `markedDates` using `useMemo` so unnecessary object recreations are avoided between parent render passes.
+

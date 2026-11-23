@@ -11,6 +11,7 @@ import {
 import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { SystemUIOverlay } from "../../components/system-ui-overlay";
 
@@ -22,6 +23,7 @@ function getSampleDate(offsetDays: number = 0): string {
 
 export default function TimelineCalendarScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const toast = useToast();
 
@@ -204,13 +206,12 @@ export default function TimelineCalendarScreen() {
 
       <ScreenHeader
         title="Timeline Calendar"
-        subtitle="24h Hourly Day Timeline & Events"
+        showTitle
         showBack
-        sticky={false}
         onBack={() => router.back()}
       />
 
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, paddingTop: insets.top + 52 }}>
         <CalendarProvider
           date={currentDate}
           onDateChanged={(date: string) => setCurrentDate(date)}

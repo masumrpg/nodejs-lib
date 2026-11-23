@@ -23,7 +23,7 @@ import {
   type RenderIcon,
 } from "@masumdev/rn-ui";
 import { SystemUIOverlay } from "../components/system-ui-overlay";
-import { ScreenHeader } from "../components/ScreenHeader";
+import { ScreenHeader, ScreenHeroHeader } from "../components/ScreenHeader";
 import { useHeaderScroll } from "../components/useHeaderScroll";
 
 const icon =
@@ -125,9 +125,10 @@ export default function QRCodeScreen() {
   const bareExportRef = useRef<Svg>(null);
   const brandedCardRef = useRef<React.ComponentRef<typeof View>>(null);
 
-  const { onScroll, headerStyle, scrollEventThrottle } = useHeaderScroll({
-    headerHeight: 220,
-  });
+  const { onScroll, scrollEventThrottle, isHeaderScrolled, showTitle } =
+    useHeaderScroll({
+      threshold: 60,
+    });
 
   const refreshLoading = () => {
     setDemoLoading(true);
@@ -235,10 +236,9 @@ export default function QRCodeScreen() {
 
       <ScreenHeader
         showBack
-        eyebrow="@masumdev/rn-qr-code"
         title="QR Code Generator"
-        subtitle="Modern custom QR components with presets, states, and gallery preview."
-        headerStyle={headerStyle}
+        showTitle={showTitle}
+        isScrolled={isHeaderScrolled}
       />
 
       <ScrollView
@@ -248,12 +248,17 @@ export default function QRCodeScreen() {
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: spacing.md,
             paddingBottom: insets.bottom + spacing.xl,
           },
         ]}
         showsVerticalScrollIndicator={false}
       >
+        <ScreenHeroHeader
+          eyebrow="@masumdev/rn-qr-code"
+          title="QR Code Generator"
+          subtitle="Modern custom QR components with presets, states, and gallery preview."
+        />
+
         <Section title="Export & Share Demos">
           {/* Option 1: Super Cool Branded Custom Card (With Custom BG) */}
           <View ref={brandedCardRef} collapsable={false} style={styles.brandedCardWrapper}>

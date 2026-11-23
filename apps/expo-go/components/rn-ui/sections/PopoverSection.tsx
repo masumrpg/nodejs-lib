@@ -1,75 +1,113 @@
-import { Popover, PopoverTrigger, PopoverContent, Button, Card, Box, Text } from "@masumdev/rn-ui";
-import { Check } from "lucide-react-native";
-import React from "react";
-import { Section, type RnUiSectionContext } from "../shared";
+import {
+  Box,
+  Button,
+  IconButton,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Text,
+} from "@masumdev/rn-ui";
+import { Check, Filter, Share2, X } from "lucide-react-native";
+import { useState } from "react";
+import { DemoCard, DemoReadout, Section, type RnUiSectionContext } from "../shared";
 
 export function PopoverSection({ ctx }: { ctx: RnUiSectionContext }) {
   const { icon } = ctx;
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
+  const [selectedTag, setSelectedTag] = useState("all");
 
   return (
     <Section title="Popover">
-      <Card outlined>
-        <Box gap="md">
-          <Text color="textMuted">
-            Anchored popover menu card attached to trigger position.
-          </Text>
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger>
-              <Button variant="filled" tone="primary">
-                Toggle Popover
-              </Button>
-            </PopoverTrigger>
-
-            <PopoverContent width={320}>
-              <Box gap="sm">
-                <Box
-                  row
-                  wrap
-                  gap="sm"
-                  style={{ justifyContent: "space-between", alignItems: "center" }}
-                >
-                  <Text variant="h3" weight="700" style={{ flexShrink: 1 }}>
-                    Quick Actions
-                  </Text>
-                  <Button
-                    variant="ghost"
-                    tone="secondary"
-                    size="xs"
-                    onPress={() => setOpen(false)}
-                  >
-                    ✕
-                  </Button>
-                </Box>
-
-                <Text variant="bodySmall" color="textMuted">
-                  This popover card provides quick contextual actions and informative overlays with animated entry.
-                </Text>
-
-                <Box row style={{ justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
-                  <Button
-                    variant="outline"
-                    tone="secondary"
-                    size="sm"
-                    onPress={() => setOpen(false)}
-                  >
-                    Cancel
-                  </Button>
+      <Box gap="lg">
+        {/* Card 1: Anchored Contextual Popover */}
+        <DemoCard
+          title="Anchored Quick Actions"
+          badge="Portal Floating"
+          badgeTone="primary"
+          description="Contextual popover card anchored to trigger node with continuous squircle corners and backdrop dismiss."
+        >
+          <Box gap="md">
+            <Box row gap="sm" style={{ alignItems: "center" }}>
+              <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger>
                   <Button
                     variant="filled"
                     tone="primary"
-                    size="sm"
-                    leftIcon={icon(Check)}
-                    onPress={() => setOpen(false)}
+                    leftIcon={icon(Filter)}
                   >
-                    Confirm
+                    Quick Filter
                   </Button>
-                </Box>
-              </Box>
-            </PopoverContent>
-          </Popover>
-        </Box>
-      </Card>
+                </PopoverTrigger>
+
+                <PopoverContent width={310}>
+                  <Box gap="sm">
+                    <Box
+                      row
+                      style={{
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text variant="subtitle" weight="700">
+                        Filter Components
+                      </Text>
+                      <IconButton
+                        variant="ghost"
+                        tone="secondary"
+                        size="xs"
+                        accessibilityLabel="Close popover"
+                        icon={icon(X)}
+                        onPress={() => setOpen(false)}
+                      />
+                    </Box>
+
+                    <Text variant="caption" color="textMuted">
+                      Select component category to highlight in the catalog.
+                    </Text>
+
+                    <Box row style={{ flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                      {[
+                        { id: "all", label: "All Items" },
+                        { id: "inputs", label: "Form Inputs" },
+                        { id: "layout", label: "Layout" },
+                        { id: "overlays", label: "Overlays" },
+                      ].map((item) => (
+                        <Button
+                          key={item.id}
+                          variant={selectedTag === item.id ? "filled" : "outline"}
+                          tone="primary"
+                          size="xs"
+                          leftIcon={selectedTag === item.id ? icon(Check) : undefined}
+                          onPress={() => {
+                            setSelectedTag(item.id);
+                            setOpen(false);
+                          }}
+                        >
+                          {item.label}
+                        </Button>
+                      ))}
+                    </Box>
+                  </Box>
+                </PopoverContent>
+              </Popover>
+
+              <Button
+                variant="outline"
+                tone="secondary"
+                leftIcon={icon(Share2)}
+                onPress={() => undefined}
+              >
+                Share
+              </Button>
+            </Box>
+
+            <DemoReadout
+              label="Active Filter Selection"
+              value={selectedTag.toUpperCase()}
+            />
+          </Box>
+        </DemoCard>
+      </Box>
     </Section>
   );
 }

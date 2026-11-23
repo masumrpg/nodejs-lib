@@ -1,91 +1,106 @@
-import { RadioGroup, RadioGroupItem, Card, Box, Text, Divider } from "@masumdev/rn-ui";
+import { Box, Divider, RadioGroup, RadioGroupItem, Text } from "@masumdev/rn-ui";
 import { useState } from "react";
-import { Section, type RnUiSectionContext } from "../shared";
+import { DemoCard, DemoReadout, Section, type RnUiSectionContext } from "../shared";
 
 export function RadioGroupSection({ ctx }: { ctx: RnUiSectionContext }) {
   const { radioValue, setRadioValue } = ctx;
-  const [plainValue, setPlainValue] = useState("standard");
-  const [genderValue, setGenderValue] = useState("male");
+  const [plainDelivery, setPlainDelivery] = useState("express");
+  const [accountType, setAccountType] = useState("organization");
 
   return (
     <Section title="RadioGroup">
-      <Card outlined>
-        <Box gap="lg">
-          {/* 1. Card Variant (Default) */}
-          <Box gap="sm">
-            <Text variant="label">Card Variant (Vertical with Description)</Text>
-            <Text variant="caption" color="textMuted">
-              Interactive card containers with active borders and backgrounds.
-            </Text>
+      <Box gap="lg">
+        {/* Card 1: Interactive Card Containers */}
+        <DemoCard
+          title="Card Radio Containers"
+          badge="Card Variant"
+          badgeTone="primary"
+          description="Full-width interactive cards with active tonal borders, subtle backgrounds, and descriptions."
+        >
+          <Box gap="md">
             <RadioGroup variant="card" value={radioValue} onValueChange={setRadioValue}>
               <RadioGroupItem
-                value="option1"
+                value="expo"
                 label="Expo React Native SDK 57"
-                description="Recommended default for mobile applications."
+                description="Modern file-based routing, auto-linking, and fast live refresh."
               />
               <RadioGroupItem
-                value="option2"
+                value="bare"
                 label="Bare React Native CLI"
-                description="Custom native modules build pipeline."
+                description="Direct control over native Android Gradle and iOS Xcode projects."
               />
               <RadioGroupItem
-                value="option3"
-                label="Web Platform (Astro / Next)"
-                description="Web documentation and SSR."
+                value="web"
+                label="Universal Web (Astro 5 + Starlight)"
+                description="Ultra-fast static documentation portal with server-side rendering."
               />
             </RadioGroup>
+
+            <DemoReadout label="Active Architecture" value={radioValue} />
           </Box>
+        </DemoCard>
 
-          <Divider />
+        {/* Card 2: Plain Horizontal & Vertical Radio Choices */}
+        <DemoCard
+          title="Minimal Plain Radios"
+          badge="Horizontal & Vertical"
+          badgeTone="secondary"
+          description="Lightweight radio controls without container cards for forms and clean settings lists."
+        >
+          <Box gap="lg">
+            <Box gap="xs">
+              <Text variant="caption" weight="600" color="textMuted">
+                Account Ownership (Horizontal Orientation)
+              </Text>
+              <RadioGroup
+                variant="plain"
+                orientation="horizontal"
+                value={accountType}
+                onValueChange={setAccountType}
+                style={{ gap: 24 }}
+              >
+                <RadioGroupItem value="personal" label="Personal Account" />
+                <RadioGroupItem value="organization" label="Organization" />
+              </RadioGroup>
+            </Box>
 
-          {/* 2. Plain Variant (Horizontal) */}
-          <Box gap="sm">
-            <Text variant="label">Plain Variant (Horizontal - No Container Box)</Text>
-            <Text variant="caption" color="textMuted">
-              Minimalist inline radio buttons without background or outer border.
-            </Text>
-            <RadioGroup
-              variant="plain"
-              orientation="horizontal"
-              value={genderValue}
-              onValueChange={setGenderValue}
-              style={{ gap: 24 }}
-            >
-              <RadioGroupItem value="male" label="Male" />
-              <RadioGroupItem value="female" label="Female" />
-            </RadioGroup>
+            <Divider />
+
+            <Box gap="xs">
+              <Text variant="caption" weight="600" color="textMuted">
+                Shipping Priority (Vertical List)
+              </Text>
+              <RadioGroup
+                variant="plain"
+                value={plainDelivery}
+                onValueChange={setPlainDelivery}
+                style={{ gap: 10 }}
+              >
+                <RadioGroupItem
+                  value="standard"
+                  label="Standard Ground Delivery"
+                  description="3 to 5 business days transit time."
+                />
+                <RadioGroupItem
+                  value="express"
+                  label="Priority Air Express"
+                  description="Guaranteed next business day by 12:00 PM."
+                />
+                <RadioGroupItem
+                  value="same-day"
+                  label="Courier Same-Day Dispatch"
+                  description="Delivered to your doorstep within 4 hours."
+                />
+              </RadioGroup>
+            </Box>
+
+            <DemoReadout
+              label="Selected Setup"
+              value={`${accountType} • ${plainDelivery}`}
+            />
           </Box>
-
-          <Divider />
-
-          {/* 3. Plain Variant (Vertical) */}
-          <Box gap="sm">
-            <Text variant="label">Plain Variant (Vertical List)</Text>
-            <RadioGroup
-              variant="plain"
-              value={plainValue}
-              onValueChange={setPlainValue}
-              style={{ gap: 8 }}
-            >
-              <RadioGroupItem
-                value="standard"
-                label="Standard Delivery"
-                description="3-5 business days"
-              />
-              <RadioGroupItem
-                value="express"
-                label="Express Priority"
-                description="Next day delivery by 12:00 PM"
-              />
-              <RadioGroupItem
-                value="same-day"
-                label="Same Day Courier"
-                description="Delivered within 4 hours"
-              />
-            </RadioGroup>
-          </Box>
-        </Box>
-      </Card>
+        </DemoCard>
+      </Box>
     </Section>
   );
 }

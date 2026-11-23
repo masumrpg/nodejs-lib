@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import Animated, {
   Easing,
+  Extrapolation,
+  cancelAnimation,
   interpolate,
   useAnimatedStyle,
   useReducedMotion,
@@ -30,10 +32,10 @@ import {
 import { triggerHaptic } from "../utils/haptics";
 import { Text } from "./Text";
 import {
-  ANIMATION_TIMING,
   minTouchHitSlop,
   renderIcon,
   resolveToneColors,
+  webDeps,
   type BaseAnimatedProps,
   type BaseGlassProps,
   type BaseHapticProps,
@@ -81,6 +83,8 @@ export interface SpeedDialProps
   labelStyle?: StyleProp<TextStyle>;
 }
 
+const DIAL_EASING = Easing.bezier(0.23, 1, 0.32, 1);
+
 const MAIN_FAB_SIZES: Record<"sm" | "md" | "lg", number> = {
   sm: 48,
   md: 56,
@@ -92,6 +96,59 @@ const ACTION_FAB_SIZES: Record<"sm" | "md" | "lg", number> = {
   md: 44,
   lg: 50,
 };
+
+interface SpeedDialBackdropProps {
+  isOpen: boolean;
+  shouldAnimate: boolean;
+  resolvedOverlayColor: string;
+  onClose: () => void;
+}
+
+const SpeedDialBackdrop = React.memo(function SpeedDialBackdrop({
+  isOpen,
+  shouldAnimate,
+  resolvedOverlayColor,
+  onClose,
+}: SpeedDialBackdropProps) {
+  const opacity = useSharedValue(isOpen && !shouldAnimate ? 1 : 0);
+
+  useEffect(() => {
+    if (!shouldAnimate) {
+      opacity.value = isOpen ? 1 : 0;
+      return;
+    }
+    opacity.value = withTiming(isOpen ? 1 : 0, {
+      duration: isOpen ? 200 : 160,
+      easing: DIAL_EASING,
+    });
+    return () => {
+      cancelAnimation(opacity);
+    };
+  }, [isOpen, opacity, shouldAnimate]);
+
+  const backdropStyle = useAnimatedStyle(
+    () => ({ opacity: opacity.value }),
+    webDeps([]),
+  );
+
+  return (
+    <Animated.View
+      pointerEvents={isOpen ? "auto" : "none"}
+      style={[
+        StyleSheet.absoluteFill,
+        { backgroundColor: resolvedOverlayColor },
+        backdropStyle,
+      ]}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Close speed dial"
+        style={styles.flexOne}
+        onPress={onClose}
+      />
+    </Animated.View>
+  );
+});
 
 interface SpeedDialActionRowProps {
   action: SpeedDialActionItem;
@@ -126,11 +183,13 @@ const SpeedDialActionRow = React.memo(function SpeedDialActionRow({
   actionButtonStyle,
   labelStyle,
 }: SpeedDialActionRowProps) {
-  const { colors, components, radii, shadows, spacing } = useTheme();
-  const rowProgress = useSharedValue(isOpen ? 1 : 0);
+  const { colors, components, radii, shadows, spacing, isDark } = useTheme();
+  const rowProgress = useSharedValue(isOpen && !shouldAnimate ? 1 : 0);
 
   const staggerIndex = isTop ? index : total - 1 - index;
-  const openDelay = shouldAnimate ? Math.min(staggerIndex * 28, 120) : 0;
+  const closeIndex = isTop ? total - 1 - index : index;
+  const openDelay = shouldAnimate ? Math.min(staggerIndex * 32, 130) : 0;
+  const closeDelay = shouldAnimate ? Math.min(closeIndex * 20, 80) : 0;
 
   useEffect(() => {
     if (!shouldAnimate) {
@@ -141,36 +200,124 @@ const SpeedDialActionRow = React.memo(function SpeedDialActionRow({
       rowProgress.value = withDelay(
         openDelay,
         withTiming(1, {
-          duration: ANIMATION_TIMING.transition,
-          easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+          duration: 220,
+          easing: DIAL_EASING,
         }),
       );
     } else {
-      rowProgress.value = withTiming(0, {
-        duration: 110,
-        easing: Easing.bezier(...ANIMATION_TIMING.bezier),
-      });
+      rowProgress.value = withDelay(
+        closeDelay,
+        withTiming(0, {
+          duration: 150,
+          easing: DIAL_EASING,
+        }),
+      );
     }
-  }, [isOpen, openDelay, rowProgress, shouldAnimate]);
+    return () => {
+      cancelAnimation(rowProgress);
+    };
+  }, [closeDelay, isOpen, openDelay, rowProgress, shouldAnimate]);
 
-  const rowStyle = useAnimatedStyle(() => ({
-    opacity: rowProgress.value,
-    transform: [
-      {
-        translateY: interpolate(
-          rowProgress.value,
-          [0, 1],
-          [isTop ? -12 : 12, 0],
-        ),
-      },
-      { scale: interpolate(rowProgress.value, [0, 1], [0.88, 1]) },
-    ],
-  }));
+  const rowStyle = useAnimatedStyle(
+    () => ({
+      opacity: rowProgress.value,
+      transform: [
+        {
+          translateY: interpolate(
+            rowProgress.value,
+            [0, 1],
+            [isTop ? -26 : 26, 0],
+            Extrapolation.CLAMP,
+          ),
+        },
+        {
+          scale: interpolate(
+            rowProgress.value,
+            [0, 1],
+            [0.82, 1],
+            Extrapolation.CLAMP,
+          ),
+        },
+      ],
+    }),
+    webDeps([isTop]),
+  );
+
+  const labelAnimatedStyle = useAnimatedStyle(
+    () => ({
+      opacity: rowProgress.value,
+      transform: [
+        {
+          translateX: interpolate(
+            rowProgress.value,
+            [0, 1],
+            [isEnd ? 12 : -12, 0],
+            Extrapolation.CLAMP,
+          ),
+        },
+      ],
+    }),
+    webDeps([isEnd]),
+  );
+
+  const isBrutal = components.surface.pressEffect === "offset";
+  const pillElevation: ViewStyle = isBrutal
+    ? shadows.sm
+    : {
+        boxShadow: isDark
+          ? "0px 4px 12px rgba(0, 0, 0, 0.38)"
+          : "0px 2px 8px rgba(15, 23, 42, 0.12)",
+      };
+  const fabElevation: ViewStyle = isBrutal
+    ? shadows.md
+    : {
+        boxShadow: isDark
+          ? "0px 6px 16px rgba(0, 0, 0, 0.45)"
+          : "0px 4px 12px rgba(15, 23, 42, 0.16)",
+      };
 
   const actionSize = ACTION_FAB_SIZES[size];
   const resolvedTone = action.tone ?? parentTone;
   const toneColors = resolveToneColors(resolvedTone, colors);
   const iconColor = glass ? colors.text : toneColors.on;
+
+  const renderLabel = () => (
+    <Animated.View style={labelAnimatedStyle}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={action.label}
+        accessibilityState={{ disabled: Boolean(action.disabled) }}
+        disabled={action.disabled}
+        onPress={() => onSelect(action)}
+        style={({ pressed }) => [
+          styles.labelContainer,
+          {
+            backgroundColor: glass
+              ? colors.glassSurfaceStrong
+              : isDark
+                ? colors.surfaceRaised
+                : colors.surface,
+            borderRadius: radii.md,
+            borderCurve: "continuous",
+            borderWidth: Math.max(components.borderWidth.default, 1),
+            borderColor: glass
+              ? colors.glassBorder
+              : components.borderWidth.default > 0
+                ? colors.border
+                : colors.borderMuted,
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.xs + 2,
+            opacity: action.disabled ? 0.5 : pressed ? 0.85 : 1,
+          },
+          pillElevation,
+        ]}
+      >
+        <Text variant="labelSmall" weight="600" style={labelStyle}>
+          {action.label}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  );
 
   return (
     <Animated.View
@@ -180,34 +327,7 @@ const SpeedDialActionRow = React.memo(function SpeedDialActionRow({
         rowStyle,
       ]}
     >
-      {action.label && isEnd ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={action.label}
-          accessibilityState={{ disabled: Boolean(action.disabled) }}
-          disabled={action.disabled}
-          onPress={() => onSelect(action)}
-          style={({ pressed }) => [
-            styles.labelContainer,
-            {
-              backgroundColor: glass
-                ? colors.glassSurfaceStrong
-                : colors.surface,
-              borderRadius: radii.md,
-              borderWidth: components.borderWidth.default,
-              borderColor: glass ? colors.glassBorder : colors.border,
-              paddingHorizontal: spacing.md,
-              paddingVertical: spacing.xs + 2,
-              opacity: action.disabled ? 0.5 : pressed ? 0.85 : 1,
-            },
-            shadows.sm,
-          ]}
-        >
-          <Text variant="labelSmall" weight="600" style={labelStyle}>
-            {action.label}
-          </Text>
-        </Pressable>
-      ) : null}
+      {action.label && isEnd ? renderLabel() : null}
 
       <Pressable
         accessibilityRole="button"
@@ -229,45 +349,26 @@ const SpeedDialActionRow = React.memo(function SpeedDialActionRow({
             backgroundColor: glass
               ? colors.glassSurfaceStrong
               : toneColors.solid,
-            borderWidth: glass ? components.borderWidth.default : 0,
-            borderColor: glass ? colors.glassBorder : "transparent",
-            opacity: action.disabled ? 0.5 : pressed ? 0.85 : 1,
+            borderWidth: glass
+              ? Math.max(components.borderWidth.default, 1)
+              : isBrutal
+                ? components.borderWidth.filled
+                : 0,
+            borderColor: glass
+              ? colors.glassBorder
+              : isBrutal
+                ? colors.border
+                : "transparent",
+            opacity: action.disabled ? 0.5 : pressed ? 0.86 : 1,
           },
-          shadows.lg,
+          fabElevation,
           actionButtonStyle,
         ]}
       >
         {renderIcon(action.icon, iconColor, Math.round(actionSize * 0.45))}
       </Pressable>
 
-      {action.label && !isEnd ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={action.label}
-          accessibilityState={{ disabled: Boolean(action.disabled) }}
-          disabled={action.disabled}
-          onPress={() => onSelect(action)}
-          style={({ pressed }) => [
-            styles.labelContainer,
-            {
-              backgroundColor: glass
-                ? colors.glassSurfaceStrong
-                : colors.surface,
-              borderRadius: radii.md,
-              borderWidth: components.borderWidth.default,
-              borderColor: glass ? colors.glassBorder : colors.border,
-              paddingHorizontal: spacing.md,
-              paddingVertical: spacing.xs + 2,
-              opacity: action.disabled ? 0.5 : pressed ? 0.85 : 1,
-            },
-            shadows.sm,
-          ]}
-        >
-          <Text variant="labelSmall" weight="600" style={labelStyle}>
-            {action.label}
-          </Text>
-        </Pressable>
-      ) : null}
+      {action.label && !isEnd ? renderLabel() : null}
     </Animated.View>
   );
 });
@@ -309,21 +410,31 @@ export const SpeedDial = React.memo(function SpeedDial({
 
   const shouldStayMounted = useDelayedUnmount(
     isOpen,
-    shouldAnimate ? 170 : 0,
+    shouldAnimate ? 260 : 0,
   );
 
   const mainProgress = useSharedValue(isOpen ? 1 : 0);
+  const pressScale = useSharedValue(1);
 
   useEffect(() => {
     if (shouldAnimate) {
       mainProgress.value = withTiming(isOpen ? 1 : 0, {
-        duration: ANIMATION_TIMING.transition,
-        easing: Easing.bezier(...ANIMATION_TIMING.bezier),
+        duration: isOpen ? 220 : 180,
+        easing: DIAL_EASING,
       });
     } else {
       mainProgress.value = isOpen ? 1 : 0;
     }
+    return () => {
+      cancelAnimation(mainProgress);
+    };
   }, [isOpen, mainProgress, shouldAnimate]);
+
+  useEffect(() => {
+    return () => {
+      cancelAnimation(pressScale);
+    };
+  }, [pressScale]);
 
   const setOpen = useCallback(
     (next: boolean) => {
@@ -378,18 +489,26 @@ export const SpeedDial = React.memo(function SpeedDial({
   const isEnd = placement.endsWith("end");
   const mainSize = MAIN_FAB_SIZES[size];
   const toneColors = resolveToneColors(tone, colors);
+  const isBrutal = components.surface.pressEffect === "offset";
+  const hasActiveIcon = Boolean(activeIcon);
 
-  const backdropStyle = useAnimatedStyle(() => ({
-    opacity: mainProgress.value,
-  }));
+  const iconRotateStyle = useAnimatedStyle(
+    () => ({
+      transform: [
+        {
+          rotate: `${hasActiveIcon ? 0 : interpolate(mainProgress.value, [0, 1], [0, 45], Extrapolation.CLAMP)}deg`,
+        },
+      ],
+    }),
+    webDeps([hasActiveIcon]),
+  );
 
-  const iconRotateStyle = useAnimatedStyle(() => ({
-    transform: [
-      {
-        rotate: `${activeIcon ? 0 : interpolate(mainProgress.value, [0, 1], [0, 45])}deg`,
-      },
-    ],
-  }));
+  const mainFabPressStyle = useAnimatedStyle(
+    () => ({
+      transform: [{ scale: pressScale.value }],
+    }),
+    webDeps([]),
+  );
 
   const resolvedOverlayColor =
     overlayColor ??
@@ -397,6 +516,13 @@ export const SpeedDial = React.memo(function SpeedDial({
 
   const mainBg = glass ? colors.glassSurfaceStrong : toneColors.solid;
   const mainIconColor = glass ? colors.text : toneColors.on;
+  const mainFabElevation: ViewStyle = isBrutal
+    ? shadows.lg
+    : {
+        boxShadow: isDark
+          ? "0px 8px 20px rgba(0, 0, 0, 0.50)"
+          : "0px 6px 16px rgba(15, 23, 42, 0.18)",
+      };
 
   const renderMainFab = (inPortal: boolean) => {
     const currentIcon =
@@ -420,33 +546,57 @@ export const SpeedDial = React.memo(function SpeedDial({
             );
 
     return (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={
-          accessibilityLabel ?? (isOpen ? "Close actions" : "Open actions")
-        }
-        accessibilityState={{ expanded: isOpen }}
-        hitSlop={minTouchHitSlop(mainSize)}
-        onPress={() => {
-          toggle();
-        }}
-        style={({ pressed }) => [
-          styles.mainFab,
-          {
-            width: mainSize,
-            height: mainSize,
-            borderRadius: mainSize / 2,
-            backgroundColor: mainBg,
-            borderWidth: glass ? components.borderWidth.default : 0,
-            borderColor: glass ? colors.glassBorder : "transparent",
-            opacity: !inPortal && overlay && (isOpen || shouldStayMounted) ? 0 : pressed ? 0.88 : 1,
-          },
-          shadows.lg,
-          mainButtonStyle,
-        ]}
-      >
-        <Animated.View style={iconRotateStyle}>{currentIcon}</Animated.View>
-      </Pressable>
+      <Animated.View style={mainFabPressStyle}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            accessibilityLabel ?? (isOpen ? "Close actions" : "Open actions")
+          }
+          accessibilityState={{ expanded: isOpen }}
+          hitSlop={minTouchHitSlop(mainSize)}
+          onPress={toggle}
+          onPressIn={() => {
+            if (shouldAnimate) {
+              pressScale.value = withTiming(0.94, {
+                duration: 100,
+                easing: DIAL_EASING,
+              });
+            }
+          }}
+          onPressOut={() => {
+            if (shouldAnimate) {
+              pressScale.value = withTiming(1, {
+                duration: 140,
+                easing: DIAL_EASING,
+              });
+            }
+          }}
+          style={[
+            styles.mainFab,
+            {
+              width: mainSize,
+              height: mainSize,
+              borderRadius: mainSize / 2,
+              backgroundColor: mainBg,
+              borderWidth: glass
+                ? Math.max(components.borderWidth.default, 1)
+                : isBrutal
+                  ? components.borderWidth.filled
+                  : 0,
+              borderColor: glass
+                ? colors.glassBorder
+                : isBrutal
+                  ? colors.border
+                  : "transparent",
+              opacity: !inPortal && overlay && (isOpen || shouldStayMounted) ? 0 : 1,
+            },
+            mainFabElevation,
+            mainButtonStyle,
+          ]}
+        >
+          <Animated.View style={iconRotateStyle}>{currentIcon}</Animated.View>
+        </Pressable>
+      </Animated.View>
     );
   };
 
@@ -541,20 +691,12 @@ export const SpeedDial = React.memo(function SpeedDial({
 
       {showPortal ? (
         <Portal layer="overlay">
-          <Animated.View
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: resolvedOverlayColor },
-              backdropStyle,
-            ]}
-          >
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Close speed dial"
-              style={styles.flexOne}
-              onPress={close}
-            />
-          </Animated.View>
+          <SpeedDialBackdrop
+            isOpen={isOpen}
+            shouldAnimate={shouldAnimate}
+            resolvedOverlayColor={resolvedOverlayColor}
+            onClose={close}
+          />
 
           <View
             pointerEvents="box-none"

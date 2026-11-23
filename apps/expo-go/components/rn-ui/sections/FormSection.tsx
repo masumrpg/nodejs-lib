@@ -1,47 +1,8 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  Checkbox,
-  Chip,
-  Combobox,
-  ComboboxContent,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
-  DatePickerInput,
-  FormControl,
-  FormDescription,
-  FormError,
-  FormField,
-  FormLabel,
-  Input,
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  InputGroupText,
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSeparator,
-  InputOTPSlot,
-  RadioGroup,
-  RadioGroupItem,
-  RangeSlider,
-  Rating,
-  Select,
-  SignaturePad,
-  type SignaturePadRef,
-  Slider,
-  Switch,
-  Text,
-  Textarea,
-  TimePickerInput,
-} from "@masumdev/rn-ui";
+import { Badge, Box, Button, Checkbox, Chip, Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList, DatePickerInput, FormControl, FormDescription, FormError, FormField, FormLabel, Input, InputGroup, InputGroupAddon, InputGroupInput, InputGroupText, InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot, RadioGroup, RadioGroupItem, RangeSlider, Rating, Select, SignaturePad, type SignaturePadRef, Slider, Switch, Text, Textarea, TimePickerInput } from "@masumdev/rn-ui";
 import { Check, ChevronsUpDown, Globe, RotateCcw, Sparkles, Trash2 } from "lucide-react-native";
 import { useRef, useState } from "react";
 import { z } from "zod";
-import { Section, type RnUiSectionContext } from "../shared";
+import { DemoCard, DemoSurface, Section, type RnUiSectionContext } from "../shared";
 
 // Zod Validation Schema covering all Form & Selection primitives
 const formSchema = z.object({
@@ -156,12 +117,14 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
   ];
 
   return (
-    <Section title="Form & Zod Validation (15 Primitives)">
-      <Card outlined>
-        <Box gap="lg">
-          <Text color="textMuted">
-            Comprehensive showcase uniting all 15 Form & Selection Input primitives with unified Zod schema validation and error handling.
-          </Text>
+    <Section title="Form">
+      <Box gap="lg">
+        <DemoCard
+          title="Developer Onboarding Form"
+          badge="17 Primitives"
+          badgeTone="primary"
+          description="Comprehensive showcase uniting all 17 Form & Selection Input primitives with unified Zod schema validation and error handling."
+        >
 
           {/* 1. Input (Text) */}
           <FormField error={errors.fullName} required>
@@ -515,8 +478,8 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
                 ref={signatureRef}
                 height={230}
                 strokeWidth={3}
-                strokeColor="#6366F1"
-                backgroundColor="rgba(99, 102, 241, 0.05)"
+                strokeColor={ctx.colors.primary}
+                backgroundColor={ctx.colors.surfaceMuted}
                 onChange={() => {
                   if (errors.hasSignature) setErrors((prev) => ({ ...prev, hasSignature: undefined }));
                 }}
@@ -546,17 +509,11 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
           </FormField>
 
           {successMessage ? (
-            <Box
-              style={{
-                backgroundColor: "rgba(34, 197, 94, 0.12)",
-                padding: 12,
-                borderRadius: 8,
-              }}
-            >
+            <DemoSurface tone="success" radius="sm">
               <Text color="success" weight="600">
                 {successMessage}
               </Text>
-            </Box>
+            </DemoSurface>
           ) : null}
 
           {/* Submit Button */}
@@ -568,8 +525,8 @@ export function FormSection({ ctx }: { ctx: RnUiSectionContext }) {
           >
             Submit & Validate All Primitives with Zod
           </Button>
-        </Box>
-      </Card>
+        </DemoCard>
+      </Box>
     </Section>
   );
 }

@@ -27,6 +27,7 @@ function CardComponent({
     return {
       backgroundColor: glass ? colors.glassSurface : colors.surface,
       borderRadius: radii.xl,
+      borderCurve: "continuous",
       ...(padded ? { padding: spacing.lg } : null),
       borderWidth: glass || outlined ? components.borderWidth.strong : 0,
       borderColor: glass ? colors.glassBorder : colors.border,

@@ -32,6 +32,7 @@ import {
   ArrowLeft,
   Camera,
   CheckCircle2,
+  Compass,
   Cpu,
   Eye,
   Palette,
@@ -40,7 +41,6 @@ import {
   ScanText,
   Share2,
   SlidersHorizontal,
-  Sparkles,
   SwitchCamera,
 } from "lucide-react-native";
 import {
@@ -1088,7 +1088,7 @@ export default function OcrScannerScreen(): React.JSX.Element {
             {isOptimalForCapture ? (
               <CheckCircle2 size={12} color={EMERALD_ACCENT} />
             ) : (
-              <Sparkles size={12} color={activePreset.accent} />
+              <Compass size={12} color={activePreset.accent} />
             )}
             <Text style={styles.metricText}>
               {isReviewingCapturedPhoto
@@ -1272,7 +1272,7 @@ export default function OcrScannerScreen(): React.JSX.Element {
                       showOverlayTags && styles.reviewToolPillActive,
                     ]}
                   >
-                    <Sparkles
+                    <Compass
                       size={12}
                       color={showOverlayTags ? "#05161E" : "#e2e8f0"}
                     />

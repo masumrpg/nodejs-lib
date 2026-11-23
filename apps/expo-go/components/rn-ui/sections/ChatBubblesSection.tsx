@@ -7,22 +7,45 @@ import {
   BubbleContent,
   BubbleGroup,
   BubbleReactions,
-  Card,
   Text,
 } from "@masumdev/rn-ui";
-import { SAMPLE_ASSETS, Section, type RnUiSectionContext } from "../shared";
+import {
+  DemoCard,
+  SAMPLE_ASSETS,
+  Section,
+  type RnUiSectionContext,
+} from "../shared";
 
 export function ChatBubblesSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
   return (
     <Section title="Chat Bubbles">
-      <Card outlined>
-        <Box gap="lg">
-          <Text color="textMuted">
-            Message layout components supporting start/end alignment, multiple
-            tone variants, and reaction overlay tags.
-          </Text>
-
+      <Box gap="lg">
+        <DemoCard
+          title="Conversation Thread"
+          badge="start • end • reactions"
+          badgeTone="primary"
+          description="WhatsApp-style message bubbles supporting start/end alignment, tone fills, and reaction tags."
+        >
           <BubbleGroup>
+            {/* Short incoming & outgoing WhatsApp-style bubbles */}
+            <Box
+              row
+              gap="sm"
+              style={{ alignSelf: "flex-start", alignItems: "flex-end" }}
+            >
+              <Avatar size="sm">
+                <AvatarImage source={{ uri: SAMPLE_ASSETS.avatarUrl }} />
+                <AvatarFallback>{SAMPLE_ASSETS.avatarInitials}</AvatarFallback>
+              </Avatar>
+              <Bubble align="start" tone="secondary" variant="soft">
+                <BubbleContent>Hai!</BubbleContent>
+              </Bubble>
+            </Box>
+
+            <Bubble align="end" tone="primary" variant="filled">
+              <BubbleContent>Siap, halo!</BubbleContent>
+            </Bubble>
+
             {/* Incoming message */}
             <Box
               row
@@ -30,17 +53,12 @@ export function ChatBubblesSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
               style={{ alignSelf: "flex-start", alignItems: "flex-end" }}
             >
               <Avatar size="sm">
-                <AvatarImage
-                  source={{
-                    uri: SAMPLE_ASSETS.avatarUrl,
-                  }}
-                />
+                <AvatarImage source={{ uri: SAMPLE_ASSETS.avatarUrl }} />
                 <AvatarFallback>{SAMPLE_ASSETS.avatarInitials}</AvatarFallback>
               </Avatar>
               <Bubble align="start" tone="secondary" variant="soft">
                 <BubbleContent>
-                  Hai! Apakah kamu bisa bantu saya memahami cara kustomisasi
-                  tema warna di pustaka ini?
+                  Hai! Apakah varian flush di Tabs dan SegmentedControl sudah siap digunakan?
                 </BubbleContent>
               </Bubble>
             </Box>
@@ -48,8 +66,7 @@ export function ChatBubblesSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
             {/* Outgoing message */}
             <Bubble align="end" tone="primary" variant="filled">
               <BubbleContent>
-                Tentu! Kamu cukup buat objek tema baru dan oper ke
-                ThemeProvider. Contoh lengkapnya ada di dokumentasi README.
+                Sudah siap! Varian flush mengusung kapsul solid mepet container dengan animasi Reanimated 60fps tanpa spring bounce.
               </BubbleContent>
               <BubbleReactions side="bottom" align="end">
                 <Text style={{ fontSize: 11 }}>+2</Text>
@@ -59,14 +76,14 @@ export function ChatBubblesSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
             {/* Outgoing follow-up */}
             <Bubble align="end" tone="primary" variant="soft">
               <BubbleContent>
-                Apakah penjelasan ini cukup membantu?
+                Semua rounded juga sudah terintegrasi ke tema minimal borderless!
               </BubbleContent>
               <BubbleReactions side="bottom" align="end">
                 <Text style={{ fontSize: 11 }}>+1</Text>
               </BubbleReactions>
             </Bubble>
 
-            {/* Incoming message with danger/warning alert */}
+            {/* Incoming message */}
             <Box
               row
               gap="sm"
@@ -77,34 +94,18 @@ export function ChatBubblesSection({ ctx: _ctx }: { ctx: RnUiSectionContext }) {
               }}
             >
               <Avatar size="sm">
-                <AvatarImage
-                  source={{
-                    uri: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=60&q=80",
-                  }}
-                />
-                <AvatarFallback>JD</AvatarFallback>
+                <AvatarImage source={{ uri: SAMPLE_ASSETS.avatarUrl }} />
+                <AvatarFallback>{SAMPLE_ASSETS.avatarInitials}</AvatarFallback>
               </Avatar>
-              <Bubble align="start" tone="danger" variant="soft">
+              <Bubble align="start" tone="success" variant="soft">
                 <BubbleContent>
-                  Wah, kelihatannya ada yang salah di setup saya. Warnanya tidak
-                  mau ganti.
+                  Mantap banget, langsung terasa bedanya saat ganti preset tema!
                 </BubbleContent>
-                <BubbleReactions side="bottom" align="start">
-                  <Text style={{ fontSize: 11 }}>1 reply</Text>
-                </BubbleReactions>
               </Bubble>
             </Box>
-
-            {/* Outgoing message with outline variant */}
-            <Bubble align="end" tone="primary" variant="outline">
-              <BubbleContent>
-                Coba pastikan berkas konfigurasi tsconfig sudah benar dan build
-                ulang projectnya.
-              </BubbleContent>
-            </Bubble>
           </BubbleGroup>
-        </Box>
-      </Card>
+        </DemoCard>
+      </Box>
     </Section>
   );
 }

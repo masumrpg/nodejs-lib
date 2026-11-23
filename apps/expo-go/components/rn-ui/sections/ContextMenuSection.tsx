@@ -1,6 +1,5 @@
 import {
   Box,
-  Card,
   ContextMenu,
   ContextMenuCheckboxItem,
   ContextMenuContent,
@@ -11,48 +10,57 @@ import {
   ContextMenuTrigger,
   Text,
 } from "@masumdev/rn-ui";
-import { Section, type RnUiSectionContext } from "../shared";
+import { FileText } from "lucide-react-native";
+import {
+  DemoCard,
+  DemoSurface,
+  Section,
+  type RnUiSectionContext,
+} from "../shared";
 
 export function ContextMenuSection({ ctx }: { ctx: RnUiSectionContext }) {
   const { colors, setAlertDialogVisible, showBookmark, setShowBookmark } = ctx;
 
   return (
     <Section title="ContextMenu">
-      <Card outlined>
-        <Box gap="lg">
-          <Text color="textMuted">
-            Long-press the card below on mobile to reveal a floating, styled
-            context menu with separators, labels, shortcuts, and checkbox items.
-          </Text>
-
+      <Box gap="lg">
+        <DemoCard
+          title="Long-Press Action Menu"
+          badge="Long-Press Trigger"
+          badgeTone="primary"
+          description="Long-press the card below on mobile to reveal a floating, styled context menu."
+        >
           <ContextMenu>
             <ContextMenuTrigger>
-              <Box
-                center
+              <DemoSurface
+                tone="muted"
                 style={{
-                  paddingVertical: 40,
-                  borderWidth: 1,
+                  paddingVertical: 36,
+                  alignItems: "center",
+                  justifyContent: "center",
                   borderStyle: "dashed",
-                  borderColor: colors.border,
-                  borderRadius: 8,
-                  backgroundColor: colors.surfaceMuted,
+                  gap: 8,
                 }}
               >
-                <Text style={{ fontWeight: "500", color: colors.textMuted }}>
-                  Long press here
+                <FileText color={colors.primary} size={28} />
+                <Text weight="600" color="text">
+                  invoice-q3-2026.pdf
                 </Text>
-              </Box>
+                <Text variant="caption" color="textMuted">
+                  Press and hold to view document options
+                </Text>
+              </DemoSurface>
             </ContextMenuTrigger>
 
             <ContextMenuContent>
-              <ContextMenuLabel>Page Actions</ContextMenuLabel>
-              <ContextMenuItem onPress={() => console.log("Back")}>
-                <Text style={{ fontSize: 14 }}>Back</Text>
-                <ContextMenuShortcut>⌘[</ContextMenuShortcut>
+              <ContextMenuLabel>Document Actions</ContextMenuLabel>
+              <ContextMenuItem onPress={() => undefined}>
+                <Text style={{ fontSize: 14 }}>Open Preview</Text>
+                <ContextMenuShortcut>⌘O</ContextMenuShortcut>
               </ContextMenuItem>
-              <ContextMenuItem onPress={() => console.log("Reload")}>
-                <Text style={{ fontSize: 14 }}>Reload</Text>
-                <ContextMenuShortcut>⌘R</ContextMenuShortcut>
+              <ContextMenuItem onPress={() => undefined}>
+                <Text style={{ fontSize: 14 }}>Duplicate</Text>
+                <ContextMenuShortcut>⌘D</ContextMenuShortcut>
               </ContextMenuItem>
 
               <ContextMenuSeparator />
@@ -61,7 +69,7 @@ export function ContextMenuSection({ ctx }: { ctx: RnUiSectionContext }) {
                 checked={showBookmark}
                 onCheckedChange={setShowBookmark}
               >
-                Show Bookmark Bar
+                Keep in Favorites
               </ContextMenuCheckboxItem>
 
               <ContextMenuSeparator />
@@ -71,14 +79,14 @@ export function ContextMenuSection({ ctx }: { ctx: RnUiSectionContext }) {
                 onPress={() => setAlertDialogVisible(true)}
               >
                 <Text style={{ fontSize: 14, color: colors.danger }}>
-                  Delete Card
+                  Move to Trash
                 </Text>
                 <ContextMenuShortcut>⌫</ContextMenuShortcut>
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
-        </Box>
-      </Card>
+        </DemoCard>
+      </Box>
     </Section>
   );
 }

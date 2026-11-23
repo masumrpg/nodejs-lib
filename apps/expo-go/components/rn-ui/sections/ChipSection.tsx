@@ -1,16 +1,11 @@
-import {
-  Badge,
-  Box,
-  Card,
-  Chip,
-  Text,
-} from "@masumdev/rn-ui";
-import { Sparkles, MapPin, Tag as TagIcon, Plus } from "lucide-react-native";
+import { Box, Chip } from "@masumdev/rn-ui";
+import { MapPin, Plus, Sparkles, Tag as TagIcon } from "lucide-react-native";
 import { useRef, useState } from "react";
-import { Section, type RnUiSectionContext } from "../shared";
+import { DemoCard, DemoReadout, Section, type RnUiSectionContext } from "../shared";
 
 export function ChipSection(_props?: { ctx?: RnUiSectionContext }) {
   const nextChipIdRef = useRef(1);
+
   // Filter chips state
   const [selectedCategories, setSelectedCategories] = useState<string[]>([
     "React Native",
@@ -38,24 +33,14 @@ export function ChipSection(_props?: { ctx?: RnUiSectionContext }) {
   return (
     <Section title="Chip">
       <Box gap="lg">
-        {/* 1. Filter Chips (Multi-Selectable) */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Selectable Filter Chips
-              </Text>
-              <Badge tone="primary">Filter Mode</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Interactive toggles with checkmark indicator and haptics.
-            </Text>
-
+        {/* Card 1: Multi-Select Filter Chips */}
+        <DemoCard
+          title="Filter Chips"
+          badge="Multi-Select"
+          badgeTone="primary"
+          description="Interactive category toggles with dynamic checkmark indicators and tactile haptic feedback."
+        >
+          <Box gap="sm">
             <Box row style={{ flexWrap: "wrap", gap: 8 }}>
               {["React Native", "TypeScript", "Tailwind", "Expo", "GraphQL", "Swift"].map(
                 (cat) => {
@@ -73,64 +58,57 @@ export function ChipSection(_props?: { ctx?: RnUiSectionContext }) {
                 },
               )}
             </Box>
+            <DemoReadout
+              label="Selected Categories"
+              value={selectedCategories.join(", ") || "None"}
+            />
           </Box>
-        </Card>
+        </DemoCard>
 
-        {/* 2. Removable Input Chips */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Removable Input Chips
-              </Text>
-              <Badge tone="accent">onClose Handler</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Dismissible chip items for forms, keyword selectors, and filters.
-            </Text>
+        {/* Card 2: Dismissible Tags with Add Action */}
+        <DemoCard
+          title="Input & Tag Chips"
+          badge="Dismissible"
+          badgeTone="accent"
+          description="Removable tags for keyword entry, query filters, and recipient lists with onClose callbacks."
+        >
+          <Box row style={{ flexWrap: "wrap", gap: 8 }}>
+            {tags.map((tag) => (
+              <Chip
+                key={tag}
+                label={tag}
+                variant="outline"
+                tone="accent"
+                onClose={() => removeTag(tag)}
+                icon={({ color, size }) => <TagIcon color={color} size={size} />}
+              />
+            ))}
 
-            <Box row style={{ flexWrap: "wrap", gap: 8 }}>
-              {tags.map((tag) => (
-                <Chip
-                  key={tag}
-                  label={tag}
-                  variant="outline"
-                  tone="accent"
-                  onClose={() => removeTag(tag)}
-                  icon={({ color, size }) => <TagIcon color={color} size={size} />}
-                />
-              ))}
-
-              {tags.length < 6 && (
-                <Chip
-                  label="Add Chip"
-                  variant="filled"
-                  tone="secondary"
-                  icon={({ color, size }) => <Plus color={color} size={size} />}
-                  onPress={() =>
-                    setTags((prev) => [
-                      ...prev,
-                      `New Chip ${nextChipIdRef.current++}`,
-                    ])
-                  }
-                />
-              )}
-            </Box>
+            {tags.length < 6 && (
+              <Chip
+                label="Add Tag"
+                variant="filled"
+                tone="secondary"
+                icon={({ color, size }) => <Plus color={color} size={size} />}
+                onPress={() =>
+                  setTags((prev) => [
+                    ...prev,
+                    `Tag ${nextChipIdRef.current++}`,
+                  ])
+                }
+              />
+            )}
           </Box>
-        </Card>
+        </DemoCard>
 
-        {/* 3. Variants & Sizes */}
-        <Card outlined>
+        {/* Card 3: Variants & Sizes */}
+        <DemoCard
+          title="Chip Variants & Sizes"
+          badge="sm • md • lg"
+          badgeTone="secondary"
+          description="Filled, outline, and soft tonal variants across three standardized scale sizes."
+        >
           <Box gap="md">
-            <Text weight="700" color="text">
-              Variants (Filled, Outline, Soft)
-            </Text>
-
             <Box row style={{ flexWrap: "wrap", gap: 8 }}>
               <Chip
                 label="Filled Variant"
@@ -160,7 +138,7 @@ export function ChipSection(_props?: { ctx?: RnUiSectionContext }) {
               <Chip label="Large Chip" size="lg" tone="primary" selected />
             </Box>
           </Box>
-        </Card>
+        </DemoCard>
       </Box>
     </Section>
   );

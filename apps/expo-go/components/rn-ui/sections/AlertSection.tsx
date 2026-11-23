@@ -1,93 +1,114 @@
-import { Alert, Box, Text } from "@masumdev/rn-ui";
-import { Check, CircleAlert, TriangleAlert, OctagonAlert, X } from "lucide-react-native";
-import {
-  AnimatedDetail,
-  AnimatedToggleIcon,
-  Section,
-  type RnUiSectionContext,
-} from "../shared";
+import { Alert, Box, Button, Text } from "@masumdev/rn-ui";
+import { AlertOctagon, AlertTriangle, CheckCircle2, Info, RefreshCw } from "lucide-react-native";
+import { useState } from "react";
+import { DemoCard, Section, type RnUiSectionContext } from "../shared";
 
 export function AlertSection({ ctx }: { ctx: RnUiSectionContext }) {
-  const { styles, icon, showAlertDetails, setShowAlertDetails } = ctx;
+  const { icon } = ctx;
+  const [showDismissible, setShowDismissible] = useState(true);
 
   return (
     <Section title="Alert">
-      <Box gap="md">
-        <Text color="textMuted">
-          Notification banners with semantic tones, glassmorphism, accent bar variants, and actions.
-        </Text>
-
-        {/* 1. Soft Alert with Action & Details Toggle */}
-        <Alert
-          tone="info"
-          variant="soft"
-          title="Information Alert"
-          icon={icon(CircleAlert)}
-          action={{
-            label: showAlertDetails ? "Hide details" : "View details",
-            icon: ({ color, size }) => (
-              <AnimatedToggleIcon
-                color={color}
-                size={size}
-                expanded={showAlertDetails}
-                direction="down"
-              />
-            ),
-            onPress: () => setShowAlertDetails((value: boolean) => !value),
-          }}
+      <Box gap="lg">
+        {/* Card 1: Semantic Tonal Alerts */}
+        <DemoCard
+          title="Semantic Banner Alerts"
+          badge="4 Tones"
+          badgeTone="primary"
+          description="Contextual notification banners with continuous squircle curvature, icons, and contrast text."
         >
           <Box gap="sm">
-            <Text color="textMuted">
-              Alert uses soft translucent tints, crisp typography, and interactive actions.
-            </Text>
-            <AnimatedDetail visible={showAlertDetails}>
-              <Box
-                bg="infoSoft"
-                radius="lg"
-                p="md"
-                style={styles.alertDetailsBox}
-              >
-                <Text variant="bodySmall" color="textMuted">
-                  Details can be toggled smoothly through component actions.
-                </Text>
-              </Box>
-            </AnimatedDetail>
+            <Alert
+              tone="success"
+              variant="soft"
+              title="Deployment Succeeded"
+              icon={icon(CheckCircle2)}
+            >
+              Your mobile production bundle v2.4 has been published to edge nodes.
+            </Alert>
+
+            <Alert
+              tone="info"
+              variant="soft"
+              title="Scheduled Maintenance"
+              icon={icon(Info)}
+            >
+              Database indexing scheduled on Sunday 02:00 AM UTC. No API downtime expected.
+            </Alert>
+
+            <Alert
+              tone="warning"
+              variant="soft"
+              title="API Rate-Limit Threshold"
+              icon={icon(AlertTriangle)}
+            >
+              Your workspace has consumed 88% of your monthly included request quota.
+            </Alert>
+
+            <Alert
+              tone="danger"
+              variant="soft"
+              title="Pipeline Build Failure"
+              icon={icon(AlertOctagon)}
+            >
+              TypeScript type-check failed on packages/rn-ui. See CI build logs for details.
+            </Alert>
           </Box>
-        </Alert>
+        </DemoCard>
 
-        {/* 2. Success Accent Bar Variant */}
-        <Alert
-          tone="success"
-          variant="accent"
-          title="System Update Complete"
-          icon={icon(Check)}
-          closeIcon={icon(X)}
-          dismissible
+        {/* Card 2: Interactive Actions & Dismissible State */}
+        <DemoCard
+          title="Interactive & Dismissible Alerts"
+          badge="Actions & Close"
+          badgeTone="secondary"
+          description="Alert banners featuring inline retry actions, close buttons, and restore states."
         >
-          Your workspace configuration has been updated successfully to v2.4.0.
-        </Alert>
+          <Box gap="md">
+            {showDismissible ? (
+              <Alert
+                tone="primary"
+                variant="outline"
+                title="New Component Available"
+                icon={icon(Info)}
+                onClose={() => setShowDismissible(false)}
+                action={{
+                  label: "Explore",
+                  onPress: () => setShowDismissible(false),
+                }}
+              >
+                Tabs & SegmentedControl now feature the flush capsule switcher variant.
+              </Alert>
+            ) : (
+              <Box row gap="sm" style={{ alignItems: "center" }}>
+                <Text variant="caption" color="textMuted" style={{ flex: 1 }}>
+                  Alert was dismissed.
+                </Text>
+                <Button
+                  variant="outline"
+                  tone="secondary"
+                  size="xs"
+                  leftIcon={icon(RefreshCw)}
+                  onPress={() => setShowDismissible(true)}
+                >
+                  Restore Alert
+                </Button>
+              </Box>
+            )}
 
-        {/* 3. Warning Glassmorphism Alert */}
-        <Alert
-          tone="warning"
-          variant="soft"
-          glass
-          title="Storage Limit Warning"
-          icon={icon(TriangleAlert)}
-        >
-          You are using 88% of your allocated cloud storage. Consider upgrading.
-        </Alert>
-
-        {/* 4. Filled Rich Dark Mode Danger Alert */}
-        <Alert
-          tone="danger"
-          variant="filled"
-          title="Critical Error Occurred"
-          icon={icon(OctagonAlert)}
-          dismissible
-        >
-          Failed to establish database connection. Please check network credentials and retry.
-        </Alert>
+            <Alert
+              tone="danger"
+              variant="filled"
+              title="Critical Security Notice"
+              icon={icon(AlertOctagon)}
+              action={{
+                label: "Configure",
+                onPress: () => undefined,
+              }}
+            >
+              Two-factor authentication is required for all administrator accounts.
+            </Alert>
+          </Box>
+        </DemoCard>
       </Box>
     </Section>
   );

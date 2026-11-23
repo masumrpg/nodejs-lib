@@ -170,26 +170,33 @@ export function measureAnchorNode(
     onMeasured(rect);
   };
 
+  const fallbackMeasure = () => {
+    if (typeof node.measure === "function") {
+      node.measure((_x, _y, mw, mh, pageX, pageY) => {
+        if (mw > 0 && mh > 0 && Number.isFinite(pageX) && Number.isFinite(pageY)) {
+          resolveWithHost({
+            x: pageX ?? 0,
+            y: pageY ?? 0,
+            width: mw,
+            height: mh,
+          });
+        }
+      });
+    }
+  };
+
   if (typeof node.measureInWindow === "function") {
     node.measureInWindow((x, y, width, height) => {
-      if (width > 0 && height > 0) {
+      if (width > 0 && height > 0 && Number.isFinite(x) && Number.isFinite(y)) {
         resolveWithHost({ x, y, width, height });
         return;
       }
-      if (typeof node.measure === "function") {
-        node.measure((_x, _y, mw, mh, pageX, pageY) => {
-          if (mw > 0 && mh > 0) {
-            resolveWithHost({
-              x: pageX ?? 0,
-              y: pageY ?? 0,
-              width: mw,
-              height: mh,
-            });
-          }
-        });
-      }
+      fallbackMeasure();
     });
+    return;
   }
+
+  fallbackMeasure();
 }
 
 export function useAnchorPosition(

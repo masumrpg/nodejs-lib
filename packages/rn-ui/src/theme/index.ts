@@ -13,7 +13,10 @@ export { createTheme, mergeTheme } from "./createTheme";
 export { useTheme } from "./useTheme";
 export { useThemeStyles } from "./useThemeStyles";
 export {
+  createGlowShadows,
   createHardShadows,
+  createNeonGlowShadows,
+  createPaperShadows,
   darkTheme,
   defaultThemes,
   flatShadows,
@@ -26,9 +29,12 @@ export {
 } from "./tokens";
 export {
   builtInThemePresets,
+  cyberThemePreset,
   defaultThemePreset,
+  editorialThemePreset,
   minimalThemePreset,
   neoBrutalismThemePreset,
+  visionGlassThemePreset,
 } from "./presets";
 export type {
   ColorSchemePreference,

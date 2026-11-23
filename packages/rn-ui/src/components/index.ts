@@ -5,6 +5,7 @@ export type {
   AccordionAnimationComponents,
   AccordionIndicator,
   AccordionIndicatorProps,
+  AccordionIconAlign,
   AccordionItem,
   AccordionProps,
   AccordionVariant,
@@ -148,8 +149,6 @@ export type {
 } from "./Button";
 export { Card } from "./Card";
 export type { CardProps } from "./Card";
-export { Command } from "./Command";
-export type { CommandItem, CommandProps } from "./Command";
 export {
   DataList,
   DataListItem,
@@ -277,6 +276,7 @@ export {
 } from "./Item";
 export type {
   ItemActionsProps,
+  ItemAlignItems,
   ItemContentProps,
   ItemDescriptionProps,
   ItemFooterProps,
@@ -290,8 +290,6 @@ export type {
   ItemTitleProps,
   ItemVariant,
 } from "./Item";
-export { KeyboardAvoiding } from "./KeyboardAvoiding";
-export type { KeyboardAvoidingProps } from "./KeyboardAvoiding";
 export { MetricCard } from "./MetricCard";
 export type { MetricCardProps } from "./MetricCard";
 export { Pagination } from "./Pagination";
@@ -514,6 +512,7 @@ export { SegmentedControl } from "./SegmentedControl";
 export type {
   SegmentedOption,
   SegmentedControlProps,
+  SegmentedControlVariant,
 } from "./SegmentedControl";
 export { Chip } from "./Chip";
 export type { ChipProps, ChipVariant } from "./Chip";
@@ -548,4 +547,28 @@ export type {
   SpeedDialActionItem,
   SpeedDialPlacement,
 } from "./SpeedDial";
+export {
+  SideNavigation,
+  SideNavHeader,
+  SideNavContent,
+  SideNavSection,
+  SideNavItem,
+  SideNavFooter,
+  SideNavToggle,
+  SideNavContext,
+  useSideNavContext,
+} from "./SideNavigation";
+export type {
+  SideNavigationProps,
+  SideNavHeaderProps,
+  SideNavContentProps,
+  SideNavSectionProps,
+  SideNavItemProps,
+  SideNavFooterProps,
+  SideNavToggleProps,
+  SideNavVariant,
+  SideNavPosition,
+  SideNavContextValue,
+} from "./SideNavigation";
+
 

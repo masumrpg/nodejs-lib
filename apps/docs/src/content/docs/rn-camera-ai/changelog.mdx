@@ -9,10 +9,34 @@ import ChangelogTimeline from '@/components/ChangelogTimeline.astro';
 
 export const releases = [
   {
-    version: 'v0.3.0',
-    date: '2026-11-22',
+    version: 'v0.4.0',
+    date: '2026-11-23',
     tag: 'Latest Release',
     isLatest: true,
+    changes: [
+      {
+        type: 'feat',
+        text: 'Added optional Design System Theme Token Binding (<code>CameraAITheme</code>, <code>ThemeColorsLike</code>, and <code>DEFAULT_CAMERA_THEME</code>) with zero forced dependencies on any external UI kit.',
+      },
+      {
+        type: 'feat',
+        text: 'Added <code>createCameraAIThemeFromTokens()</code> adapter utility for auto-mapping theme palettes (including <code>@masumdev/rn-ui</code> design tokens) into strongly-typed camera overlay themes.',
+      },
+      {
+        type: 'feat',
+        text: 'Introduced <code>&lt;CameraAIThemeProvider /&gt;</code> and <code>useCameraAITheme()</code> React Context for seamless global camera overlay styling.',
+      },
+      {
+        type: 'feat',
+        text: 'Integrated dynamic theme recoloring directly into background frame worklet configurations and all overlay components (<code>DetectionOverlay</code>, <code>DocumentGuideOverlay</code>, <code>ScannerAnimationOverlay</code>, <code>PermissionFallbackView</code>).',
+      },
+    ],
+  },
+  {
+    version: 'v0.3.0',
+    date: '2026-11-22',
+    tag: 'Feature Release',
+    isLatest: false,
     changes: [
       {
         type: 'fix',

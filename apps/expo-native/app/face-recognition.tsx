@@ -43,6 +43,7 @@ import {
   type EnrolledFaceProfile,
   type TFLiteFaceRecognizer,
 } from "@masumdev/rn-camera-ai-tflite";
+import { useTheme } from "@masumdev/rn-ui";
 
 const EMERALD_ACCENT = "#3da441";
 const CYAN_ACCENT = "#38bdf8";
@@ -98,6 +99,7 @@ function renderEmptyOverlay(): React.ReactNode {
 export default function FaceRecognitionScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { theme } = useTheme();
 
   const [recognizer, setRecognizer] = useState<
     TFLiteFaceRecognizer | undefined
@@ -271,17 +273,21 @@ export default function FaceRecognitionScreen(): React.JSX.Element {
     () => ({
       showBoxes,
       boxVariant: resolvedBoxVariant,
-      boxColor: EMERALD_ACCENT,
-      unrecognizedBoxColor: "#38bdf8",
+      boxColor: theme.colors.primary,
+      unrecognizedBoxColor: theme.colors.warning ?? theme.colors.accent,
       cornerLength: 24,
       cornerThickness: 3,
       meshStyle: {
         showMeshLines: meshMode === "full" || meshMode === "contours",
         showTesselation: meshMode === "full",
         showDots: meshMode === "full" || meshMode === "dots",
+        dotColor: theme.colors.info ?? theme.colors.accent,
+        eyeContourColor: theme.colors.accent,
+        tesselationColor: `${theme.colors.info ?? theme.colors.accent}42`,
+        faceOvalColor: `${theme.colors.info ?? theme.colors.accent}bf`,
       },
     }),
-    [showBoxes, resolvedBoxVariant, meshMode],
+    [showBoxes, resolvedBoxVariant, meshMode, theme.colors],
   );
 
   const handleSelectSimilarity = useCallback(

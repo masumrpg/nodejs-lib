@@ -57,6 +57,7 @@ import { CameraAI } from '@masumdev/rn-camera-ai';
 | `showBoxes` | `boolean` | `true` | Shows or hides bounding boxes around detected objects/faces while keeping landmarks or labels active. |
 | `boxVariant` | `'solid' \| 'corners' \| 'dashed'` | `'solid'` | Bounding box visual style: full solid rectangle, futuristic 4-corner scanner brackets (`'corners'`), or dashed border. |
 | `boxColor` | `string` | `'#3da441'` | Primary bounding box and label badge color. |
+| `theme` | `CameraAITheme \| ThemeColorsLike` | `undefined` | Optional design system token binding. Automatically harmonizes bounding boxes, mesh lines, document guides, laser sweeps, and fallback views with the active theme. |
 | `landmarkColor` | `string` | `'#38bdf8'` | Facial landmark dot accent color. |
 | `showLabels` | `boolean` | `true` | Whether to display class/identity label badges on detections. |
 | `showConfidence` | `boolean` | `true` | Whether to append confidence percentage to default label badges. |
@@ -448,3 +449,79 @@ export function DocumentCaptureCamera() {
 ```
 
 `<ScannerAnimationOverlay />` runs entirely on the Reanimated 4 UI thread (`transform` + `opacity` only), uses zero-bounce quint/cubic curves (`Easing.bezier(0.23, 1, 0.32, 1)` & `Easing.bezier(0.77, 0, 0.175, 1)`), and automatically degrades to stationary corner reticles when OS `ReduceMotion.System` is enabled.
+
+---
+
+## Design System Theme Token Binding (Optional)
+
+`@masumdev/rn-camera-ai` includes a neutral, optional theme token binding layer designed to dynamically harmonize camera HUD chrome, bounding boxes, face meshes, document reticles, and fallback cards with your application's active design system (e.g. `@masumdev/rn-ui`):
+
+### 1. Local Binding with `theme` Prop
+
+Pass color tokens directly to any `<CameraAI />` component:
+
+```tsx
+import { CameraAI } from '@masumdev/rn-camera-ai';
+import { useTheme } from '@masumdev/rn-ui';
+
+export function Screen() {
+  const { theme } = useTheme();
+
+  return (
+    <CameraAI
+      processor={myDetector}
+      theme={theme.colors} // Binds primary, warning, success, info, surface, border
+    />
+  );
+}
+```
+
+### 2. Global Provider Architecture (`CameraAIThemeProvider`)
+
+Wrap your root layout with `<CameraAIThemeProvider>` to cascade tokens across all camera views:
+
+```tsx
+import React, { useMemo } from 'react';
+import {
+  CameraAIThemeProvider,
+  createCameraAIThemeFromTokens,
+} from '@masumdev/rn-camera-ai';
+import { ThemeProvider, useTheme } from '@masumdev/rn-ui';
+
+function CameraBridge({ children }: { children: React.ReactNode }) {
+  const { theme } = useTheme();
+  const cameraTheme = useMemo(
+    () => createCameraAIThemeFromTokens(theme.colors),
+    [theme.colors]
+  );
+
+  return (
+    <CameraAIThemeProvider theme={cameraTheme}>
+      {children}
+    </CameraAIThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider defaultThemeName="cyber">
+      <CameraBridge>
+        <AppNavigator />
+      </CameraBridge>
+    </ThemeProvider>
+  );
+}
+```
+
+### Supported Token Mappings
+
+| Camera AI Element | Bound Token | Fallback Default |
+| :--- | :--- | :--- |
+| Primary Bounding Box & Label | `colors.primary` | `#3da441` |
+| Unrecognized Face / Alert Box | `colors.warning` | `#f59e0b` |
+| Verified Face & Optimal Paper | `colors.success` | `#22c55e` |
+| Facial Landmarks & 468 Mesh Dots | `colors.info` \| `colors.accent` | `#38bdf8` |
+| Laser Beam & Reticle Brackets | `colors.warning` \| `colors.primary` | `#f59e0b` |
+| Fallback Container & Reticle Mask | `colors.background` / `colors.mask` | `#000000` / `rgba(5, 22, 30, 0.50)` |
+| Permission Card Surface & Border | `colors.surface` & `colors.border` | `#1e293b` & `#334155` |
+

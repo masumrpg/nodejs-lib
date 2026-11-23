@@ -25,6 +25,7 @@ import {
   SwipeableItem,
   ThemeProvider,
   TimelineCalendar,
+  minimalThemePreset,
   parseLocalDateString,
   type SignaturePadRef,
 } from "../src";
@@ -220,5 +221,30 @@ describe("calendars, date picker, carousel & gesture components", () => {
     );
 
     expect(collectText(container)).toContain("Signature");
+  });
+
+  it("renders SwipeableItem with zero border under minimal borderless theme", () => {
+    const { container } = renderUI(
+      React.createElement(
+        ThemeProvider,
+        { themeName: "minimal" },
+        React.createElement(
+          SwipeableItem,
+          {
+            rightActions: [{ label: "Delete", tone: "danger" }],
+          },
+          React.createElement("rn-text", null, "Borderless Row"),
+        ),
+      ),
+    );
+
+    expect(collectText(container)).toContain("Borderless Row");
+    expect(minimalThemePreset.light.components?.borderWidth?.default).toBe(0);
+    const outer = findAllNodes(container, (n) => n.type === "anim-view")[0];
+    const outerStyle =
+      (outer?.props?.style as Record<string, unknown> | undefined) ?? {};
+    expect(outerStyle.borderWidth).toBe(0);
+    expect(outerStyle.borderColor).toBe("transparent");
+    expect(mockUiState.withSpringCallCount).toBe(0);
   });
 });

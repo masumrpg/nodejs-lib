@@ -30,12 +30,27 @@ export function isPressableTriggerElement(
   if (!React.isValidElement(node)) return false;
   const type = node.type as unknown;
   if (typeof type === "object" || typeof type === "function") {
-    if ((type as Record<symbol, unknown>)[RN_UI_PRESSABLE_TRIGGER]) {
+    const inner = (type as { type?: unknown }).type;
+    if (
+      (type as Record<symbol, unknown>)[RN_UI_PRESSABLE_TRIGGER] ||
+      (inner && (inner as Record<symbol, unknown>)[RN_UI_PRESSABLE_TRIGGER])
+    ) {
       return true;
     }
-    const named = type as { displayName?: string; name?: string };
-    const name = named.displayName ?? named.name ?? "";
-    if (name === "Pressable" || name.startsWith("Touchable")) {
+    const target = (inner && typeof inner === "function" ? inner : type) as {
+      displayName?: string;
+      name?: string;
+    };
+    const name =
+      target.displayName ??
+      target.name ??
+      (type as { displayName?: string }).displayName ??
+      "";
+    if (
+      name === "Pressable" ||
+      name.startsWith("Touchable") ||
+      name.includes("Button")
+    ) {
       return true;
     }
   }

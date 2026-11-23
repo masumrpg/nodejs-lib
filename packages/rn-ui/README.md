@@ -34,17 +34,19 @@ Comprehensive guides, component previews, prop tables, and interactive examples 
 - **63 Typed Components**: Forms, feedback, overlays, navigation, calendars, data display, and chat UI primitives.
 - **Pluggable Architecture**: Zero lock-in for fonts, icons (`renderIcon`), navigation, storage, or haptics.
 - **Zero-Bounce Timing Worklets**: Pure `withTiming` transitions using `Easing.bezier(0.23, 1, 0.32, 1)` and `useReducedMotion()` running on the UI thread with zero spring bounce.
+- **High-Performance Pickers & Calendars**: Worklet-optimized 3D momentum wheel with off-screen trigonometry bypass (`normalizedDistance > 3.2`), memoized picker columns, and selective day re-rendering (`areDayPropsEqual`) skipping 40 out of 42 day cells per date tap across `Calendar`, `ExpandableCalendar`, and `WeekCalendar`.
+- **Android Edge-to-Edge & Frosted Headers**: Native transparent system bars on Android paired with Reanimated semi-transparent floating headers that smoothly interpolate on scroll.
 - **A11y First**: Enforced accessibility roles, interactive states, SVG icons, and touch targets (>= 44pt).
 - **Strict Type Safety**: 100% TypeScript with zero `any` types and shared base UI prop interfaces.
 
-### Component Highlights (62 Primitives)
+### Component Highlights (60 Primitives)
 
-- **Navigation & Structure**: `Tabs` (Compound TabView with animated indicator & fluid slide/scale transitions), `Breadcrumb`, `Pagination`, `Stepper`
-- **Overlays & Modals**: `Tooltip` (Collision-aware balloons with pointer arrows & tap-and-hold), `SpeedDial` (Expanding FAB with staggered actions), `Alert`, `AlertDialog`, `Toast`, `Popover`, `HoverCard`, `DropdownMenu`, `ContextMenu`, `Command`
+- **Navigation & Structure**: `SideNavigation` (Gesture-dismiss drawer, compact rail, expanded sidebar, floating dock), `Tabs` (Compound TabView with animated indicator & fluid slide/scale transitions), `Breadcrumb`, `Pagination`, `Stepper`
+- **Overlays & Modals**: `Tooltip` (Collision-aware balloons with pointer arrows & tap-and-hold), `SpeedDial` (Expanding FAB with staggered actions), `Alert`, `AlertDialog`, `Toast`, `Popover`, `HoverCard`, `DropdownMenu`, `ContextMenu`
 - **Form Controls & Inputs**: `SearchBar` (Debounced input with clear & cancel transition), `Input`, `InputGroup`, `InputOTP`, `DatePicker`, `TimePicker`, `Textarea`, `Checkbox`, `RadioGroup`, `Switch`, `Slider`, `RangeSlider`, `SignaturePad`, `Rating`, `Select`, `Combobox`, `Label`, `FormField`
 - **Buttons & Actions**: `Button`, `IconButton`, `Chip`, `SegmentedControl`, `FloatingActionButton`
 - **Typography & Data**: `Text`, `Avatar`, `Badge`, `Item`, `SwipeableItem`, `Bubble`, `Attachment`, `DataList`, `MetricCard`, `Table`, `Timeline`, `Empty`
-- **Layout & Foundations**: `Box`, `Card`, `Divider`, `AspectRatio`, `KeyboardAvoiding`
+- **Layout & Foundations**: `Box`, `Card`, `Divider`, `AspectRatio`
 - **Disclosure & Loading**: `Accordion`, `Collapsible`, `Carousel`, `Calendar`, `ExpandableCalendar`, `TimelineCalendar`, `Progress`, `Skeleton`, `Spinner`
 
 ---

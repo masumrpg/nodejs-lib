@@ -122,6 +122,7 @@ Calling `useToast()` returns an object with the following methods:
     tone: { type: "'default' | 'success' | 'warning' | 'danger' | 'info'", default: "'default'", description: 'Color tone styling.' },
     variant: { type: "'solid' | 'outline' | 'flat' | 'subtle'", default: "'subtle'", description: 'Border and background fill variant.' },
     duration: { type: 'number', default: '3500', description: 'Auto-dismiss timeout duration in ms (set 0 to disable).' },
+    loading: { type: 'boolean', description: 'Displays an embedded UI-thread Spinner inside the static toast badge during async work.' },
     action: { type: '{ label: string; onPress: () => void }', description: 'Optional interactive action button configuration.' },
     icon: { type: 'RenderIcon', description: 'Custom left icon render function.' },
   }}

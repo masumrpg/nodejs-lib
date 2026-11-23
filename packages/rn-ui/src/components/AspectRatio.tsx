@@ -37,7 +37,12 @@ function AspectRatioComponent({
       width: "100%",
       aspectRatio: safeRatio,
       overflow: "hidden",
-      ...(radius ? { borderRadius: radii[radius] } : null),
+      ...(radius
+        ? {
+            borderRadius: radii[radius],
+            borderCurve: "continuous",
+          }
+        : null),
     }),
     [radii, radius, safeRatio],
   );

@@ -417,8 +417,8 @@ export const CarouselContent = React.memo(function CarouselContent({
         horizontal
         pagingEnabled={false}
         snapToOffsets={snapOffsets}
-        disableIntervalMomentum
         decelerationRate="fast"
+        disableIntervalMomentum={true}
         nestedScrollEnabled
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}

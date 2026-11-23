@@ -5,6 +5,22 @@ All notable changes to **@masumdev/rn-ui** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-11-23
+
+### Added
+- **SideNavigation Component Suite**: Added compound `SideNavigation` with 5 responsive variants (`drawer` with swipe gesture, `rail` 70px icon dock with tooltips, `expanded` 260px sidebar, `floating` island dock, and `collapsible` adaptive morph) respecting zero-bounce gestures.
+- **Warm Editorial & Cyberpunk Terminal Presets**: Added papercraft-inspired Editorial theme with deckle hairline borders and neon HUD Cyberpunk theme with radial glow shadows and 0px razor radii across Light and Dark modes.
+- **Android Edge-to-Edge Navigation**: Clean native edge-to-edge support on Android without system bar backgrounds, alongside smooth Reanimated worklet transitions for frosted semi-transparent floating headers with centered title typography.
+
+### Performance & Optimization
+- **DatePicker 3D Wheel Worklet Early-Exit**: Added fast-path distance guard (`normalizedDistance > 3.2`) in `AnimatedWheelItem` Reanimated worklet. Bypasses 3D trigonometric rotation (`rotateX`, `perspective`) and opacity interpolation for off-screen items, cutting UI thread frame calculation time by over 85%.
+- **WheelPicker Column Memoization**: Wrapped `WheelPickerColumn` in `React.memo` to guarantee referential stability and prevent cross-column re-renders during single-column momentum scrolls.
+- **Calendar Day Selective Re-rendering**: Implemented specialized equality comparator (`areDayPropsEqual`) for `CalendarDayButton`. Selecting or changing dates re-renders only the 2 affected day cells (previous and next), skipping the remaining 40 day cells completely across `Calendar`, `ExpandableCalendar`, and `WeekCalendar`.
+- **Showcase State Decoupling (`apps/expo-go`)**: Isolated state in `DatePickerSection` and `CalendarSection` into memoized sub-components, preventing full-screen re-render cascades during momentum wheel scrolling or date selection.
+
+### Fixed & Changed
+- **Item & Tooltip Alignment**: Updated `Item` component to default `alignItems="start"` for natural top alignment of leading icons and trailing actions. Harmonized `Tooltip` default tone with active theme surface and shadows.
+
 ## [0.7.0] - 2026-11-22
 
 ### Breaking Changes

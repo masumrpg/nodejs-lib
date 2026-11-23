@@ -98,6 +98,7 @@
         "@masumdev/rn-camera-ai": "workspace:*",
         "@masumdev/rn-camera-ai-mlkit": "workspace:*",
         "@masumdev/rn-camera-ai-tflite": "workspace:*",
+        "@masumdev/rn-ui": "workspace:*",
         "babel-preset-expo": "~58.0.0",
         "expo": "~58.0.26",
         "expo-constants": "~58.0.16",
@@ -301,7 +302,7 @@
     },
     "packages/rn-ui": {
       "name": "@masumdev/rn-ui",
-      "version": "0.7.0",
+      "version": "0.8.0",
       "devDependencies": {
         "@babel/core": "^7.25.0",
         "@babel/preset-env": "^7.25.0",

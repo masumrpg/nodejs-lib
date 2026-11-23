@@ -34,6 +34,11 @@ import type {
 } from '../types/contracts';
 import { CameraAIError, CameraError, InferenceError } from '../types/errors';
 import {
+  useCameraAITheme,
+  createCameraAIThemeFromTokens,
+  type CameraAITheme,
+} from '../theme';
+import {
   DetectionOverlay,
   projectDetectionsWorklet,
   type ProjectedDetectionItem,
@@ -81,6 +86,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
   fps,
   showBoxes,
   boxVariant,
+  theme: themeProp,
   boxColor,
   landmarkColor,
   showLabels,
@@ -157,12 +163,18 @@ export const CameraAI: React.FC<CameraAIProps> = ({
   const requestPermissionRef = React.useRef(requestPermission);
   requestPermissionRef.current = requestPermission;
 
+  const contextTheme = useCameraAITheme();
+  const activeTheme = React.useMemo<Required<CameraAITheme>>(
+    () => createCameraAIThemeFromTokens(themeProp ?? contextTheme),
+    [themeProp, contextTheme]
+  );
+
   // Build worklet-safe overlay projection config so all 468-mesh math runs on the Camera Worklet Thread
   const workletOverlayConfig = React.useMemo<WorkletOverlayConfig>(() => {
     const meshCfg: FaceMeshStyleConfig | undefined = overlayTheme?.meshStyle;
     return {
-      boxColor: boxColor ?? overlayTheme?.boxColor ?? '#3da441',
-      unrecognizedBoxColor: overlayTheme?.unrecognizedBoxColor ?? '#f59e0b',
+      boxColor: boxColor ?? overlayTheme?.boxColor ?? activeTheme.primary,
+      unrecognizedBoxColor: overlayTheme?.unrecognizedBoxColor ?? activeTheme.warning,
       cornerLength: overlayTheme?.cornerLength ?? 22,
       showConfidence: showConfidence ?? overlayTheme?.showConfidence ?? true,
       showLandmarks,
@@ -172,15 +184,15 @@ export const CameraAI: React.FC<CameraAIProps> = ({
       lineScale: meshCfg?.lineThickness ?? 1.0,
       tesselationColor: meshCfg?.tesselationColor ?? 'rgba(56, 189, 248, 0.42)',
       faceOvalColor: meshCfg?.faceOvalColor ?? 'rgba(56, 189, 248, 0.75)',
-      eyeContourColor: meshCfg?.eyeContourColor ?? '#22d3ee',
+      eyeContourColor: meshCfg?.eyeContourColor ?? activeTheme.info,
       eyebrowContourColor:
         meshCfg?.eyebrowContourColor ?? 'rgba(125, 211, 252, 0.85)',
       lipOuterContourColor: meshCfg?.lipOuterContourColor ?? '#34d399',
       lipInnerContourColor: meshCfg?.lipInnerContourColor ?? '#6ee7b7',
-      noseContourColor: meshCfg?.noseContourColor ?? '#38bdf8',
-      eyeDotColor: meshCfg?.eyeDotColor ?? '#22d3ee',
+      noseContourColor: meshCfg?.noseContourColor ?? activeTheme.info,
+      eyeDotColor: meshCfg?.eyeDotColor ?? activeTheme.info,
       denseMeshDotColor: meshCfg?.dotColor ?? '#e0f2fe',
-      landmarkColor: landmarkColor ?? meshCfg?.dotColor ?? '#38bdf8',
+      landmarkColor: landmarkColor ?? meshCfg?.dotColor ?? activeTheme.info,
       eyeDotRadius: meshCfg?.eyeDotRadius ?? 2.4,
       denseMeshDotRadius: meshCfg?.dotRadius ?? 1.8,
       keypointDotRadius: meshCfg?.dotRadius ?? 3.5,
@@ -193,6 +205,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
     showMeshLines,
     showTesselation,
     overlayTheme,
+    activeTheme,
   ]);
 
   useEffect(() => {
@@ -612,6 +625,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
       <PermissionFallbackView
         onRequestPermission={handleRequestPermission}
         style={style}
+        theme={activeTheme}
       />
     );
   }
@@ -622,10 +636,39 @@ export const CameraAI: React.FC<CameraAIProps> = ({
       return <View style={[styles.container, style]}>{cameraUnavailableFallback}</View>;
     }
     return (
-      <View style={[styles.container, styles.unavailableContainer, style]}>
-        <View style={styles.unavailableCard}>
-          <Text style={styles.unavailableTitle}>Camera Unavailable</Text>
-          <Text style={styles.unavailableMessage}>
+      <View
+        style={[
+          styles.container,
+          styles.unavailableContainer,
+          activeTheme ? { backgroundColor: activeTheme.background } : null,
+          style,
+        ]}
+      >
+        <View
+          style={[
+            styles.unavailableCard,
+            activeTheme
+              ? {
+                  backgroundColor: activeTheme.surface,
+                  borderColor: activeTheme.border,
+                }
+              : null,
+          ]}
+        >
+          <Text
+            style={[
+              styles.unavailableTitle,
+              activeTheme ? { color: activeTheme.text } : null,
+            ]}
+          >
+            Camera Unavailable
+          </Text>
+          <Text
+            style={[
+              styles.unavailableMessage,
+              activeTheme ? { color: activeTheme.muted } : null,
+            ]}
+          >
             No camera device found for position &quot;{resolvedFacing}&quot;.
           </Text>
         </View>
@@ -661,6 +704,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
           statusTextStyle={resolvedScanAnimation?.statusTextStyle}
           flashTrigger={effectiveFlashTrigger}
           sweepDurationMs={resolvedScanAnimation?.sweepDurationMs}
+          theme={activeTheme}
           renderOverlay={
             renderAnimationOverlay ?? resolvedScanAnimation?.renderOverlay
           }
@@ -673,6 +717,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
           showGridCorners={false}
           showLaser={false}
           flashTrigger={effectiveFlashTrigger}
+          theme={activeTheme}
         />
       ) : null}
 
@@ -691,6 +736,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
           resizeMode={resizeMode}
           isMirrored={resolvedFacing === 'front'}
           theme={documentGuideTheme}
+          cameraTheme={activeTheme}
           renderGuide={renderDocumentGuide}
           renderCorner={renderDocumentCorner}
           renderStatus={renderDocumentStatus}
@@ -721,6 +767,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
               showMeshLines={showMeshLines}
               showTesselation={showTesselation}
               overlayTheme={overlayTheme}
+              theme={activeTheme}
               formatLabel={formatLabel}
               renderBox={renderBox}
               renderLabel={renderLabel}

@@ -1,6 +1,6 @@
 {
   "name": "@masumdev/rn-camera-ai",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "Unified React Native camera preview, on-device AI inference, and real-time bounding box overlay.",
   "main": "lib/commonjs/index.js",
   "module": "lib/module/index.js",

@@ -1,6 +1,5 @@
 import {
   Box,
-  Card,
   Combobox,
   ComboboxContent,
   ComboboxEmpty,
@@ -10,7 +9,7 @@ import {
   Text,
 } from "@masumdev/rn-ui";
 import { Check, ChevronsUpDown, Search } from "lucide-react-native";
-import { Section, type RnUiSectionContext } from "../shared";
+import { DemoCard, DemoReadout, Section, type RnUiSectionContext } from "../shared";
 
 export function ComboboxSection({ ctx }: { ctx: RnUiSectionContext }) {
   const { icon, framework, setFramework } = ctx;
@@ -18,54 +17,57 @@ export function ComboboxSection({ ctx }: { ctx: RnUiSectionContext }) {
   const frameworks = [
     { value: "react-native", label: "React Native CLI" },
     { value: "expo", label: "Expo SDK 57" },
-    { value: "masum", label: "@masumdev/rn-ui" },
-    { value: "next", label: "Next.js" },
-    { value: "svelte", label: "SvelteKit" },
-    { value: "nuxt", label: "Nuxt.js" },
-    { value: "astro", label: "Astro" },
+    { value: "rn-ui", label: "@masumdev/rn-ui" },
+    { value: "turbo", label: "Turborepo Workspace" },
+    { value: "next", label: "Next.js 15" },
+    { value: "astro", label: "Astro 5 + Starlight" },
+    { value: "bun", label: "Bun Fast Runtime" },
   ];
 
   return (
     <Section title="Combobox">
-      <Card outlined>
-        <Box gap="lg">
-          <Text color="textMuted">
-            A fully floating autocomplete input selection dropdown. Tap the
-            input to type and filter options live, or select from the dropdown.
-          </Text>
+      <Box gap="lg">
+        {/* Card 1: Searchable Autocomplete Picker */}
+        <DemoCard
+          title="Searchable Combobox"
+          badge="Live Filter"
+          badgeTone="primary"
+          description="Floating autocomplete input with instant substring filtering, portal layering, and empty states."
+        >
+          <Box gap="md">
+            <Box gap="xs">
+              <Text variant="caption" weight="600" color="textMuted">
+                Target Architecture & Framework
+              </Text>
+              <Combobox value={framework} onValueChange={setFramework}>
+                <ComboboxInput
+                  placeholder="Type to filter frameworks..."
+                  searchIcon={icon(Search)}
+                  chevronIcon={icon(ChevronsUpDown)}
+                />
+                <ComboboxContent>
+                  <ComboboxList>
+                    {frameworks.map((item) => (
+                      <ComboboxItem
+                        key={item.value}
+                        value={item.value}
+                        label={item.label}
+                        checkIcon={icon(Check)}
+                      />
+                    ))}
+                    <ComboboxEmpty>No matching framework found.</ComboboxEmpty>
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+            </Box>
 
-          {/* Autocomplete Combobox Input */}
-          <Box gap="xs">
-            <Text variant="labelSmall" color="textSubtle">
-              Typeable Autocomplete Combobox (Anchored Below Input)
-            </Text>
-            <Combobox value={framework} onValueChange={setFramework}>
-              <ComboboxInput
-                placeholder="Type to filter frameworks..."
-                searchIcon={icon(Search)}
-                chevronIcon={icon(ChevronsUpDown)}
-              />
-              <ComboboxContent>
-                <ComboboxList>
-                  {frameworks.map((item) => (
-                    <ComboboxItem
-                      key={item.value}
-                      value={item.value}
-                      label={item.label}
-                      checkIcon={icon(Check)}
-                    />
-                  ))}
-                  <ComboboxEmpty>No matching framework found.</ComboboxEmpty>
-                </ComboboxList>
-              </ComboboxContent>
-            </Combobox>
+            <DemoReadout
+              label="Selected Architecture"
+              value={framework || "None"}
+            />
           </Box>
-
-          <Text variant="caption" color="textMuted">
-            Selected Value: {framework}
-          </Text>
-        </Box>
-      </Card>
+        </DemoCard>
+      </Box>
     </Section>
   );
 }

@@ -34,7 +34,17 @@ import {
   type RenderIcon,
   type SizeProps,
   type ToneProps,
+  type VariantProps,
 } from "./types";
+
+/**
+ * - `surface`: floating raised segment inside a muted rounded track (iOS style).
+ * - `flush`: solid tone-filled capsule that hugs the full-capsule track edge
+ *   (2px concentric inset), with high-contrast `on` label color.
+ */
+export type SegmentedControlVariant = "surface" | "flush";
+
+const FLUSH_INSET = 2;
 
 export interface SegmentedOption {
   label: string;
@@ -46,6 +56,7 @@ export interface SegmentedOption {
 
 export interface SegmentedControlProps
   extends ToneProps<ComponentTone>,
+    VariantProps<SegmentedControlVariant>,
     SizeProps<ComponentSize>,
     BaseGlassProps,
     BaseHapticProps,
@@ -69,6 +80,7 @@ function SegmentedControlComponent({
   onChange,
   size = "md",
   tone = "primary",
+  variant = "surface",
   disabled = false,
   haptic = true,
   animated = true,
@@ -111,7 +123,8 @@ function SegmentedControlComponent({
   const indicatorWidth = useSharedValue(0);
 
   const segTokens = components.segmentedControl;
-  const padding = segTokens.padding;
+  const isFlush = variant === "flush";
+  const padding = isFlush ? FLUSH_INSET : segTokens.padding;
   const height = segTokens.height[size];
   const iconSize = segTokens.iconSize[size];
   const fontSize = segTokens.fontSize[size];
@@ -175,8 +188,15 @@ function SegmentedControlComponent({
   }));
 
   const toneColors = resolveToneColors(tone, colors);
-  const activeTextColor =
-    tone === "warning" && !isDark ? "#92400E" : toneColors.solid;
+  const activeTextColor = isFlush
+    ? toneColors.on
+    : tone === "warning" && !isDark
+      ? "#92400E"
+      : toneColors.solid;
+  const trackRadius = isFlush ? radii.full : radii.lg;
+  const indicatorRadius = isFlush
+    ? radii.full
+    : Math.max(radii.xs, radii.lg - padding);
   const hitSlop = minTouchHitSlop(height);
 
   return (
@@ -190,9 +210,12 @@ function SegmentedControlComponent({
         {
           height,
           backgroundColor: glass ? colors.glassSurface : colors.backgroundMuted,
-          borderRadius: radii.lg,
+          borderRadius: trackRadius,
+          borderCurve: "continuous",
           padding,
-          borderWidth: components.borderWidth.default,
+          borderWidth: isFlush
+            ? components.borderWidth.hairline
+            : components.borderWidth.default,
           borderColor: glass ? colors.glassBorder : colors.border,
           opacity: disabled ? 0.5 : 1,
         },
@@ -203,12 +226,17 @@ function SegmentedControlComponent({
         pointerEvents="none"
         style={[
           styles.indicator,
-          shadows.sm,
+          isFlush ? null : shadows.sm,
           {
             top: padding,
             bottom: padding,
-            borderRadius: radii.md,
-            backgroundColor: isDark ? colors.surfaceRaised : colors.surface,
+            borderRadius: indicatorRadius,
+            borderCurve: "continuous",
+            backgroundColor: isFlush
+              ? toneColors.solid
+              : isDark
+                ? colors.surfaceRaised
+                : colors.surface,
           },
           indicatorAnimatedStyle,
           indicatorStyle,
@@ -266,7 +294,7 @@ function SegmentedControlComponent({
               <Badge
                 size="xs"
                 tone={isSelected ? tone : "secondary"}
-                variant={isSelected ? "filled" : "soft"}
+                variant={isSelected && !isFlush ? "filled" : "soft"}
               >
                 {String(option.badge)}
               </Badge>

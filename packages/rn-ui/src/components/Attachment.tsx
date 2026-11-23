@@ -272,6 +272,8 @@ export const Attachment = React.memo(function Attachment({
     );
   }
 
+  const isMultiline = Boolean(description);
+
   return (
     <Pressable
       accessibilityRole={onPress ? "button" : "none"}
@@ -287,6 +289,7 @@ export const Attachment = React.memo(function Attachment({
           borderRadius: radii.xl,
           padding: spacing.md,
           gap: spacing.md,
+          alignItems: isMultiline ? "flex-start" : "center",
           opacity: pressed ? 0.88 : 1,
         },
         shadows.sm,
@@ -317,7 +320,11 @@ export const Attachment = React.memo(function Attachment({
         ) : null}
       </View>
 
-      {renderRemoveButton(16)}
+      {onRemove ? (
+        <View style={isMultiline ? { marginTop: 2 } : undefined}>
+          {renderRemoveButton(16)}
+        </View>
+      ) : null}
     </Pressable>
   );
 });

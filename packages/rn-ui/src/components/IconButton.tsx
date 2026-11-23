@@ -299,9 +299,11 @@ function IconButtonComponent({
   );
 }
 
+markAsPressableTrigger(IconButtonComponent);
 export const IconButton = markAsPressableTrigger(
   React.memo(IconButtonComponent),
 );
+IconButton.displayName = "IconButton";
 
 const styles = StyleSheet.create({
   wrapper: {

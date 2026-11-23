@@ -1,0 +1,186 @@
+---
+title: SideNavigation
+description: Responsive side navigation suite featuring gesture-dismiss drawer, compact rail, expanded sidebar, and floating dock variants.
+sidebar:
+  badge:
+    text: New
+    variant: tip
+---
+
+import { Code } from '@astrojs/starlight/components';
+import TypeTable from '@/components/TypeTable.astro';
+
+The `SideNavigation` component suite provides a responsive navigation hierarchy for mobile, tablet, and desktop applications. Built with `react-native-gesture-handler` and `react-native-reanimated`, it delivers zero-bounce animations and interactive swipe-to-dismiss gestures.
+
+## Features
+
+- **5 Responsive Variants**: `drawer` (mobile overlay), `rail` (compact 70px icon dock), `expanded` (260px full sidebar), `floating` (modern elevated island), and `collapsible` (adaptive morph).
+- **Zero-Bounce Gestures**: Follows the monorepo's Zero-Bounce Animation Policy with cubic bezier easing (`[0.23, 1, 0.32, 1]`) and UI-thread worklets.
+- **Swipe-to-Dismiss**: Gesture tracking with velocity handoff on drawers.
+- **Accessible Tooltips**: In `rail` mode, items automatically wrap with the `Tooltip` component to display labels on hover or press.
+- **6 Multi-Theme Presets**: Seamless visual adaptation across *Default*, *Minimal Borderless*, *Neo-Brutalism*, *Vision Glass*, *Warm Editorial*, and *Cyberpunk Terminal*.
+
+---
+
+## Installation
+
+```bash
+import {
+  SideNavigation,
+  SideNavHeader,
+  SideNavContent,
+  SideNavSection,
+  SideNavItem,
+  SideNavFooter,
+  SideNavToggle,
+} from '@masumdev/rn-ui';
+```
+
+---
+
+## Basic Usage (Expanded Sidebar)
+
+```tsx
+import { useState } from 'react';
+import {
+  SideNavigation,
+  SideNavHeader,
+  SideNavContent,
+  SideNavSection,
+  SideNavItem,
+  SideNavFooter,
+} from '@masumdev/rn-ui';
+import { LayoutDashboard, BarChart3, Settings } from 'lucide-react-native';
+
+export function SidebarExample() {
+  const [activeRoute, setActiveRoute] = useState('dashboard');
+
+  return (
+    <SideNavigation
+      variant="expanded"
+      activeKey={activeRoute}
+      onSelect={setActiveRoute}
+      tone="primary"
+    >
+      <SideNavHeader
+        title="Acme Cloud"
+        subtitle="Production Cluster"
+      />
+
+      <SideNavContent>
+        <SideNavSection label="Platform">
+          <SideNavItem
+            id="dashboard"
+            label="Dashboard"
+            icon={({ color, size }) => <LayoutDashboard color={color} size={size} />}
+            badge="NEW"
+            badgeTone="success"
+          />
+          <SideNavItem
+            id="analytics"
+            label="Analytics"
+            icon={({ color, size }) => <BarChart3 color={color} size={size} />}
+          />
+        </SideNavSection>
+      </SideNavContent>
+
+      <SideNavFooter>
+        <SideNavItem
+          id="settings"
+          label="Settings"
+          icon={({ color, size }) => <Settings color={color} size={size} />}
+        />
+      </SideNavFooter>
+    </SideNavigation>
+  );
+}
+```
+
+---
+
+## Gesture-Dismiss Drawer (Mobile)
+
+```tsx
+import { useState } from 'react';
+import { SideNavigation, SideNavContent, SideNavItem, Button } from '@masumdev/rn-ui';
+
+export function DrawerExample() {
+  const [open, setOpen] = useState(false);
+  const [route, setRoute] = useState('home');
+
+  return (
+    <>
+      <Button onPress={() => setOpen(true)}>Open Menu</Button>
+
+      <SideNavigation
+        variant="drawer"
+        isOpen={open}
+        onOpenChange={setOpen}
+        activeKey={route}
+        onSelect={setRoute}
+        position="left"
+      >
+        <SideNavContent>
+          <SideNavItem id="home" label="Home" />
+          <SideNavItem id="explore" label="Explore" />
+          <SideNavItem id="saved" label="Saved" />
+        </SideNavContent>
+      </SideNavigation>
+    </>
+  );
+}
+```
+
+---
+
+## Compact Navigation Rail (Tablet / Desktop)
+
+```tsx
+<SideNavigation
+  variant="rail"
+  activeKey="analytics"
+  tone="accent"
+  activeVariant="solid"
+>
+  <SideNavContent>
+    <SideNavItem id="home" label="Home" icon={HomeIcon} />
+    <SideNavItem id="analytics" label="Analytics" icon={ChartIcon} badge="dot" />
+    <SideNavItem id="messages" label="Messages" icon={MailIcon} badge="4" />
+  </SideNavContent>
+</SideNavigation>
+```
+
+---
+
+## Props Reference
+
+### SideNavigation Props
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `variant` | `'drawer' \| 'rail' \| 'expanded' \| 'floating' \| 'collapsible'` | `'expanded'` | Layout presentation mode. |
+| `position` | `'left' \| 'right'` | `'left'` | Edge anchor position for drawers. |
+| `isOpen` | `boolean` | `false` | Controlled drawer open state. |
+| `onOpenChange` | `(open: boolean) => void` | `undefined` | Callback fired on drawer open/close. |
+| `collapsed` | `boolean` | `false` | Controlled collapsed state for collapsible variant. |
+| `onCollapsedChange` | `(collapsed: boolean) => void` | `undefined` | Callback fired on collapse toggle. |
+| `activeKey` | `string` | `undefined` | Current active navigation key. |
+| `onSelect` | `(key: string) => void` | `undefined` | Callback fired when an item is selected. |
+| `tone` | `ComponentTone` | `'primary'` | Semantic tone for active highlight. |
+| `activeVariant` | `'subtle' \| 'solid' \| 'outline' \| 'ghost'` | `'subtle'` | Visual style for active item pill. |
+| `width` | `number` | `260` (or `280` drawer) | Custom sidebar width. |
+| `collapsedWidth` | `number` | `70` | Custom collapsed/rail width. |
+| `portal` | `boolean` | `true` | Whether drawer renders in Portal layer. |
+
+### SideNavItem Props
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `id` | `string` | *(required)* | Unique item identifier. |
+| `label` | `string` | *(required)* | Display title text. |
+| `icon` | `RenderIcon` | `undefined` | Left slot icon component or function. |
+| `badge` | `ReactNode \| string \| number` | `undefined` | Right badge or counter. |
+| `badgeTone` | `ComponentTone` | `'primary'` | Tone color for badge pill. |
+| `tooltip` | `string` | `label` | Tooltip content in rail mode. |
+| `disabled` | `boolean` | `false` | Disables user interaction. |
+| `onPress` | `() => void` | `undefined` | Custom press handler override. |

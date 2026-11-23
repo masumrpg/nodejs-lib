@@ -13,9 +13,12 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
   ThemeProvider,
   ToastProvider,
+  cyberThemePreset,
   defaultThemes,
+  editorialThemePreset,
   minimalThemePreset,
   neoBrutalismThemePreset,
+  visionGlassThemePreset,
   type ColorSchemePreference,
   type Theme,
   type ThemePresets,
@@ -63,6 +66,18 @@ const appThemePresets: ThemePresets = {
     light: { ...neoBrutalismThemePreset.light, fonts: appFonts },
     dark: { ...neoBrutalismThemePreset.dark, fonts: appFonts },
   },
+  glass: {
+    light: { ...visionGlassThemePreset.light, fonts: appFonts },
+    dark: { ...visionGlassThemePreset.dark, fonts: appFonts },
+  },
+  editorial: {
+    light: { ...editorialThemePreset.light, fonts: appFonts },
+    dark: { ...editorialThemePreset.dark, fonts: appFonts },
+  },
+  cyber: {
+    light: { ...cyberThemePreset.light, fonts: appFonts },
+    dark: { ...cyberThemePreset.dark, fonts: appFonts },
+  },
 };
 
 const themeStorage: ThemeStorage = {
@@ -101,6 +116,7 @@ const isColorSchemePreference = (
 const AppLayout = () => {
   const [colorScheme, setColorSchemeState] =
     React.useState<ColorSchemePreference>("system");
+  const [themeName, setThemeName] = React.useState<string>("brutal");
   const [themeLoaded, setThemeLoaded] = React.useState(false);
   const [loaded, error] = useFonts({
     OutfitRegular: Outfit_400Regular,
@@ -123,11 +139,18 @@ const AppLayout = () => {
     };
   }, []);
 
+
   React.useEffect(() => {
-    Promise.resolve(themeStorage.getItem(THEME_STORAGE_KEY))
-      .then((saved) => {
-        if (isColorSchemePreference(saved)) {
-          setColorSchemeState(saved);
+    Promise.all([
+      Promise.resolve(themeStorage.getItem(THEME_STORAGE_KEY)).catch(() => null),
+      Promise.resolve(themeStorage.getItem(THEME_NAME_STORAGE_KEY)).catch(() => null),
+    ])
+      .then(([savedScheme, savedTheme]) => {
+        if (isColorSchemePreference(savedScheme)) {
+          setColorSchemeState(savedScheme);
+        }
+        if (savedTheme && appThemePresets[savedTheme]) {
+          setThemeName(savedTheme);
         }
       })
       .catch((err: unknown) => {
@@ -150,6 +173,18 @@ const AppLayout = () => {
     [],
   );
 
+  const handleThemeNameChange = React.useCallback(
+    (next: string) => {
+      setThemeName(next);
+      Promise.resolve(themeStorage.setItem(THEME_NAME_STORAGE_KEY, next)).catch(
+        (err: unknown) => {
+          console.error("Theme save error:", err);
+        },
+      );
+    },
+    [],
+  );
+
   if ((!loaded && !error) || !themeLoaded) {
     return null;
   }
@@ -159,7 +194,9 @@ const AppLayout = () => {
       <ThemeProvider
         colorScheme={colorScheme}
         defaultColorScheme="system"
-        defaultThemeName="default"
+        themeName={themeName}
+        defaultThemeName="glass"
+        onThemeNameChange={handleThemeNameChange}
         presets={appThemePresets}
         storage={themeStorage}
         storageKey={THEME_STORAGE_KEY}

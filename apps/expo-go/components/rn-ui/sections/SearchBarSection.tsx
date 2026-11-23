@@ -1,12 +1,11 @@
-import {
-  Badge,
-  Box,
-  Card,
-  SearchBar,
-  Text,
-} from "@masumdev/rn-ui";
+import { Box, SearchBar } from "@masumdev/rn-ui";
 import { useState } from "react";
-import { Section, type RnUiSectionContext } from "../shared";
+import {
+  DemoCard,
+  DemoReadout,
+  Section,
+  type RnUiSectionContext,
+} from "../shared";
 
 export function SearchBarSection(_props?: { ctx?: RnUiSectionContext }) {
   const [query1, setQuery1] = useState("");
@@ -26,95 +25,63 @@ export function SearchBarSection(_props?: { ctx?: RnUiSectionContext }) {
     <Section title="SearchBar">
       <Box gap="lg">
         {/* 1. Standard Filled SearchBar with Debouncing */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Debounced Search
-              </Text>
-              <Badge tone="primary">Filled Variant</Badge>
-            </Box>
-            <Text color="textMuted" variant="bodySmall">
-              Built-in debouncing with animated clear button and cancel action.
-            </Text>
+        <DemoCard
+          title="Debounced Live Search"
+          badge="Filled Variant"
+          badgeTone="primary"
+          description="Built-in debouncing with animated clear button, loading spinner, and cancel transition."
+        >
+          <SearchBar
+            placeholder="Search components or docs..."
+            value={query1}
+            onChangeText={setQuery1}
+            onSearchDebounced={handleDebouncedSearch}
+            debounceMs={300}
+            loading={isSearching}
+            showCancelButton
+          />
 
-            <SearchBar
-              placeholder="Search components or docs..."
-              value={query1}
-              onChangeText={setQuery1}
-              onSearchDebounced={handleDebouncedSearch}
-              debounceMs={300}
-              loading={isSearching}
-              showCancelButton
-            />
-
-            <Box p="sm" bg="surfaceMuted" style={{ borderRadius: 6 }}>
-              <Text variant="caption" color="textMuted">
-                Debounced Query:{" "}
-                <Text variant="caption" weight="600" color="primary">
-                  {debouncedQuery || "(Waiting for input...)"}
-                </Text>
-              </Text>
-            </Box>
-          </Box>
-        </Card>
+          <DemoReadout
+            label="Debounced Search Query"
+            value={debouncedQuery || "(Waiting for input...)"}
+          />
+        </DemoCard>
 
         {/* 2. Outline Pill Shape */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Pill Outline Search
-              </Text>
-              <Badge tone="accent">Outline Pill</Badge>
-            </Box>
+        <DemoCard
+          title="Pill Shape Outline Search"
+          badge="Outline Pill"
+          badgeTone="accent"
+          description="Pill curvature with accent tone highlights and custom cancel action label."
+        >
+          <SearchBar
+            placeholder="Search contacts..."
+            value={query2}
+            onChangeText={setQuery2}
+            variant="outline"
+            shape="pill"
+            tone="accent"
+            showCancelButton
+            cancelLabel="Done"
+          />
 
-            <SearchBar
-              placeholder="Search contacts..."
-              value={query2}
-              onChangeText={setQuery2}
-              variant="outline"
-              shape="pill"
-              tone="accent"
-              showCancelButton
-              cancelLabel="Done"
-            />
-          </Box>
-        </Card>
+          <DemoReadout label="Active Filter" value={query2} />
+        </DemoCard>
 
         {/* 3. Soft Tint Variant */}
-        <Card outlined>
-          <Box gap="md">
-            <Box
-              row
-              wrap
-              gap="sm"
-              style={{ alignItems: "center", justifyContent: "space-between" }}
-            >
-              <Text weight="700" color="text" style={{ flexShrink: 1 }}>
-                Soft Tint Search
-              </Text>
-              <Badge tone="success">Soft Variant</Badge>
-            </Box>
-
-            <SearchBar
-              placeholder="Filter transactions..."
-              variant="soft"
-              tone="success"
-              showCancelButton={false}
-            />
-          </Box>
-        </Card>
+        <DemoCard
+          title="Soft Tint Filter Bar"
+          badge="Soft Variant"
+          badgeTone="success"
+          description="Subtle tinted background for embedded transaction or table filtering."
+        >
+          <SearchBar
+            placeholder="Filter transactions..."
+            variant="soft"
+            tone="success"
+            showCancelButton={false}
+          />
+        </DemoCard>
       </Box>
     </Section>
   );

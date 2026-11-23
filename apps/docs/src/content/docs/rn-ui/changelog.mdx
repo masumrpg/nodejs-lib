@@ -9,10 +9,42 @@ import ChangelogTimeline from '@/components/ChangelogTimeline.astro';
 
 export const releases = [
   {
+    version: 'v0.8.0',
+    date: '2026-11-23',
+    tag: 'SideNavigation & Dual Themes Release',
+    isLatest: true,
+    changes: [
+      {
+        type: 'feat',
+        text: '<strong>SideNavigation Component Suite</strong>: Added compound <code>SideNavigation</code> with 5 responsive variants (<code>drawer</code> with swipe-to-dismiss gesture, <code>rail</code> 70px icon dock with tooltips, <code>expanded</code> 260px sidebar, <code>floating</code> island dock, and <code>collapsible</code> adaptive morph). Follows zero-bounce gesture animations via Reanimated 4 and RNGH 3.',
+      },
+      {
+        type: 'feat',
+        text: '<strong>Warm Editorial & Cyberpunk Terminal Presets</strong>: Added papercraft-inspired Editorial theme with deckle hairline borders and neon HUD Cyberpunk theme with radial glow shadows and 0px razor radii across Light and Dark modes.',
+      },
+      {
+        type: 'fix',
+        text: '<strong>Item & Tooltip Alignment & Color Harmonization</strong>: Updated <code>Item</code> component to default <code>alignItems="start"</code> for natural top alignment of leading icons and trailing actions. Harmonized <code>Tooltip</code> default tone with active theme surface and shadows.',
+      },
+      {
+        type: 'perf',
+        text: '<strong>DatePicker 3D Wheel Worklet Optimization</strong>: Added fast-path distance guard (<code>normalizedDistance &gt; 3.2</code>) in <code>AnimatedWheelItem</code> worklet, skipping 3D trigonometric rotation and interpolation for off-screen items to eliminate frame drops and reduce UI thread load by ~85%. Memoized <code>WheelPickerColumn</code> with <code>React.memo</code>.',
+      },
+      {
+        type: 'perf',
+        text: '<strong>Calendar Day Memoization & Selective Re-rendering</strong>: Implemented specialized equality comparator (<code>areDayPropsEqual</code>) for <code>CalendarDayButton</code>. Selecting or changing dates now re-renders only the 2 affected day cells, skipping the remaining 40 cells completely across <code>Calendar</code>, <code>ExpandableCalendar</code>, and <code>WeekCalendar</code>.',
+      },
+      {
+        type: 'feat',
+        text: '<strong>Android Edge-to-Edge & Frosted Semi-Transparent Header</strong>: Clean native edge-to-edge navigation on Android with transparent system bars, alongside smooth Reanimated worklet transitions for frosted semi-transparent floating headers with centered title typography.',
+      },
+    ],
+  },
+  {
     version: 'v0.7.0',
     date: '2026-11-22',
     tag: 'Design System & Stability Release',
-    isLatest: true,
+    isLatest: false,
     changes: [
       {
         type: 'feat',

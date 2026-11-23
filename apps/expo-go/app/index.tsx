@@ -19,7 +19,7 @@ import {
   type RenderIcon,
 } from "@masumdev/rn-ui";
 import { SystemUIOverlay } from "../components/system-ui-overlay";
-import { ScreenHeader } from "../components/ScreenHeader";
+import { ScreenHeader, ScreenHeroHeader } from "../components/ScreenHeader";
 import { useHeaderScroll } from "../components/useHeaderScroll";
 
 const icon =
@@ -65,9 +65,10 @@ export default function Native() {
     null,
   );
 
-  const { onScroll, scrollEventThrottle } = useHeaderScroll({
-    headerHeight: 220,
-  });
+  const { onScroll, scrollEventThrottle, isHeaderScrolled, showTitle } =
+    useHeaderScroll({
+      threshold: 55,
+    });
 
   const isAnyNavigating = navigatingRoute !== null;
 
@@ -90,9 +91,9 @@ export default function Native() {
       <SystemUIOverlay />
 
       <ScreenHeader
-        eyebrow="MasumDev Mobile"
         title="Component Libraries"
-        subtitle="Interact with custom React Native packages using one flat visual system."
+        showTitle={showTitle}
+        isScrolled={isHeaderScrolled}
       />
 
       <ScrollView
@@ -102,11 +103,16 @@ export default function Native() {
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: spacing.md,
             paddingBottom: insets.bottom + spacing.xl,
           },
         ]}
       >
+        <ScreenHeroHeader
+          eyebrow="MasumDev Mobile"
+          title="Component Libraries"
+          subtitle="Interact with custom React Native packages using one flat visual system."
+        />
+
         <Box gap="md">
           <Text
             variant="labelSmall"

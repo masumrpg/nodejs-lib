@@ -31,6 +31,9 @@ import {
   lightTheme,
   minimalThemePreset,
   neoBrutalismThemePreset,
+  visionGlassThemePreset,
+  editorialThemePreset,
+  cyberThemePreset,
   registerLocale,
   resolveLocaleKey,
   subtleShadows,
@@ -225,12 +228,18 @@ describe("theme tokens, WCAG AA contrast & utilities", () => {
     expect(toastIdx).toBeGreaterThan(tooltipIdx);
   });
 
-  it("meets WCAG AA (>= 4.5:1) contrast for Minimal (HeroUI) and Neo-Brutalism presets in Light and Dark modes", () => {
+  it("meets WCAG AA (>= 4.5:1) contrast for Minimal, Neo-Brutalism, Vision Glass, Editorial, and Cyber presets in Light and Dark modes", () => {
     const presetThemes = [
       createTheme("light", minimalThemePreset.light),
       createTheme("dark", minimalThemePreset.dark),
       createTheme("light", neoBrutalismThemePreset.light),
       createTheme("dark", neoBrutalismThemePreset.dark),
+      createTheme("light", visionGlassThemePreset.light),
+      createTheme("dark", visionGlassThemePreset.dark),
+      createTheme("light", editorialThemePreset.light),
+      createTheme("dark", editorialThemePreset.dark),
+      createTheme("light", cyberThemePreset.light),
+      createTheme("dark", cyberThemePreset.dark),
     ];
 
     for (const presetTheme of presetThemes) {
@@ -325,7 +334,14 @@ describe("theme tokens, WCAG AA contrast & utilities", () => {
 
     expect(api).not.toBeNull();
     expect(api!.themeName).toBe("default");
-    expect(api!.availableThemes).toEqual(["default", "minimal", "brutal"]);
+    expect(api!.availableThemes).toEqual([
+      "default",
+      "minimal",
+      "brutal",
+      "glass",
+      "editorial",
+      "cyber",
+    ]);
     expect(api!.components.borderWidth.strong).toBe(1.5);
     expect(api!.components.surface.outlineStyle).toBe("bordered");
     expect(api!.elevation).toBe(true);
@@ -369,6 +385,31 @@ describe("theme tokens, WCAG AA contrast & utilities", () => {
       (brutalCard?.props?.style as Record<string, unknown> | undefined)
         ?.overflow,
     ).toBe("visible");
+
+    act(() => {
+      api!.setThemeName("glass");
+    });
+
+    expect(api!.themeName).toBe("glass");
+    expect(api!.elevation).toBe(true);
+    expect(api!.components.borderWidth.strong).toBe(1.5);
+    expect(api!.radii.xl).toBe(28);
+    expect(api!.shadows.md.boxShadow).toContain("rgba(99, 102, 241");
+
+    act(() => {
+      api!.setThemeName("editorial");
+    });
+    expect(api!.themeName).toBe("editorial");
+    expect(api!.radii.md).toBe(8);
+    expect(api!.colors.primary).toBe("#9A3412");
+
+    act(() => {
+      api!.setThemeName("cyber");
+    });
+    expect(api!.themeName).toBe("cyber");
+    expect(api!.radii.md).toBe(2);
+    expect(api!.components.borderWidth.strong).toBe(2);
+    expect(api!.shadows.md.boxShadow).toContain("rgba(0, 122, 153");
 
     act(() => {
       api!.toggleElevation();
@@ -626,14 +667,14 @@ describe("theme tokens, WCAG AA contrast & utilities", () => {
     expect(
       (getPressable("btn-md")?.props?.style as Record<string, unknown> | undefined)
         ?.borderRadius,
-    ).toBe(10);
+    ).toBe(16);
     expect(
       (
         getPressable("btn-square")?.props?.style as
           | Record<string, unknown>
           | undefined
       )?.borderRadius,
-    ).toBe(5);
+    ).toBe(8);
   });
 
   it("maintains consistent border-radius hierarchy across controls, inputs, alerts, and cards for default, minimal, and brutal presets", () => {
@@ -791,7 +832,7 @@ describe("theme tokens, WCAG AA contrast & utilities", () => {
     act(() => {
       api!.setThemeName("minimal");
     });
-    assertPresetRadii({ xs: 5, md: 10, lg: 14, xl: 20 });
+    assertPresetRadii({ xs: 8, md: 16, lg: 20, xl: 26 });
 
     act(() => {
       api!.setThemeName("brutal");

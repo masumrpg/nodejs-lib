@@ -10,7 +10,6 @@ import {
   ComboboxInput,
   ComboboxItem,
   ComboboxList,
-  Command,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -92,6 +91,7 @@ describe("overlays, portals, toasts & anchored menus", () => {
     expect(actionBtn).toBeDefined();
     (actionBtn?.props?.onPress as (() => void) | undefined)?.();
     expect(onCreate).toHaveBeenCalledTimes(1);
+    expect(mockUiState.withSpringCallCount).toBe(0);
   });
 
   it("opens Select inside Portal without closing on disabled options", () => {
@@ -163,7 +163,7 @@ describe("overlays, portals, toasts & anchored menus", () => {
     expect(collectText(container)).not.toContain("Nothing matched");
   });
 
-  it("supports Toast outline variant and AlertDialog / Command rendering", () => {
+  it("supports Toast outline variant and AlertDialog rendering", () => {
     let api: ReturnType<typeof useToast> | null = null;
     function Driver() {
       api = useToast();
@@ -184,17 +184,11 @@ describe("overlays, portals, toasts & anchored menus", () => {
             onConfirm: () => {},
             onCancel: () => {},
           }),
-          React.createElement(Command, {
-            visible: true,
-            items: [{ value: "open", label: "Open File", group: "File" }],
-            onClose: () => {},
-          }),
         ),
       ),
     );
 
     expect(collectText(container)).toContain("Confirm Action");
-    expect(collectText(container)).toContain("Open File");
     expect(api).not.toBeNull();
     let id = "";
     act(() => {
@@ -444,7 +438,7 @@ describe("overlays, portals, toasts & anchored menus", () => {
     expect(alerts.length).toBe(3);
     for (const alertNode of alerts) {
       const st = (alertNode.props?.style as Record<string, unknown> | undefined) ?? {};
-      expect(st.position).toBe("relative");
+      expect(st.position).toBe("absolute");
     }
 
     const closedTopToast = renderUI(
@@ -474,5 +468,164 @@ describe("overlays, portals, toasts & anchored menus", () => {
     const ty = transforms.find((t) => typeof t.translateY === "number")?.translateY;
     expect(ty).toBeDefined();
     expect(ty!).toBeLessThanOrEqual(-140);
+  });
+
+  it("renders visible overlay backdrops and opens Popover/Tooltip even when anchor rect measurement is delayed or empty", () => {
+    mockUiState.anchorRect = { x: 0, y: 0, width: 0, height: 0 };
+
+    const { container } = renderUI(
+      wrap(
+        React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(
+            Popover,
+            null,
+            React.createElement(
+              PopoverTrigger,
+              null,
+              React.createElement(Button, null, "Show Popover"),
+            ),
+            React.createElement(PopoverContent, null, "Popover Overlay Ready"),
+          ),
+          React.createElement(
+            Tooltip,
+            { content: "Tooltip Overlay Ready", triggerMode: "press" },
+            React.createElement(Button, null, "Show Tooltip"),
+          ),
+        ),
+      ),
+    );
+
+    const popTrigger = findAllNodes(
+      container,
+      (n) => n.type === "rn-pressable" && collectText(n).includes("Show Popover"),
+    )[0];
+    const tipTrigger = findAllNodes(
+      container,
+      (n) => n.type === "rn-pressable" && collectText(n).includes("Show Tooltip"),
+    )[0];
+
+    act(() => {
+      (popTrigger?.props?.onPress as ((e: unknown) => void) | undefined)?.({});
+      (tipTrigger?.props?.onPress as ((e: unknown) => void) | undefined)?.({});
+    });
+
+    expect(collectText(container)).toContain("Popover Overlay Ready");
+    expect(collectText(container)).toContain("Tooltip Overlay Ready");
+
+    const backdropViews = findAllNodes(
+      container,
+      (n) =>
+        n.type === "anim-view" &&
+        typeof (n.props?.style as Record<string, unknown> | undefined)
+          ?.backgroundColor === "string" &&
+        findAllNodes(
+          n,
+          (c) =>
+            c.props?.accessibilityLabel === "Dismiss popover" ||
+            c.props?.accessibilityLabel === "Dismiss tooltip",
+        ).length > 0,
+    );
+    expect(backdropViews.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("renders Spinner inside static Toast badge while loading and clears spinner to upright icon on completion update", () => {
+    let api: ReturnType<typeof useToast> | null = null;
+    function Driver() {
+      api = useToast();
+      return null;
+    }
+
+    const { container } = renderUI(
+      wrap(
+        React.createElement(
+          ToastProvider,
+          { placement: "top" },
+          React.createElement(Driver, null),
+        ),
+      ),
+    );
+
+    let id = "";
+    act(() => {
+      id = api!.show({
+        title: "Saving Settings...",
+        tone: "info",
+        loading: true,
+        duration: 0,
+      });
+    });
+
+    const alertWhileLoading = findAllNodes(
+      container,
+      (n) => n.type === "anim-view" && n.props?.accessibilityRole === "alert",
+    )[0];
+    expect(alertWhileLoading).toBeDefined();
+    const spinnersDuringLoad = alertWhileLoading
+      ? findAllNodes(
+          alertWhileLoading,
+          (n) => n.props?.accessibilityRole === "progressbar",
+        )
+      : [];
+    expect(spinnersDuringLoad.length).toBe(1);
+
+    // Outer badge around spinner must remain static (rn-view, no rotation transform)
+    const staticBadges = alertWhileLoading
+      ? findAllNodes(
+          alertWhileLoading,
+          (n) =>
+            n.type === "rn-view" &&
+            (n.props?.style as Record<string, unknown> | undefined)?.width === 36 &&
+            (n.props?.style as Record<string, unknown> | undefined)?.height === 36,
+        )
+      : [];
+    expect(staticBadges.length).toBe(1);
+    expect(
+      (staticBadges[0]?.props?.style as Record<string, unknown> | undefined)
+        ?.transform,
+    ).toBeUndefined();
+
+    act(() => {
+      api!.update(id, {
+        title: "Settings Saved!",
+        tone: "success",
+        loading: false,
+        duration: 3500,
+      });
+    });
+
+    const alertAfterDone = findAllNodes(
+      container,
+      (n) => n.type === "anim-view" && n.props?.accessibilityRole === "alert",
+    )[0];
+    expect(collectText(container)).toContain("Settings Saved!");
+    const spinnersAfterDone = alertAfterDone
+      ? findAllNodes(
+          alertAfterDone,
+          (n) => n.props?.accessibilityRole === "progressbar",
+        )
+      : [];
+    expect(spinnersAfterDone.length).toBe(0);
+
+    const completionBadge = alertAfterDone
+      ? findAllNodes(
+          alertAfterDone,
+          (n) =>
+            n.type === "rn-view" &&
+            (n.props?.style as Record<string, unknown> | undefined)?.width === 36,
+        )[0]
+      : undefined;
+    expect(completionBadge).toBeDefined();
+    const innerAnimatedWrappers = completionBadge
+      ? findAllNodes(completionBadge, (n) => n.type === "anim-view")
+      : [];
+    for (const wrapper of innerAnimatedWrappers) {
+      const transforms =
+        ((wrapper.props?.style as Record<string, unknown> | undefined)
+          ?.transform as Array<Record<string, unknown>> | undefined) ?? [];
+      const hasRotate = transforms.some((t) => "rotate" in t);
+      expect(hasRotate).toBe(false);
+    }
   });
 });

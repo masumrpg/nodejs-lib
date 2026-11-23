@@ -18,6 +18,8 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
+import { useCameraAITheme } from '../theme/context';
+import type { CameraAITheme } from '../theme/types';
 import type {
   PixelBoundingBox,
   RenderScannerLaserParams,
@@ -68,6 +70,8 @@ export interface ScannerAnimationOverlayProps {
   renderStatusBadge?: (params: RenderScannerStatusParams) => React.ReactNode;
   /** Optional custom container style */
   style?: StyleProp<ViewStyle>;
+  /** Optional theme override */
+  theme?: CameraAITheme;
 }
 
 const EASE_OUT =
@@ -86,14 +90,14 @@ const MIN_TRAVEL_PX = 80;
 export const ScannerAnimationOverlay: React.FC<ScannerAnimationOverlayProps> = ({
   active = true,
   state = 'scanning',
-  accentColor = '#f59e0b',
+  accentColor,
   showGridCorners = true,
   cornerLength = 24,
   cornerThickness = 2.5,
   cornerRadius = 10,
   showLaser = true,
   scanRegion,
-  veilColor = 'rgba(5, 22, 30, 0.34)',
+  veilColor,
   statusLabel,
   statusContainerStyle,
   statusTextStyle,
@@ -103,7 +107,15 @@ export const ScannerAnimationOverlay: React.FC<ScannerAnimationOverlayProps> = (
   renderLaser,
   renderStatusBadge,
   style,
+  theme,
 }) => {
+  const contextTheme = useCameraAITheme();
+  const activeTheme = theme ?? contextTheme;
+
+  const resolvedAccentColor =
+    accentColor ?? activeTheme?.warning ?? activeTheme?.primary ?? '#f59e0b';
+  const resolvedVeilColor =
+    veilColor ?? activeTheme?.mask ?? 'rgba(5, 22, 30, 0.34)';
   const reducedMotion =
     typeof useReducedMotion === 'function' ? useReducedMotion() : false;
 
@@ -312,7 +324,7 @@ export const ScannerAnimationOverlay: React.FC<ScannerAnimationOverlayProps> = (
         renderOverlay({
           active,
           state,
-          accentColor,
+          accentColor: resolvedAccentColor,
           statusLabel,
           region: scanRegion,
         })
@@ -321,7 +333,7 @@ export const ScannerAnimationOverlay: React.FC<ScannerAnimationOverlayProps> = (
           {/* Subtle tint veil while post-capture analysis runs */}
           {state === 'analyzing' ? (
             <View
-              style={[StyleSheet.absoluteFill, { backgroundColor: veilColor }]}
+              style={[StyleSheet.absoluteFill, { backgroundColor: resolvedVeilColor }]}
             />
           ) : null}
 
@@ -337,7 +349,7 @@ export const ScannerAnimationOverlay: React.FC<ScannerAnimationOverlayProps> = (
                       left: 0,
                       width: cornerLength,
                       height: cornerLength,
-                      borderColor: accentColor,
+                      borderColor: resolvedAccentColor,
                       borderTopWidth: cornerThickness,
                       borderLeftWidth: cornerThickness,
                       borderTopLeftRadius: effectiveCornerRadius,
@@ -352,7 +364,7 @@ export const ScannerAnimationOverlay: React.FC<ScannerAnimationOverlayProps> = (
                       right: 0,
                       width: cornerLength,
                       height: cornerLength,
-                      borderColor: accentColor,
+                      borderColor: resolvedAccentColor,
                       borderTopWidth: cornerThickness,
                       borderRightWidth: cornerThickness,
                       borderTopRightRadius: effectiveCornerRadius,
@@ -367,7 +379,7 @@ export const ScannerAnimationOverlay: React.FC<ScannerAnimationOverlayProps> = (
                       left: 0,
                       width: cornerLength,
                       height: cornerLength,
-                      borderColor: accentColor,
+                      borderColor: resolvedAccentColor,
                       borderBottomWidth: cornerThickness,
                       borderLeftWidth: cornerThickness,
                       borderBottomLeftRadius: effectiveCornerRadius,
@@ -382,7 +394,7 @@ export const ScannerAnimationOverlay: React.FC<ScannerAnimationOverlayProps> = (
                       right: 0,
                       width: cornerLength,
                       height: cornerLength,
-                      borderColor: accentColor,
+                      borderColor: resolvedAccentColor,
                       borderBottomWidth: cornerThickness,
                       borderRightWidth: cornerThickness,
                       borderBottomRightRadius: effectiveCornerRadius,
@@ -396,7 +408,7 @@ export const ScannerAnimationOverlay: React.FC<ScannerAnimationOverlayProps> = (
               <Animated.View style={[styles.laserTrack, laserAnimatedStyle]}>
                 {renderLaser ? (
                   renderLaser({
-                    accentColor,
+                    accentColor: resolvedAccentColor,
                     state,
                     regionWidth: effectiveRegionWidth,
                   })
@@ -405,17 +417,17 @@ export const ScannerAnimationOverlay: React.FC<ScannerAnimationOverlayProps> = (
                     <View
                       style={[
                         styles.laserHaloOuter,
-                        { backgroundColor: accentColor },
+                        { backgroundColor: resolvedAccentColor },
                       ]}
                     />
                     <View
                       style={[
                         styles.laserHaloMid,
-                        { backgroundColor: accentColor },
+                        { backgroundColor: resolvedAccentColor },
                       ]}
                     />
                     <View
-                      style={[styles.laserCore, { backgroundColor: accentColor }]}
+                      style={[styles.laserCore, { backgroundColor: resolvedAccentColor }]}
                     >
                       <View style={styles.laserSpecular} />
                     </View>
@@ -430,18 +442,18 @@ export const ScannerAnimationOverlay: React.FC<ScannerAnimationOverlayProps> = (
                   renderStatusBadge({
                     statusLabel,
                     state,
-                    accentColor,
+                    accentColor: resolvedAccentColor,
                   })
                 ) : (
                   <View
                     style={[
                       styles.statusPill,
-                      { borderColor: accentColor },
+                      { borderColor: resolvedAccentColor },
                       statusContainerStyle,
                     ]}
                   >
                     <View
-                      style={[styles.statusDot, { backgroundColor: accentColor }]}
+                      style={[styles.statusDot, { backgroundColor: resolvedAccentColor }]}
                     />
                     <Text
                       style={[styles.statusText, statusTextStyle]}
