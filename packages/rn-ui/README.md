@@ -41,8 +41,8 @@ Comprehensive guides, component previews, prop tables, and interactive examples 
 
 ### Component Highlights (60 Primitives)
 
-- **Navigation & Structure**: `SideNavigation` (Gesture-dismiss drawer, compact rail, expanded sidebar, floating dock), `Tabs` (Compound TabView with animated indicator & fluid slide/scale transitions), `Breadcrumb`, `Pagination`, `Stepper`
-- **Overlays & Modals**: `Tooltip` (Collision-aware balloons with pointer arrows & tap-and-hold), `SpeedDial` (Expanding FAB with staggered actions), `Alert`, `AlertDialog`, `Toast`, `Popover`, `HoverCard`, `DropdownMenu`, `ContextMenu`
+- **Navigation & Structure**: `SideNavigation` (Strict-mode safe gesture-dismiss drawer, compact rail, expanded sidebar, floating dock), `Tabs` (Compound TabView with animated indicator & fluid slide/scale transitions), `Breadcrumb`, `Pagination`, `Stepper`
+- **Overlays & Modals**: `Tooltip` (Collision-aware balloons with pointer arrows & tap-and-hold), `SpeedDial` (Expanding FAB with staggered actions), `Alert`, `AlertDialog` (Portal overlay with zero-overflow flex action buttons & Android BackHandler support), `Toast`, `Popover`, `HoverCard`, `DropdownMenu`, `ContextMenu`
 - **Form Controls & Inputs**: `SearchBar` (Debounced input with clear & cancel transition), `Input`, `InputGroup`, `InputOTP`, `DatePicker`, `TimePicker`, `Textarea`, `Checkbox`, `RadioGroup`, `Switch`, `Slider`, `RangeSlider`, `SignaturePad`, `Rating`, `Select`, `Combobox`, `Label`, `FormField`
 - **Buttons & Actions**: `Button`, `IconButton`, `Chip`, `SegmentedControl`, `FloatingActionButton`
 - **Typography & Data**: `Text`, `Avatar`, `Badge`, `Item`, `SwipeableItem`, `Bubble`, `Attachment`, `DataList`, `MetricCard`, `Table`, `Timeline`, `Empty`

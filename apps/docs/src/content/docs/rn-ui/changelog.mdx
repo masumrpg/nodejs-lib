@@ -9,10 +9,30 @@ import ChangelogTimeline from '@/components/ChangelogTimeline.astro';
 
 export const releases = [
   {
+    version: 'v0.8.1',
+    date: '2026-11-23',
+    tag: 'AlertDialog Portal & Reanimated Strict Mode Stability Release',
+    isLatest: true,
+    changes: [
+      {
+        type: 'feat',
+        text: '<strong>AlertDialog Portal Layering & BackHandler</strong>: Upgraded <code>AlertDialog</code> to automatically mount via <code>Portal</code> (<code>layer="overlay"</code>) when available, falling back smoothly to <code>Modal</code>. Added native Android hardware back button dismissal listener.',
+      },
+      {
+        type: 'fix',
+        text: '<strong>AlertDialog Non-Scrollable Flex Body & Button Overflow</strong>: Changed <code>AlertDialog</code> body to clean flex layout by default (eliminating unwanted scrollbars and clipped text), with <code>scrollable={true}</code> opt-in. Resolved Yoga layout container calculation so action buttons remain 100% inside the card container across all theme presets.',
+      },
+      {
+        type: 'fix',
+        text: '<strong>SideNavigation Reanimated Strict Mode Compliance</strong>: Replaced direct shared value reading during render (<code>drawerAnim.value === 0</code>) with React state-driven unmounting via <code>useDelayedUnmount</code>, completely eliminating Reanimated runtime strict mode warnings.',
+      },
+    ],
+  },
+  {
     version: 'v0.8.0',
     date: '2026-11-23',
     tag: 'SideNavigation & Dual Themes Release',
-    isLatest: true,
+    isLatest: false,
     changes: [
       {
         type: 'feat',

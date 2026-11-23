@@ -201,6 +201,64 @@ describe("overlays, portals, toasts & anchored menus", () => {
     });
   });
 
+  it("renders AlertDialog via Portal by default and non-scrollable, with scrollable opt-in and modal fallback", () => {
+    const { container, unmount } = renderUI(
+      wrap(
+        React.createElement(AlertDialog, {
+          visible: true,
+          title: "Delete File",
+          description: "Are you sure you want to delete this file?",
+          confirmText: "Delete",
+          cancelText: "Cancel",
+          onConfirm: () => {},
+          onCancel: () => {},
+        }),
+      ),
+    );
+
+    expect(collectText(container)).toContain("Delete File");
+    expect(collectText(container)).toContain(
+      "Are you sure you want to delete this file?",
+    );
+    const scrollViews = findAllNodes(
+      container,
+      (n) => n.type === "rn-scrollview",
+    );
+    expect(scrollViews.length).toBe(0);
+    unmount();
+
+    const { container: scrollContainer, unmount: unmountScroll } = renderUI(
+      wrap(
+        React.createElement(AlertDialog, {
+          visible: true,
+          scrollable: true,
+          title: "Terms and Conditions",
+          description: "Long text here...",
+          confirmText: "Accept",
+        }),
+      ),
+    );
+    const scrollViewsWithScrollable = findAllNodes(
+      scrollContainer,
+      (n) => n.type === "rn-scrollview",
+    );
+    expect(scrollViewsWithScrollable.length).toBe(1);
+    unmountScroll();
+
+    const { container: modalContainer } = renderUI(
+      wrap(
+        React.createElement(AlertDialog, {
+          visible: true,
+          portal: false,
+          title: "Modal Fallback",
+          description: "Renders in native modal",
+        }),
+      ),
+    );
+    const modals = findAllNodes(modalContainer, (n) => n.type === "rn-modal");
+    expect(modals.length).toBe(1);
+  });
+
   it("preserves child disabled state in DropdownMenu and mounts Popover / Tooltip / HoverCard / ContextMenu", () => {
     const childPress = mock(() => {});
     const { container } = renderUI(
