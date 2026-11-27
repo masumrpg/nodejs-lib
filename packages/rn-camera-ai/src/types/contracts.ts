@@ -260,6 +260,114 @@ export interface DocumentAlignmentMetrics {
 }
 
 /**
+ * Source classifier contributing a cat breed prediction candidate.
+ */
+export type CatBreedSource = 'breed67' | 'oxford12' | 'ensemble';
+
+/**
+ * Ranked cat breed classification prediction with confidence score.
+ */
+export interface CatBreedCandidate {
+  /** Human-readable cat breed or coat pattern label */
+  breed: string;
+  /** Softmax probability / confidence score in [0, 1] */
+  confidence: number;
+  /** Source model engine that produced this candidate */
+  source: CatBreedSource;
+}
+
+/**
+ * Synthesized feline affective mood state inferred from CatFACS geometry.
+ */
+export type CatMoodState =
+  | 'calm_affectionate'
+  | 'alert_curious'
+  | 'playful_hunting'
+  | 'annoyed_defensive'
+  | 'vocalizing'
+  | 'sleepy';
+
+/**
+ * Feline facial Action Unit (CatFACS) geometry & affective mood telemetry computed from 48 CatFLW landmarks.
+ */
+export interface CatFACSMetrics {
+  /** Average eye height vs inter-ocular width ratio */
+  eyeApertureRatio: number;
+  /** True when eye aperture narrows gently (squint / affectionate slow blink) */
+  isSlowBlinking: boolean;
+  /** Ear tip vertical elevation normalized by face height */
+  earElevationRatio: number;
+  /** Horizontal flare ratio across both ears */
+  earSpreadRatio: number;
+  /** True when ears flatten / swivel sideways ("airplane ears" defensive/annoyed signal) */
+  isAirplaneEars: boolean;
+  /** Vertical mouth/chin opening relative to muzzle width */
+  mouthOpenRatio: number;
+  /** True when cat mouth indicates active meowing, hissing, or yawning */
+  isVocalizing: boolean;
+  /** Head roll tilt angle in degrees across outer eye corners */
+  headTiltDeg: number;
+  /** Categorized feline mood state */
+  mood: CatMoodState;
+  /** Human-readable mood headline */
+  moodLabel: string;
+  /** Confidence in inferred mood state in [0, 1] */
+  moodConfidence: number;
+}
+
+/**
+ * Dominant fur color cluster extracted from segmented cat coat pixels.
+ */
+export interface CatCoatSwatch {
+  /** Hex color swatch representing fur cluster centroid */
+  hex: string;
+  /** Descriptive feline coat color label (e.g. 'Orange / Ginger', 'Charcoal Black') */
+  name: string;
+  /** Percentage of foreground cat pixels belonging to this swatch [0, 100] */
+  percentage: number;
+}
+
+/**
+ * Compact downsampled semantic cat segmentation summary from DeepLabV3 (PASCAL VOC class 8).
+ */
+export interface CatSegmentationSummary {
+  /** Grid width in cells */
+  maskWidth: number;
+  /** Grid height in cells */
+  maskHeight: number;
+  /** Flattened mask probabilities/flags in [0, 1] with length maskWidth * maskHeight */
+  foregroundMask: number[];
+  /** Fraction of frame pixels occupied by cat class [0, 1] */
+  coverageRatio: number;
+  /** Tight normalized bounding box enveloping foreground cat pixels */
+  tightBounds?: BoundingBox;
+}
+
+/**
+ * Structured multi-model feline analysis metadata attached to cat detections.
+ */
+export interface CatDetectionMetadata {
+  /** Confirmed cat detection flag */
+  isCat: boolean;
+  /** Tight localized cat face bounding box [0, 1] inside the frame */
+  faceBoundingBox?: BoundingBox;
+  /** Top ranked breed predictions with EMA temporal smoothing */
+  topBreeds: CatBreedCandidate[];
+  /** Real-time CatFACS ear/eye/mouth mood telemetry */
+  moodMetrics?: CatFACSMetrics;
+  /** Top segmented fur coat color swatches */
+  coatSwatches?: CatCoatSwatch[];
+  /** Inferred coat pattern classification (e.g. 'Tabby / Striped', 'Calico', 'Tuxedo') */
+  coatPattern?: string;
+  /** Contextual scene cues detected by COCO SSD around the cat */
+  sceneContextTags?: string[];
+  /** DeepLabV3 cat segmentation mask summary */
+  segmentation?: CatSegmentationSummary;
+  /** Frame clarity & lighting optimality score [0, 100] for Cat Passport photo capture */
+  shotOptimalityScore?: number;
+}
+
+/**
  * Standard detection result returned by a camera processor.
  */
 export interface DetectionResult {
@@ -283,6 +391,8 @@ export interface DetectionResult {
   ocr?: OcrDetectionMetadata;
   /** Optional background worklet document alignment & framing metrics */
   documentAlignment?: DocumentAlignmentMetrics;
+  /** Optional multi-model feline detection, breed, mood, segmentation, and coat telemetry */
+  cat?: CatDetectionMetadata;
   /** Optional raw vendor inference data */
   raw?: unknown;
 }

@@ -25,9 +25,11 @@ Provides worklet-safe, GPU-accelerated on-device machine learning inference for 
   - Real-time identity matching against stored embedding profiles with configurable cosine similarity threshold.
 - **🔄 Universal Asset Resolution**:
   - Supports Metro asset bundles (`require('./model.tflite')`), local filesystem URIs (`file:///...`), and remote URLs (`https://...`).
-- **🛡️ Worklet-Safe Execution**:
+- **Worklet-Safe Execution**:
   - Implements the `CameraProcessor` interface from `@masumdev/rn-camera-ai`.
   - Runs in dedicated background worklet threads with zero garbage collection spikes and 0% JS-thread lag.
+- **Multi-Model Cat Vision (`createTFLiteCatAnalyzer`)**:
+  - Staggered 6-model feline pipeline (COCO SSD cat gate + Close-Up Fallback, Dual 67 + Oxford-12 Breed Ensemble, 2-stage 48-pt CatFLW face mesh & CatFACS mood, DeepLabV3 class-8 segmentation + fur coat color swatches, and 1-tap 96-D Cat ID).
 
 ---
 
@@ -367,6 +369,35 @@ Exported for building custom inference loops or testing:
   Computes hybrid Active + Passive face liveness and anti-spoofing telemetry inside a worklet.
 - **`cosineSimilarity(vectorA, vectorB): number`**  
   Computes the dot product of two L2-normalized embedding vectors in range `[-1.0, 1.0]`.
+
+---
+
+## Multi-Model Cat Vision Analyzer (`createTFLiteCatAnalyzer`)
+
+Orchestrates up to 6 staggered on-device `.tflite` models inside a single worklet `CameraProcessor`:
+
+- **`detectorModel`**: COCO SSD species & scene context gate (`detect.tflite`) with optional DeepLab/Oxford-12 **Close-Up Fallback**.
+- **`breed67Model` & `breed12Model`**: Dual breed classifiers fused with Exponential Moving Average (EMA) smoothing (`'ensemble' | '67' | '12'`).
+- **`catFaceLocalizerModel` & `catFaceLandmarksModel`**: 2-stage tight face ROI localization (letterboxed 224x224) + 48-point CatFLW keypoints (384x384) driving `CatFACSMetrics` (slow-blink, airplane ears, vocalizing, head tilt). *(Note: CatFLW weights are typically distributed under CC BY-NC 4.0 for non-commercial use while this library package remains MIT.)*
+- **`segmentationModel`**: MediaPipe DeepLab-V3 (257x257, Pascal VOC class `8 = cat`) generating a downsampled silhouette mask, dominant fur hex swatches, coat pattern classification, and shot optimality score.
+- **1-Tap Cat ID**: `enrollLastDetectedCat(name, breedHint)` captures a 96-D L2-normalized descriptor matching cats across sessions via cosine similarity.
+
+```tsx
+const analyzer = await createTFLiteCatAnalyzer({
+  detectorModel: require('./assets/models/detect.tflite'),
+  detectorLabels: COCO_91_LABELS,
+  detectorLabelOffset: 1,
+  breed67Model: require('./assets/models/cat_breed_67.tflite'),
+  breed67Labels: CAT_BREED_67_LABELS,
+  breed12Model: require('./assets/models/cat_breed_oxford12.tflite'),
+  breed12Labels: CAT_BREED_12_LABELS,
+  catFaceLocalizerModel: require('./assets/models/cat_face_localizer.tflite'),
+  catFaceLandmarksModel: require('./assets/models/cat_face_landmarks_full.tflite'),
+  segmentationModel: require('./assets/models/deeplab_v3.tflite'),
+  initialMode: 'all',
+  initialBreedEngine: 'ensemble',
+});
+```
 
 ---
 

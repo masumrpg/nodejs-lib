@@ -405,3 +405,17 @@ const styles = StyleSheet.create({
 });
 ```
 
+---
+
+## Multi-Model Cat Vision Analyzer (`createTFLiteCatAnalyzer`)
+
+`@masumdev/rn-camera-ai-tflite` includes a 6-model staggered feline vision pipeline powering the `/cat-scanner` showcase in `apps/expo-native`:
+
+1. **Species Gate & Scene Context (`detect.tflite`)**: Verifies confirmed cat bounding boxes while extracting companion environmental cues (`couch`, `bowl`, `bed`, `person`, `bird`). Includes an optional **Close-Up Portrait Fallback** gated by DeepLab & Oxford-12 when tight close-ups obscure full body bounds.
+2. **Dual Breed Ensemble (`breed67Model` + `breed12Model`)**: Combines a 67-class Float32 model with an Oxford-12 Uint8 model via Exponential Moving Average (EMA) temporal smoothing (`setBreedEngine('ensemble' | '67' | '12')`).
+3. **2-Stage 48-Point CatFLW Landmarks & CatFACS Mood**: Runs letterboxed feline face localization (`cat_face_localizer.tflite`, 224x224) and 48-point landmark regression (`cat_face_landmarks_full.tflite`, 384x384). `<DetectionOverlay />` renders anatomical ear, eye, nose, and chin contours alongside `CatFACSMetrics` (slow-blink, airplane ears, vocalizing, head tilt).
+4. **DeepLab-V3 Cat Segmentation & Fur Swatches (`segmentationModel`)**: Extracts Pascal VOC class `8` (`cat`) from DeepLab-V3 (257x257) into `CatDetectionMetadata.segmentation`, dominant fur coat swatches (`coatSwatches`), `coatPattern`, and `shotOptimalityScore`.
+5. **1-Tap Cat ID (`enrollLastDetectedCat`)**: Computes a 96-D L2-normalized descriptor combining fur color histograms and landmark geometry for real-time cosine similarity matching.
+
+> **Note on Optional CatFLW Model Licenses**: If bundling CatFLW face localizer / 48-pt landmark models (`cat_face_localizer.tflite`, `cat_face_landmarks_full.tflite`) in your app, verify upstream **CC BY-NC 4.0** terms (non-commercial demo/research use). The TypeScript code inside `@masumdev/rn-camera-ai` and `@masumdev/rn-camera-ai-tflite` remains MIT licensed.
+
