@@ -9,10 +9,38 @@ import ChangelogTimeline from '@/components/ChangelogTimeline.astro';
 
 export const releases = [
   {
-    version: 'v0.4.0',
-    date: '2026-11-23',
+    version: 'v0.5.0',
+    date: '2026-11-27',
     tag: 'Latest Release',
     isLatest: true,
+    changes: [
+      {
+        type: 'feat',
+        text: 'Added structured feline computer vision types (<code>CatDetectionMetadata</code>, <code>CatBreedCandidate</code>, <code>CatFACSMetrics</code>, <code>CatCoatSwatch</code>, <code>CatSegmentationSummary</code>) to <code>@masumdev/rn-camera-ai</code>.',
+      },
+      {
+        type: 'feat',
+        text: 'Extended worklet-side <code>&lt;DetectionOverlay /&gt;</code> wireframe rendering to automatically detect 48-point CatFLW feline facial landmarks and draw ear, almond-eye, nose, and muzzle contours.',
+      },
+      {
+        type: 'feat',
+        text: 'Published <code>createTFLiteCatAnalyzer()</code> and worklet <code>catParser</code> utilities in <code>@masumdev/rn-camera-ai-tflite</code> supporting staggered 6-model execution: COCO SSD cat gating with Close-Up Fallback, Dual 67+12 EMA Breed Ensemble, 48-pt CatFLW Mood, DeepLabV3 class-8 segmentation + coat swatches, and 1-Tap 96-D Cat ID.',
+      },
+      {
+        type: 'feat',
+        text: 'Added interactive <strong>Cat AI Studio</strong> (<code>/cat-scanner</code>) playground screen with Passport capture & share in <code>apps/expo-native</code> themed by <code>@masumdev/rn-ui</code>.',
+      },
+      {
+        type: 'fix',
+        text: 'Fixed critical npm packaging & peer dependency conflicts across <code>@masumdev/rn-camera-ai</code> (v0.5.0), <code>@masumdev/rn-camera-ai-tflite</code> (v0.2.0), and <code>@masumdev/rn-camera-ai-mlkit</code> (v0.1.1): removed leaked <code>workspace:*</code> from adapter <code>dependencies</code>, relaxed <code>react-native-worklets</code> to <code>*</code> and <code>react-native-nitro-modules</code> to <code>&gt;=0.37.0</code> for Reanimated 4.8+ / Worklets 0.14+ compatibility, and corrected <code>peerDependenciesMeta</code> required flags.',
+      },
+    ],
+  },
+  {
+    version: 'v0.4.0',
+    date: '2026-11-23',
+    tag: 'Feature Release',
+    isLatest: false,
     changes: [
       {
         type: 'feat',

@@ -1,6 +1,6 @@
 {
   "name": "@masumdev/rn-camera-ai",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Unified React Native camera preview, on-device AI inference, and real-time bounding box overlay.",
   "main": "lib/commonjs/index.js",
   "module": "lib/module/index.js",
@@ -67,23 +67,17 @@
   "peerDependencies": {
     "react": ">=18",
     "react-native": "*",
-    "react-native-nitro-modules": "^0.37.0",
+    "react-native-nitro-modules": ">=0.37.0",
     "react-native-reanimated": "*",
     "react-native-vision-camera": ">=5.0.0",
     "react-native-vision-camera-worklets": ">=5.0.0",
-    "react-native-worklets": "0.13.x"
+    "react-native-worklets": "*"
   },
   "peerDependenciesMeta": {
     "react-native-nitro-modules": {
       "optional": true
     },
-    "react-native-reanimated": {
-      "optional": true
-    },
     "react-native-vision-camera-worklets": {
-      "optional": true
-    },
-    "react-native-worklets": {
       "optional": true
     }
   },

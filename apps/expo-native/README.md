@@ -16,7 +16,12 @@ apps/expo-native/
 │   ├── object-detection.tsx   # MobileNet SSD object detection & live styling
 │   ├── face-recognition.tsx   # 468 Face Mesh + MobileFaceNet face recognition
 │   ├── liveness-detection.tsx # Hybrid Active + Passive Liveness & e-KYC Wizard
-│   └── ocr-scanner.tsx        # Single-Capture Smart Document OCR & Entity Extraction
+│   ├── ocr-scanner.tsx        # Single-Capture Smart Document OCR & Entity Extraction
+│   └── cat-scanner.tsx        # Multi-Model Cat AI Studio (Breed, Mood, Seg, Cat ID)
+├── src/
+│   └── constants/
+│       ├── cocoLabels.ts      # COCO SSD label map
+│       └── catLabels.ts       # 67+12 Cat Breed catalogs & trait summaries
 └── assets/
     └── models/                # Bundled local TFLite neural network models
 ```
@@ -61,19 +66,34 @@ apps/expo-native/
 - Uses zero-OCR background YUV paper corner detection (`createDocumentAlignmentProcessor`) with live 4-corner `DocumentQuad` tracking and capture optimality scoring, running Google ML Kit v2 (`@masumdev/rn-camera-ai-mlkit`) once after capture during Reanimated 4 laser animation.
 - Post-capture review provides automatic **Fit Paper Zoom** (`Fit Zoom` / `1x Full`), clean non-obscuring text highlights (or collision-free `Smart Tags` via `avoidLabelOverlap`), tap-to-inspect selected box banners, an expandable **Full Text Reader (`Baca Penuh`)**, live **Granularity** switching (`Line`, `Block`, `Word`), `Studio` / `Emerald` / custom UI theme presets, and structured extraction chips (`NIK / KTP`, `Phone`, `Email`, `URL`, `Rp / Currency`) with 1-tap Share / Export.
 
+### 6. Multi-Model Cat AI Studio & Breed Analyzer (`/cat-scanner`)
+- **6-Model Cooperative On-Device Feline Pipeline (`createTFLiteCatAnalyzer`)**:
+  1. **COCO SSD Cat Gate (`detect.tflite`)**: Isolates confirmed feline subjects and companion scene context cues (`couch`, `bowl`, `bed`, `bird`, `person`). Includes an automatic **Close-Up Portrait Fallback** gated by DeepLab & Oxford-12 when macro framing obscures the body silhouette.
+  2. **Dual Breed Ensemble (`cat_breed_67.tflite` + `cat_breed_oxford12.tflite`)**: Fuses 67 fine-grained breeds/coat archetypes (plus Indonesian *Kucing Kampung* domestic lineage badges) with Oxford-IIIT 12-breed classification using EMA temporal smoothing across live ticks.
+  3. **2-Stage CatFLW 48-Point Mesh & CatFACS Mood (`cat_face_localizer.tflite` -> `cat_face_landmarks_full.tflite`)**: Projects an anatomical 48-point feline face wireframe (ears, almond eyes, nose triangle, mouth/whiskers) and classifies affectionate slow-blink, airplane ears, vocalizing/meow, and curious head tilt.
+  4. **DeepLabV3 Segmentation & Fur Palette (`deeplab_v3.tflite`)**: Masks PASCAL VOC class `8` (`cat`) into a 24x24 foreground grid, clusters top coat colors with hex swatches, and infers patterns (`Ginger / Oyen`, `Calico / Tricolor`, `Tuxedo`, `Tabby`).
+  5. **1-Tap Cat ID & Cat Passport**: Enrolls custom cat profiles (96-D L2-normalized descriptor matching) and captures shareable Passport snapshots using `@masumdev/rn-ui` tokens.
+
 ---
 
 ## Bundled TFLite Models
 
 All neural network models are pre-bundled in `assets/models/`:
 
-| File | Size | Architecture | Resolution | Purpose |
+| File | Size | Architecture / Source | Resolution | Purpose & License |
 | :--- | :---: | :--- | :---: | :--- |
-| `detect.tflite` | ~4.3 MB | MobileNet SSD v1 | 300×300 | 80-Class COCO Object Detection |
-| `face_detection_full_range.tflite` | ~900 KB | BlazeFace Full-Range | 192×192 | 896-Anchor Face Detection |
-| `face_landmark.tflite` | ~5.2 MB | MediaPipe FaceMesh | 192×192 | 468-Point 3D Facial Keypoints |
-| `mobilefacenet.tflite` | ~4.0 MB | MobileFaceNet | 112×112 | 192-D Biometric Face Embeddings |
+| `detect.tflite` | ~4.3 MB | MobileNet SSD v1 | 300x300 | 80-Class COCO Object Detection (Apache 2.0) |
+| `face_detection_full_range.tflite` | ~900 KB | BlazeFace Full-Range | 192x192 | 896-Anchor Face Detection (Apache 2.0) |
+| `face_landmark.tflite` | ~5.2 MB | MediaPipe FaceMesh | 192x192 | 468-Point 3D Facial Keypoints (Apache 2.0) |
+| `mobilefacenet.tflite` | ~4.0 MB | MobileFaceNet | 112x112 | 192-D Biometric Face Embeddings (MIT / Apache 2.0) |
+| `cat_breed_67.tflite` | ~2.2 MB | MobileNetV2 67-Class + `cat_breed_67_labels.txt` | 224x224 | 67-Class Feline Breed & Coat Classifier |
+| `cat_breed_oxford12.tflite` | ~5.9 MB | MobileNet Quantized + `cat_breed_12_labels.txt` | 224x224 | 12-Class Oxford-IIIT Cat Breed Classifier |
+| `deeplab_v3.tflite` | ~2.8 MB | MediaPipe DeepLab-V3 | 257x257 | Semantic Segmentation, Class 8 = Cat (Apache 2.0) |
+| `cat_face_localizer.tflite` | ~17.2 MB | CatFLW YOLOv8n Export (Letterboxed) | 224x224 | Tight Feline Face Bounding Box (CC BY-NC 4.0) |
+| `cat_face_landmarks_full.tflite` | ~11.6 MB | CatFLW-Full 48-Pt Estimator | 384x384 | 48-Point Feline Face Landmarks (CC BY-NC 4.0) |
 | `labelmap.txt` | ~1.5 KB | Plain Text | N/A | 80 COCO Category Labels |
+
+> **Research & Model Attribution Note**: The CatFLW face localizer and 48-point landmark weights (`cat_face_localizer.tflite` and `cat_face_landmarks_full.tflite`) are bundled in `apps/expo-native` for non-commercial demo & evaluation purposes under **CC BY-NC 4.0**. `@masumdev/*` TypeScript library code remains **MIT**.
 
 ---
 

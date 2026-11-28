@@ -10,6 +10,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Box,
+  Cat,
   ChevronRight,
   Compass,
   Cpu,
@@ -64,6 +65,10 @@ export default function CameraAIFeatureMenuScreen(): React.JSX.Element {
 
   const handleOpenOcrScanner = () => {
     router.push("/ocr-scanner");
+  };
+
+  const handleOpenCatScanner = () => {
+    router.push("/cat-scanner");
   };
 
   const handleToggleColorScheme = () => {
@@ -770,6 +775,113 @@ export default function CameraAIFeatureMenuScreen(): React.JSX.Element {
             >
               <Text style={[styles.bulletChipText, { color: theme.colors.text }]}>
                 Theme Overlays
+              </Text>
+            </View>
+          </View>
+        </Pressable>
+
+        {/* Feature 5: Multi-Model Cat AI Studio */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open Multi-Model Cat AI Studio Camera"
+          onPress={handleOpenCatScanner}
+          style={({ pressed }) => [
+            styles.featureCard,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+              borderWidth,
+              borderRadius: cardRadius,
+            },
+            pressed && styles.pressedState,
+          ]}
+        >
+          <View style={styles.cardHeaderRow}>
+            <View
+              style={[
+                styles.featureIconWrap,
+                {
+                  backgroundColor: `${theme.colors.accent}18`,
+                  borderColor: theme.colors.accent,
+                  borderWidth: isMinimal ? 0 : 1,
+                  borderRadius: cardRadius * 0.7,
+                },
+              ]}
+            >
+              <Cat size={22} color={theme.colors.accent} />
+            </View>
+            <View style={styles.cardTitleGroup}>
+              <View style={styles.cardTagRow}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.modelTag, { color: theme.colors.accent }]}
+                >
+                  6 TFLITE MODELS · FELINE VISION AI
+                </Text>
+                <Text
+                  style={[
+                    styles.resolutionTag,
+                    {
+                      backgroundColor: theme.colors.surfaceRaised ?? theme.colors.surface,
+                      color: theme.colors.textMuted,
+                      borderRadius: 4,
+                    },
+                  ]}
+                >
+                  67+12 BREEDS
+                </Text>
+              </View>
+              <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+                Cat AI Studio &amp; Breed Analyzer
+              </Text>
+            </View>
+            <ChevronRight size={20} color={theme.colors.textMuted} />
+          </View>
+
+          <Text style={[styles.cardDescription, { color: theme.colors.textMuted }]}>
+            Pipeline 6 neural network untuk kucing: deteksi ras ensemble (67 +
+            Oxford 12), 48-point CatFLW facial wireframe &amp; mood CatFACS,
+            segmentasi DeepLabV3 + warna bulu, hingga 1-Tap Cat ID &amp; Passport.
+          </Text>
+
+          <View style={styles.featureBulletsRow}>
+            <View
+              style={[
+                styles.bulletChip,
+                {
+                  backgroundColor: theme.colors.surfaceRaised ?? theme.colors.surface,
+                  borderRadius: pillRadius,
+                },
+              ]}
+            >
+              <Text style={[styles.bulletChipText, { color: theme.colors.text }]}>
+                67+12 Breed Ensemble
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.bulletChip,
+                {
+                  backgroundColor: theme.colors.surfaceRaised ?? theme.colors.surface,
+                  borderRadius: pillRadius,
+                },
+              ]}
+            >
+              <Text style={[styles.bulletChipText, { color: theme.colors.text }]}>
+                48-Pt Mesh &amp; Mood
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.bulletChip,
+                {
+                  backgroundColor: theme.colors.surfaceRaised ?? theme.colors.surface,
+                  borderRadius: pillRadius,
+                },
+              ]}
+            >
+              <Text style={[styles.bulletChipText, { color: theme.colors.text }]}>
+                Seg &amp; Cat Passport
               </Text>
             </View>
           </View>

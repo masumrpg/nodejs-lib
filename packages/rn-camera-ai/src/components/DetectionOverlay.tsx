@@ -268,6 +268,74 @@ const KEY_MESH_VERTEX_INDICES: readonly number[] = [
   251, 284, 332, 297, 338, 151, 9, 50, 280, 205, 425,
 ];
 
+/**
+ * Canonical CatFLW 48-Point Cat Facial Landmark anatomical clusters.
+ */
+const CAT_RIGHT_EYE_INDICES: readonly number[] = [3, 4, 5, 6, 7, 36, 37, 38];
+const CAT_LEFT_EYE_INDICES: readonly number[] = [1, 8, 9, 10, 11, 39, 40, 41];
+const CAT_RIGHT_EAR_INDICES: readonly number[] = [22, 23, 24, 25, 26];
+const CAT_LEFT_EAR_INDICES: readonly number[] = [27, 28, 29, 30, 31];
+const CAT_NOSE_INDICES: readonly number[] = [12, 13, 14, 15, 32, 33, 34, 35, 42, 43, 44, 45];
+const CAT_MOUTH_CHIN_INDICES: readonly number[] = [0, 2, 16, 17, 18, 19, 20, 21, 46, 47];
+const CAT_HIGHLIGHT_EYE_SET: readonly number[] = [4, 8, 36, 37, 38, 39, 40, 41];
+
+function appendOrderedLoopSegments(
+  target: ProjectedMeshSegment[],
+  points: PixelFaceLandmark[],
+  indices: readonly number[],
+  prefix: string,
+  color: string,
+  thickness: number,
+  closed = true
+): void {
+  'worklet';
+  const valid: PixelFaceLandmark[] = [];
+  let sumX = 0;
+  let sumY = 0;
+  for (let i = 0; i < indices.length; i++) {
+    const pt = points[indices[i]];
+    if (pt) {
+      valid.push(pt);
+      sumX += pt.x;
+      sumY += pt.y;
+    }
+  }
+  if (valid.length < 2) {
+    return;
+  }
+  const cx = sumX / valid.length;
+  const cy = sumY / valid.length;
+  const withAngles = valid.map((pt) => ({
+    pt,
+    angle: Math.atan2(pt.y - cy, pt.x - cx),
+  }));
+  withAngles.sort((a, b) => a.angle - b.angle);
+
+  const count = withAngles.length;
+  const edgeLimit = closed ? count : count - 1;
+  for (let i = 0; i < edgeLimit; i++) {
+    const a = withAngles[i].pt;
+    const b = withAngles[(i + 1) % count].pt;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len >= 0.5) {
+      const angleRad = Math.atan2(dy, dx);
+      const midX = (a.x + b.x) / 2;
+      const midY = (a.y + b.y) / 2;
+      target.push({
+        key: `${prefix}-${i}`,
+        left: midX - len / 2,
+        top: midY - thickness / 2,
+        width: len,
+        height: thickness,
+        color,
+        angleRad,
+      });
+    }
+  }
+}
+
 function appendProjectedPolyline(
   target: ProjectedMeshSegment[],
   points: PixelFaceLandmark[],
@@ -330,6 +398,7 @@ export function projectDetectionsWorklet(
 
     const landmarks = detection.landmarks;
     const isDenseFaceMesh = Array.isArray(landmarks) && landmarks.length >= 468;
+    const isCatFaceMesh = Array.isArray(landmarks) && landmarks.length === 48;
 
     const meshSegments: ProjectedMeshSegment[] = [];
     const meshDots: ProjectedMeshDot[] = [];
@@ -463,6 +532,84 @@ export function projectDetectionsWorklet(
                 borderWidth: 0,
               });
             }
+          }
+        }
+      } else if (isCatFaceMesh) {
+        if (config.showMeshLines) {
+          appendOrderedLoopSegments(
+            meshSegments,
+            pixelPoints,
+            CAT_RIGHT_EAR_INDICES,
+            'cat-rear',
+            config.eyebrowContourColor,
+            1.8 * config.lineScale,
+            true
+          );
+          appendOrderedLoopSegments(
+            meshSegments,
+            pixelPoints,
+            CAT_LEFT_EAR_INDICES,
+            'cat-lear',
+            config.eyebrowContourColor,
+            1.8 * config.lineScale,
+            true
+          );
+          appendOrderedLoopSegments(
+            meshSegments,
+            pixelPoints,
+            CAT_RIGHT_EYE_INDICES,
+            'cat-reye',
+            config.eyeContourColor,
+            1.8 * config.lineScale,
+            true
+          );
+          appendOrderedLoopSegments(
+            meshSegments,
+            pixelPoints,
+            CAT_LEFT_EYE_INDICES,
+            'cat-leye',
+            config.eyeContourColor,
+            1.8 * config.lineScale,
+            true
+          );
+          appendOrderedLoopSegments(
+            meshSegments,
+            pixelPoints,
+            CAT_NOSE_INDICES,
+            'cat-nose',
+            config.noseContourColor,
+            1.5 * config.lineScale,
+            true
+          );
+          appendOrderedLoopSegments(
+            meshSegments,
+            pixelPoints,
+            CAT_MOUTH_CHIN_INDICES,
+            'cat-mouth',
+            config.lipOuterContourColor,
+            1.5 * config.lineScale,
+            false
+          );
+        }
+
+        if (config.showDots) {
+          for (let lmIdx = 0; lmIdx < pixelPoints.length; lmIdx++) {
+            const pt = pixelPoints[lmIdx];
+            const isEyePt = CAT_HIGHLIGHT_EYE_SET.indexOf(lmIdx) !== -1;
+            const radius = isEyePt
+              ? config.eyeDotRadius
+              : Math.max(2.2, config.denseMeshDotRadius * 1.25);
+            meshDots.push({
+              key: `${detection.id}-cat-lm-${lmIdx}`,
+              point: pt,
+              index: lmIdx,
+              left: pt.x - radius,
+              top: pt.y - radius,
+              size: radius * 2,
+              radius,
+              color: isEyePt ? config.eyeDotColor : config.landmarkColor,
+              borderWidth: 0,
+            });
           }
         }
       } else if (config.showDots) {

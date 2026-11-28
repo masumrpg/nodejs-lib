@@ -1,6 +1,6 @@
 {
   "name": "@masumdev/rn-camera-ai-tflite",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "TensorFlow Lite object detection adapter for @masumdev/rn-camera-ai using react-native-fast-tflite.",
   "main": "lib/commonjs/index.js",
   "module": "lib/module/index.js",
@@ -50,12 +50,10 @@
   "bugs": {
     "url": "https://github.com/masumrpg/nodejs-lib/issues"
   },
-  "dependencies": {
-    "@masumdev/rn-camera-ai": "workspace:*"
-  },
   "devDependencies": {
     "@babel/core": "^7.25.0",
     "@babel/preset-env": "^7.25.0",
+    "@masumdev/rn-camera-ai": "workspace:*",
     "@react-native/babel-preset": "^0.86.0",
     "@types/react": "~19.3.0",
     "react-native-builder-bob": "^0.43.0",
@@ -67,19 +65,16 @@
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
-    "@masumdev/rn-camera-ai": "*",
+    "@masumdev/rn-camera-ai": ">=0.5.0",
     "react": ">=18",
     "react-native": "*",
     "react-native-fast-tflite": ">=3.0.0",
     "react-native-nitro-image": "*",
-    "react-native-nitro-modules": "^0.37.0",
+    "react-native-nitro-modules": ">=0.37.0",
     "react-native-vision-camera": ">=5.0.0",
-    "react-native-worklets": "0.13.x"
+    "react-native-worklets": "*"
   },
   "peerDependenciesMeta": {
-    "react-native-fast-tflite": {
-      "optional": true
-    },
     "react-native-nitro-image": {
       "optional": true
     },
