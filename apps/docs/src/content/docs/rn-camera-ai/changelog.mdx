@@ -30,6 +30,10 @@ export const releases = [
         type: 'feat',
         text: 'Added interactive <strong>Cat AI Studio</strong> (<code>/cat-scanner</code>) playground screen with Passport capture & share in <code>apps/expo-native</code> themed by <code>@masumdev/rn-ui</code>.',
       },
+      {
+        type: 'fix',
+        text: 'Fixed critical npm packaging & peer dependency conflicts across <code>@masumdev/rn-camera-ai</code> (v0.5.0), <code>@masumdev/rn-camera-ai-tflite</code> (v0.2.0), and <code>@masumdev/rn-camera-ai-mlkit</code> (v0.1.1): removed leaked <code>workspace:*</code> from adapter <code>dependencies</code>, relaxed <code>react-native-worklets</code> to <code>*</code> and <code>react-native-nitro-modules</code> to <code>&gt;=0.37.0</code> for Reanimated 4.8+ / Worklets 0.14+ compatibility, and corrected <code>peerDependenciesMeta</code> required flags.',
+      },
     ],
   },
   {

@@ -1,4 +1,5 @@
-import { readdirSync, existsSync, readFileSync } from "node:fs";
+import { readdirSync, existsSync, readFileSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -21,6 +22,86 @@ interface PackageMeta {
   name: string;
   version: string;
   path: string;
+  internalRefs: string[];
+}
+
+interface PackageManifestLike {
+  name?: string;
+  version?: string;
+  private?: boolean;
+  dependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+}
+
+function validatePublishableManifest(pkgPath: string): string[] {
+  const pkgJsonPath = join(pkgPath, "package.json");
+  const manifest = JSON.parse(readFileSync(pkgJsonPath, "utf-8")) as PackageManifestLike;
+  return findWorkspaceProtocolViolations(manifest);
+}
+
+function findWorkspaceProtocolViolations(manifest: PackageManifestLike): string[] {
+  const violations: string[] = [];
+  const fields: Array<keyof Pick<PackageManifestLike, "dependencies" | "peerDependencies" | "optionalDependencies">> = [
+    "dependencies",
+    "peerDependencies",
+    "optionalDependencies",
+  ];
+
+  for (const field of fields) {
+    const map = manifest[field];
+    if (!map) continue;
+    for (const [depName, range] of Object.entries(map)) {
+      if (typeof range === "string" && range.startsWith("workspace:")) {
+        violations.push(`${field}.${depName} = "${range}"`);
+      }
+    }
+  }
+
+  return violations;
+}
+
+function sortDecisionsTopologically(decisions: PublishDecision[]): PublishDecision[] {
+  const byName = new Map<string, PublishDecision>();
+  for (const d of decisions) {
+    byName.set(d.meta.name, d);
+  }
+
+  const visited = new Set<string>();
+  const visiting = new Set<string>();
+  const ordered: PublishDecision[] = [];
+
+  const visit = (item: PublishDecision): void => {
+    if (visited.has(item.meta.name) || visiting.has(item.meta.name)) return;
+    visiting.add(item.meta.name);
+    for (const depName of item.meta.internalRefs) {
+      const depDecision = byName.get(depName);
+      if (depDecision) {
+        visit(depDecision);
+      }
+    }
+    visiting.delete(item.meta.name);
+    visited.add(item.meta.name);
+    ordered.push(item);
+  };
+
+  const deterministic = [...decisions].sort((a, b) => a.meta.name.localeCompare(b.meta.name));
+  for (const d of deterministic) {
+    visit(d);
+  }
+  return ordered;
+}
+
+function inspectPackedTarballManifest(tarballPath: string): string[] {
+  const tarResult = spawnSync("tar", ["-xOf", tarballPath, "package/package.json"], {
+    encoding: "utf-8",
+  });
+  if (tarResult.status !== 0 || !tarResult.stdout) {
+    return [`Failed to inspect packed manifest in ${tarballPath}`];
+  }
+  const manifest = JSON.parse(tarResult.stdout) as PackageManifestLike;
+  return findWorkspaceProtocolViolations(manifest);
 }
 
 interface PublishDecision {
@@ -108,17 +189,21 @@ function getCandidatePackages(): PackageMeta[] {
       const pkgJsonPath = join(PACKAGES_DIR, entry.name, "package.json");
       if (existsSync(pkgJsonPath)) {
         try {
-          const pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf-8")) as {
-            name?: string;
-            version?: string;
-            private?: boolean;
-          };
+          const pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf-8")) as PackageManifestLike;
           if (pkgJson.name && pkgJson.version && !pkgJson.private) {
+            const internalRefs = Array.from(
+              new Set<string>([
+                ...Object.keys(pkgJson.dependencies ?? {}),
+                ...Object.keys(pkgJson.peerDependencies ?? {}),
+                ...Object.keys(pkgJson.devDependencies ?? {}),
+              ])
+            );
             pkgs.push({
               folder: entry.name,
               name: pkgJson.name,
               version: pkgJson.version,
               path: join(PACKAGES_DIR, entry.name),
+              internalRefs,
             });
           }
         } catch {
@@ -309,16 +394,30 @@ async function main(): Promise<void> {
   }
   console.log("─".repeat(80) + "\n");
 
-  const toPublish = decisions.filter((d) => d.shouldPublish);
+  const toPublish = sortDecisionsTopologically(decisions.filter((d) => d.shouldPublish));
 
   if (toPublish.length === 0) {
-    console.log(`${colors.green}✅ All packages are up to date with the npm registry. Nothing to publish.${colors.reset}\n`);
+    console.log(`${colors.green}All packages are up to date with the npm registry. Nothing to publish.${colors.reset}\n`);
     process.exit(0);
+  }
+
+  for (const item of toPublish) {
+    const violations = validatePublishableManifest(item.meta.path);
+    if (violations.length > 0) {
+      console.error(
+        `\n${colors.red}Manifest validation failed for ${item.meta.name}:${colors.reset}\n` +
+          violations.map((v) => `  - Disallowed workspace protocol in publishable manifest: ${v}`).join("\n") +
+          `\nMove local workspace references to devDependencies and declare semver ranges in peerDependencies.\n`
+      );
+      process.exit(1);
+    }
   }
 
   if (isDryRun) {
     console.log(
-      `${colors.yellow}${colors.bold}🔍 Dry-run complete!${colors.reset} ${toPublish.length} package(s) would be published if run live.\n`
+      `${colors.yellow}${colors.bold}Dry-run complete!${colors.reset} ${toPublish.length} package(s) validated in topological publish order:\n` +
+        toPublish.map((d, idx) => `  ${idx + 1}. ${d.meta.name}@${d.meta.version}`).join("\n") +
+        "\n"
     );
     process.exit(0);
   }
@@ -348,21 +447,60 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    // Step 2: Publish package to npm
-    console.log(`\n${colors.green}📤 Publishing ${meta.name}@${meta.version} to npm...${colors.reset}`);
-    const publishArgs = ["publish", "--access", "public"];
-    const isCI = Boolean(process.env.CI);
-    const noProvenance = Boolean(process.env.NO_PROVENANCE);
+    // Step 2: Pack tarball via Bun (resolves any workspace protocol safely) and publish via npm
+    console.log(`\n${colors.green}Packing and publishing ${meta.name}@${meta.version} to npm...${colors.reset}`);
+    const packTempDir = mkdtempSync(join(tmpdir(), "masumdev-pack-"));
+    let publishSuccess = false;
+    try {
+      const packEnv = {
+        ...process.env,
+        PATH: `${join(process.env.HOME || "", ".bun/bin")}:${join(process.cwd(), "node_modules/.bin")}:${process.env.PATH}`,
+      };
+      const packResult = spawnSync("bun", ["pm", "pack", "--destination", packTempDir, "--quiet"], {
+        cwd: meta.path,
+        encoding: "utf-8",
+        env: packEnv,
+      });
+      if (packResult.status !== 0) {
+        console.error(`\n${colors.red}bun pm pack failed for ${meta.name}!${colors.reset}\n${packResult.stderr || ""}`);
+        process.exit(1);
+      }
 
-    if (isCI && !noProvenance) {
-      publishArgs.push("--provenance");
+      const tgzName = readdirSync(packTempDir).find((f) => f.endsWith(".tgz"));
+      if (!tgzName) {
+        console.error(`\n${colors.red}No tarball generated for ${meta.name} in ${packTempDir}!${colors.reset}\n`);
+        process.exit(1);
+      }
+      const tarballPath = join(packTempDir, tgzName);
+      const packedViolations = inspectPackedTarballManifest(tarballPath);
+      if (packedViolations.length > 0) {
+        console.error(
+          `\n${colors.red}Packed tarball manifest validation failed for ${meta.name}:${colors.reset}\n` +
+            packedViolations.map((v) => `  - ${v}`).join("\n") +
+            "\n"
+        );
+        process.exit(1);
+      }
+
+      const publishArgs = ["publish", `"${tarballPath}"`, "--access", "public"];
+      const isCI = Boolean(process.env.CI);
+      const noProvenance = Boolean(process.env.NO_PROVENANCE);
+
+      if (isCI && !noProvenance) {
+        publishArgs.push("--provenance");
+      }
+
+      publishSuccess = runCommand("npm", publishArgs, meta.path, extraEnv);
+    } finally {
+      rmSync(packTempDir, { recursive: true, force: true });
     }
 
-    const publishSuccess = runCommand("npm", publishArgs, meta.path, extraEnv);
     if (!publishSuccess) {
-      console.error(`\n${colors.red}❌ npm publish failed for ${meta.name}! Aborting pipeline.${colors.reset}\n`);
+      console.error(`\n${colors.red}npm publish failed for ${meta.name}! Aborting pipeline.${colors.reset}\n`);
       process.exit(1);
     }
+
+    const isCI = Boolean(process.env.CI);
 
     // Step 3: Git Tag & GitHub Release
     const tagName = `${meta.name}@${meta.version}`;

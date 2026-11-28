@@ -56,6 +56,26 @@ function getAvailablePackages(): Map<string, PackageMeta> {
   return pkgs;
 }
 
+function validatePublishableManifest(pkgPath: string): string[] {
+  const pkgJsonPath = join(pkgPath, "package.json");
+  const manifest = JSON.parse(readFileSync(pkgJsonPath, "utf-8")) as {
+    dependencies?: Record<string, string>;
+    peerDependencies?: Record<string, string>;
+    optionalDependencies?: Record<string, string>;
+  };
+  const violations: string[] = [];
+  for (const field of ["dependencies", "peerDependencies", "optionalDependencies"] as const) {
+    const map = manifest[field];
+    if (!map) continue;
+    for (const [depName, range] of Object.entries(map)) {
+      if (typeof range === "string" && range.startsWith("workspace:")) {
+        violations.push(`${field}.${depName} = "${range}"`);
+      }
+    }
+  }
+  return violations;
+}
+
 function runCommand(command: string, args: string[], cwd: string = process.cwd()): boolean {
   console.log(`${colors.dim}$ ${command} ${args.join(" ")}${colors.reset}`);
   const env = {
@@ -105,7 +125,17 @@ function main(): void {
     process.exit(1);
   }
 
-  console.log(`\n${colors.bold}🚀 Publishing ${colors.cyan}${pkgMeta.name}${colors.reset} (folder: ${pkgMeta.folder})...\n`);
+  const manifestViolations = validatePublishableManifest(pkgMeta.path);
+  if (manifestViolations.length > 0) {
+    console.error(
+      `\n${colors.red}Manifest validation failed for ${pkgMeta.name}:${colors.reset}\n` +
+        manifestViolations.map((v) => `  - Disallowed workspace protocol: ${v}`).join("\n") +
+        `\nMove workspace references to devDependencies and use semver ranges in peerDependencies.\n`
+    );
+    process.exit(1);
+  }
+
+  console.log(`\n${colors.bold}Publishing ${colors.cyan}${pkgMeta.name}${colors.reset} (folder: ${pkgMeta.folder})...\n`);
 
   // Step 1: Version bump (if specified)
   if (bumpArg) {
